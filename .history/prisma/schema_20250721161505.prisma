@@ -1,0 +1,63 @@
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum untuk Role Pengguna
+enum Role {
+  ADMIN
+  USER
+}
+
+// Model baru untuk Pengguna
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  role           Role     @default(USER)
+  
+  fingerprintId  String?  @unique // ID atau template sidik jari
+  cardUid        String?  @unique // UID dari kartu RFID/NFC
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Model yang sudah ada sebelumnya
+model DeviceExternal {
+  id             String                 @id @default(cuid())
+  uniqId         String                 @unique @default(cuid())
+  name           String
+  topic          String                 @unique
+  address        String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  loggingConfigs LoggingConfiguration[]
+}
+
+model LoggingConfiguration {
+  id           String         @id @default(cuid())
+  customName   String
+  key          String
+  units        String?
+  multiply     Float?         @default(1)
+  deviceUniqId String
+  device       DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([deviceUniqId, key])
+}
+
+model LoggedData {
+  id        String   @id @default(cuid())
+  configId  String
+  value     Float
+  timestamp DateTime @default(now())
+}

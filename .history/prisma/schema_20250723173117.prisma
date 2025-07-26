@@ -1,0 +1,154 @@
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  role           Role     @default(USER)
+  fingerprintId  String?  @unique
+  cardUid        String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model DeviceExternal {
+  id                         String                  @id @default(cuid())
+  uniqId                     String                  @unique @default(cuid())
+  name                       String
+  topic                      String                  @unique
+  address                    String?
+   // --- START NEW FIELDS ---
+  lastPayload           Json? @db.JsonB // Menyimpan seluruh payload JSON terakhir dari MQTT
+  lastUpdatedByMqtt     DateTime? // Kapan terakhir diupdate oleh MQTT
+  // --- END NEW FIELDS ---
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  loggingConfigs             LoggingConfiguration[]
+
+  sourceForBillConfigs       BillConfiguration[]     @relation("SourceDeviceForBill")
+  publishTargetForBillConfig BillConfiguration?      @relation("PublishTargetForBill")
+
+  // Relasi balik untuk PueApiTopic
+  pueApiTopicConfig          PueConfiguration?       @relation("PueApiTopic") // <-- PERBAIKAN: Tambahkan nama relasi
+
+  // --- NEW: Relasi balik untuk PowerAnalyzerApiTopic ---
+  powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic") // <--- TAMBAHKAN BARIS INI
+}
+
+model LoggingConfiguration {
+  id           String         @id @default(cuid())
+  customName   String
+  key          String
+  units        String?
+  multiply     Float?         @default(1)
+  deviceUniqId String
+  device       DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  @@unique([deviceUniqId, key])
+}
+
+model LoggedData {
+  id        String   @id @default(cuid())
+  configId  String
+  value     Float
+  timestamp DateTime @default(now())
+}
+
+model BillConfiguration {
+  id                        String         @id @default(cuid())
+  customName                String         @unique
+
+  sourceDeviceUniqId        String
+  sourceDevice              DeviceExternal @relation("SourceDeviceForBill", fields: [sourceDeviceUniqId], references: [uniqId])
+  sourceDeviceKey           String
+
+  publishTargetDeviceUniqId String @unique // <-- PERBAIKAN: Tambahkan @unique
+  publishTargetDevice       DeviceExternal @relation("PublishTargetForBill", fields: [publishTargetDeviceUniqId], references: [uniqId])
+
+  rupiahRatePerKwh          Float          @default(1467)
+  dollarRatePerKwh          Float          @default(0.1)
+
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
+  logs                      BillLog[]
+}
+
+model BillLog {
+  id             String            @id @default(cuid())
+  configId       String
+  config         BillConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  rawValue       Float
+  rupiahCost     Float
+  dollarCost     Float
+
+  timestamp      DateTime          @default(now())
+}
+
+model PueConfiguration {
+  id                   String   @id @default(cuid())
+  customName           String   @unique
+  type                 String   @default("pue")
+
+  apiTopicUniqId       String?  @unique
+  apiTopic             DeviceExternal? @relation("PueApiTopic", fields: [apiTopicUniqId], references: [uniqId])
+
+  pduList              Json? @db.JsonB
+  mainPower            Json? @db.JsonB
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+
+// --- NEW: Power Analyzer Configuration Model ---
+model PowerAnalyzerConfiguration {
+  id            String    @id @default(cuid())
+  customName    String    @unique // Nama yang diberikan user
+  type          String    @default("powerAnalyzer") // Tipe konfigurasi
+
+  // apiTopic: Ini adalah DeviceExternal yang akan mempublikasikan hasil Power Analyzer
+  apiTopicUniqId String?   @unique
+  apiTopic      DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
+
+  // listSensors: Daftar sensor/topic yang terlibat (mirip pduList di PUE)
+  // Akan disimpan sebagai JSONB karena strukturnya fleksibel
+  listSensors   Json?     @db.JsonB
+
+  // chartConfig: Konfigurasi spesifik untuk tampilan grafik
+  // Akan disimpan sebagai JSONB
+  chartConfig   Json?     @db.JsonB
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Log yang terkait dengan konfigurasi ini
+  logs          PowerAnalyzerLog[]
+}
+
+// --- NEW: Power Analyzer Log Model ---
+model PowerAnalyzerLog {
+  id            String    @id @default(cuid())
+  configId      String
+  config        PowerAnalyzerConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  // Value yang dilog (misalnya, total power, atau kumpulan nilai dari listSensors)
+  value         Float // Asumsi ini adalah satu nilai utama yang di-log
+  timestamp     DateTime  @default(now())
+}

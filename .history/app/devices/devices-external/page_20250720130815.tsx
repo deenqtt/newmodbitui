@@ -1,0 +1,403 @@
+"use client";
+
+import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2"; // Import SweetAlert2
+import { useConnectivity } from "@/hooks/useConnectivity";
+
+// --- Komponen UI & Ikon ---
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  HardDrive,
+  PlusCircle,
+  Database,
+  Wifi,
+  WifiOff,
+  FileDown,
+  FileUp,
+  Edit,
+  Trash2,
+  Loader2,
+  UploadCloud,
+} from "lucide-react";
+
+interface Device {
+  /* ... (interface sama seperti sebelumnya) ... */
+}
+
+export default function DevicesExternalPage() {
+  const { dbStatus, mqttStatus } = useConnectivity();
+  const router = useRouter();
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // State untuk berbagai dialog
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
+  const [currentDevice, setCurrentDevice] = useState<Device | null>(null);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [fileToImport, setFileToImport] = useState<File | null>(null);
+
+  // --- Fungsi-fungsi ---
+  const fetchDevices = async () => {
+    /* ... (sama seperti sebelumnya) ... */
+  };
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    /* ... (sama seperti sebelumnya, tapi gunakan Swal untuk notifikasi) ... */
+  };
+  const handleDelete = async () => {
+    /* ... (sama seperti sebelumnya, tapi gunakan Swal untuk notifikasi) ... */
+  };
+  const handleExport = () => {
+    /* ... (sama seperti sebelumnya) ... */
+  };
+
+  // Handler untuk impor data dari JSON
+  const handleImport = async () => {
+    if (!fileToImport) return;
+
+    Swal.fire({
+      title: "Mengimpor data...",
+      text: "Mohon tunggu sebentar.",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result;
+        const data = JSON.parse(content as string);
+        if (!Array.isArray(data))
+          throw new Error("File JSON harus berisi sebuah array.");
+
+        const response = await fetch("/api/devices/external", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(result.message || "Gagal mengimpor data.");
+
+        Swal.fire({
+          icon: "success",
+          title: "Impor Selesai!",
+          html: `
+            Dibuat: <b>${result.created}</b><br>
+            Diperbarui: <b>${result.updated}</b><br>
+            Dilewati: <b>${result.skipped}</b>
+          `,
+        });
+
+        fetchDevices(); // Refresh data
+        setIsImportModalOpen(false);
+        setFileToImport(null);
+      } catch (err: any) {
+        Swal.fire({ icon: "error", title: "Oops...", text: err.message });
+      }
+    };
+    reader.readAsText(fileToImport);
+  };
+  return (
+    <TooltipProvider>
+      {/* ===== HEADER ===== */}
+      <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mr-2 h-4" />
+        <div className="flex items-center gap-2">
+          <HardDrive className="h-5 w-5" />
+          <h1 className="text-lg font-semibold">External Devices</h1>
+        </div>
+
+        <div className="ml-auto flex items-center gap-4">
+          <Tooltip>
+            <TooltipTrigger>
+              <Database
+                className={`h-5 w-5 ${
+                  dbStatus === "connected" ? "text-green-500" : "text-red-500"
+                }`}
+              />
+            </TooltipTrigger>
+            <TooltipContent>Database: {dbStatus}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger>
+              {mqttStatus === "connected" ? (
+                <Wifi className="h-5 w-5 text-green-500" />
+              ) : (
+                <WifiOff className="h-5 w-5 text-red-500" />
+              )}
+            </TooltipTrigger>
+            <TooltipContent>MQTT: {mqttStatus}</TooltipContent>
+          </Tooltip>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={devices.length === 0}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => importFileRef.current?.click()}
+          >
+            <FileUp className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <input
+            type="file"
+            ref={importFileRef}
+            onChange={handleImport}
+            className="hidden"
+            accept=".json"
+          />
+
+          <Button onClick={() => handleOpenForm("add")}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Tambah Device
+          </Button>
+        </div>
+      </header>
+
+      {/* ===== KONTEN UTAMA HALAMAN ===== */}
+      <main className="p-6">
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama Device</TableHead>
+                <TableHead>Topic</TableHead>
+                <TableHead>Unique ID</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center h-24">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : devices.length > 0 ? (
+                devices.map((device) => (
+                  <TableRow key={device.id}>
+                    <TableCell className="font-medium">{device.name}</TableCell>
+                    <TableCell>{device.topic}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {device.uniqId}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenForm("edit", device)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setDeviceToDelete(device);
+                          setIsDeleteAlertOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center h-24">
+                    Belum ada data.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </main>
+
+      {/* ===== DIALOG UNTUK ADD/EDIT FORM ===== */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dialogMode === "edit" ? "Edit Device" : "Tambah Device Baru"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label htmlFor="name">Nama Device</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={currentDevice?.name}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="topic">Topic</Label>
+                <Input
+                  id="topic"
+                  name="topic"
+                  defaultValue={currentDevice?.topic}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="address">Address (Opsional)</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  defaultValue={currentDevice?.address ?? ""}
+                />
+              </div>
+              {dialogMode === "edit" && (
+                <div>
+                  <Label>Unique ID (Tidak bisa diubah)</Label>
+                  <Input value={currentDevice?.uniqId} disabled />
+                </div>
+              )}
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <DialogFooter>
+              <Button type="submit">Simpan</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== ALERT DIALOG UNTUK KONFIRMASI HAPUS ===== */}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anda Yakin?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            Aksi ini tidak dapat dibatalkan. Ini akan menghapus device "
+            {deviceToDelete?.name}" secara permanen.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* ===== MODAL BARU UNTUK IMPORT ===== */}
+      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Devices dari JSON</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Pilih file JSON yang berisi array data device. Sistem akan secara
+              otomatis memperbarui data jika `uniqId` sudah ada, atau membuat
+              data baru jika belum ada.
+            </p>
+            <div className="flex items-center justify-center w-full">
+              <label
+                htmlFor="dropzone-file"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    <span className="font-semibold">Klik untuk unggah</span>{" "}
+                    atau seret file
+                  </p>
+                  {fileToImport && (
+                    <p className="text-xs text-foreground font-semibold">
+                      {fileToImport.name}
+                    </p>
+                  )}
+                </div>
+                <input
+                  id="dropzone-file"
+                  type="file"
+                  className="hidden"
+                  accept=".json"
+                  onChange={(e) => setFileToImport(e.target.files?.[0] || null)}
+                />
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleImport} disabled={!fileToImport}>
+              <FileUp className="mr-2 h-4 w-4" />
+              Mulai Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
+  );
+}

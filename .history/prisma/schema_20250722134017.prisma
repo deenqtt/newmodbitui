@@ -1,0 +1,101 @@
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ... (Model User, Role, dll. yang sudah ada)
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  role           Role     @default(USER)
+  fingerprintId  String?  @unique
+  cardUid        String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model DeviceExternal {
+  id                      String                  @id @default(cuid())
+  uniqId                  String                  @unique @default(cuid())
+  name                    String
+  topic                   String                  @unique
+  address                 String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  loggingConfigs          LoggingConfiguration[]
+  
+  // Relasi baru untuk menandai perangkat ini sebagai sumber data untuk Bill Calculation
+  sourceForBillConfigs    BillConfiguration[]     @relation("SourceDeviceForBill")
+  // Relasi baru untuk menandai perangkat ini sebagai tujuan publish dari Bill Calculation
+  publishTargetForBillConfig BillConfiguration?   @relation("PublishTargetForBill")
+}
+
+model LoggingConfiguration {
+  id           String         @id @default(cuid())
+  customName   String
+  key          String
+  units        String?
+  multiply     Float?         @default(1)
+  deviceUniqId String
+  device       DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  @@unique([deviceUniqId, key])
+}
+
+model LoggedData {
+  id        String   @id @default(cuid())
+  configId  String
+  value     Float
+  timestamp DateTime @default(now())
+}
+
+// --- MODEL BARU UNTUK BILL CALCULATION ---
+
+
+model BillConfiguration {
+  id                  String   @id @default(cuid())
+  customName          String   @unique
+  
+  // Menggunakan uniqId untuk relasi ke perangkat sumber
+  sourceDeviceUniqId  String
+  sourceDevice        DeviceExternal @relation("SourceDeviceForBill", fields: [sourceDeviceUniqId], references: [uniqId])
+  sourceDeviceKey     String
+
+  // Menggunakan uniqId untuk relasi ke perangkat "virtual"
+  publishTargetDeviceUniqId String   @unique
+  publishTargetDevice       DeviceExternal @relation("PublishTargetForBill", fields: [publishTargetDeviceUniqId], references: [uniqId])
+
+  rupiahRatePerKwh    Float    @default(1467)
+  dollarRatePerKwh    Float    @default(0.1)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  logs                BillLog[]
+}
+
+model BillLog {
+  id             String   @id @default(cuid())
+  configId       String
+  config         BillConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+  
+  rawValue       Float
+  rupiahCost     Float
+  dollarCost     Float
+
+  timestamp      DateTime @default(now())
+}

@@ -1,0 +1,21 @@
+// 1. Konfigurasi Prisma Client
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 2. Koneksi ke Database Anda
+datasource db {
+  provider = "postgresql" // Ganti jika Anda pakai MySQL, dll.
+  url      = env("DATABASE_URL")
+}
+
+// 3. Model Data / Cetak Biru Tabel
+model DeviceExternal {
+  id        String   @id @default(cuid())
+  uniqId    String   @unique @default(cuid())
+  name      String
+  topic     String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
