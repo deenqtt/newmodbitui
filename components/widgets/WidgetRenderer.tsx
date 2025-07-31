@@ -1,0 +1,104 @@
+// File: components/widgets/WidgetRenderer.tsx
+"use client";
+
+import { SingleValueCardWidget } from "./SingleValueCard/SingleValueCardWidget";
+import { IconStatusCardWidget } from "./IconStatusCard/IconStatusCardWidget";
+import { GroupedIconStatusWidget } from "./GroupedIconStatus/GroupedIconStatusWidget";
+import { AnalogueGaugeWidget } from "./AnalogueGauge/AnalogueGaugeWidget";
+import { TemperatureIndicatorBarWidget } from "./TemperatureIndicatorBar/TemperatureIndicatorBarWidget";
+import { CalculatedParameterWidget } from "./CalculatedParameter/CalculatedParameterWidget";
+import { RunningHoursLogWidget } from "./RunningHoursLog/RunningHoursLogWidget";
+import { EnergyUsageWidget } from "./EnergyUsage/EnergyUsageWidget";
+import { EnergyTargetGapWidget } from "./EnergyTargetGap/EnergyTargetGapWidget";
+import { BreakerStatusWidget } from "./BreakerStatus/BreakerStatusWidget";
+import { MultiProtocolMonitorWidget } from "./MultiProtocolMonitor/MultiProtocolMonitorWidget";
+import { ChartLineWidget } from "./ChartLine/ChartLineWidget";
+import { ChartBarWidget } from "./ChartBar/ChartBarWidget";
+import { MultiSeriesChartWidget } from "./MultiSeriesChart/MultiSeriesChartWidget";
+import { BasicTrendChartWidget } from "./BasicTrendChart/BasicTrendChartWidget";
+import { PowerAnalyzerChartWidget } from "./PowerAnalyzerChart/PowerAnalyzerChartWidget";
+import { EnergyTargetChartWidget } from "./EnergyTargetChart/EnergyTargetChartWidget";
+import { PowerGenerateChartWidget } from "./PowerGenerateChart/PowerGenerateChartWidget";
+
+// Di masa depan, Anda akan mengimpor komponen widget lain di sini
+
+interface Props {
+  item: {
+    i: string;
+    widgetType: string;
+    config: any;
+  };
+}
+
+export const WidgetRenderer = ({ item }: Props) => {
+  if (!item || !item.widgetType) {
+    return (
+      <div className="p-4 text-center text-destructive">
+        Error: Widget data is missing or invalid.
+      </div>
+    );
+  }
+
+  const { widgetType, config } = item;
+
+  // Pastikan config ada sebelum merender
+  if (!config) {
+    return <div className="p-4 text-center">Please configure this widget.</div>;
+  }
+
+  switch (widgetType) {
+    case "Single Value Card":
+      return <SingleValueCardWidget config={config} />;
+
+    case "Icon Status Card":
+      return <IconStatusCardWidget config={config} />;
+
+    case "Grouped Icon Status":
+      return <GroupedIconStatusWidget config={config} />;
+
+    case "Analogue gauges":
+      return <AnalogueGaugeWidget config={config} />;
+
+    case "Temperature Indicator Bar":
+      return <TemperatureIndicatorBarWidget config={config} />;
+
+    case "Calculated Parameter Card":
+      return <CalculatedParameterWidget config={config} />;
+
+    case "Running Hours Log":
+      return <RunningHoursLogWidget config={config} />;
+
+    case "Energy Usage – Last Month":
+      return <EnergyUsageWidget config={config} />;
+    case "Energy Usage – Current Month":
+      return <EnergyUsageWidget config={config} />;
+    case "Energy Target Gap":
+      return <EnergyTargetGapWidget config={config} />;
+    case "Breaker Status":
+      return <BreakerStatusWidget config={config} />;
+    case "Multi-Protocol Monitor":
+      return <MultiProtocolMonitorWidget config={config} />;
+    case "Chart Line":
+      return <ChartLineWidget config={config} />;
+    case "Chart Bar":
+      return <ChartBarWidget config={config} />;
+
+    case "Multi-Series Chart":
+      return <MultiSeriesChartWidget config={config} />;
+    case "Basic Trend Chart":
+      return <BasicTrendChartWidget config={config} />;
+
+    case "Power Analyzer Chart":
+      return <PowerAnalyzerChartWidget config={config} />;
+    case "Energy Target Chart":
+      return <EnergyTargetChartWidget config={config} />;
+    case "Power Generate Chart":
+      return <PowerGenerateChartWidget config={config} />;
+    default:
+      return (
+        <div className="p-4 text-center italic text-muted-foreground">
+          Widget type "{widgetType}" is not implemented yet.
+        </div>
+      );
+  }
+};

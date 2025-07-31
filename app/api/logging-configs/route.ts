@@ -1,14 +1,20 @@
 // File: app/api/logging-configs/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+// --- PERBAIKAN: Impor prisma dari lib, jangan buat baru ---
+import { prisma } from "@/lib/prisma";
 
 // FUNGSI GET: Mengambil semua konfigurasi logging
 export async function GET() {
   try {
     const configs = await prisma.loggingConfiguration.findMany({
-      orderBy: { createdAt: "asc" },
-      include: { device: true }, // Sertakan data device terkait
+      orderBy: { customName: "asc" }, // Urutkan berdasarkan nama agar mudah dibaca
+      include: {
+        device: {
+          select: {
+            name: true, // Hanya ambil nama device agar payload lebih ringan
+          },
+        },
+      },
     });
 
     return NextResponse.json(configs);

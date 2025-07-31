@@ -20,63 +20,108 @@ class AlarmMonitorService {
   private mqttClient: mqtt.MqttClient | null = null;
   private alarmConfigs: Map<string, FullAlarmConfig[]> = new Map();
   private alarmStates: Map<string, { active: boolean | boolean[] }> = new Map();
+  private subscribedTopics: Set<string> = new Set();
 
   constructor() {
     this.prisma = new PrismaClient();
   }
 
   public async start() {
-    console.log("✅ [ALARM SERVICE] Starting Alarm Monitor Service...");
-    const topics = await this.loadAlarmConfigurations();
-    this.connectToMqtt(topics);
+    this.connectToMqtt();
+    await this.refreshConfigurations();
+
+    if ((global as any).alarmMonitorInterval) {
+      clearInterval((global as any).alarmMonitorInterval);
+    }
+    (global as any).alarmMonitorInterval = setInterval(
+      () => this.refreshConfigurations(),
+      15 * 1000
+    );
   }
 
-  private async loadAlarmConfigurations(): Promise<string[]> {
-    console.log("[ALARM SERVICE] 1. Memuat konfigurasi alarm dari database...");
+  public async refreshConfigurations() {
     const configsFromDb = await this.prisma.alarmConfiguration.findMany({
       include: { device: true, bits: true },
     });
 
-    this.alarmConfigs.clear();
-    const topics = new Set<string>();
+    const newAlarmConfigs = new Map<string, FullAlarmConfig[]>();
+    const newTopics = new Set<string>();
 
     for (const config of configsFromDb) {
       if (config.device?.topic) {
         const topic = config.device.topic;
-        topics.add(topic);
-        if (!this.alarmConfigs.has(topic)) {
-          this.alarmConfigs.set(topic, []);
+        newTopics.add(topic);
+        if (!newAlarmConfigs.has(topic)) {
+          newAlarmConfigs.set(topic, []);
         }
-        this.alarmConfigs.get(topic)?.push(config as FullAlarmConfig);
+        newAlarmConfigs.get(topic)?.push(config as FullAlarmConfig);
       }
     }
 
+    this.alarmConfigs = newAlarmConfigs;
     console.log(
-      `[ALARM SERVICE] 2. Selesai memuat ${configsFromDb.length} aturan alarm untuk ${topics.size} topik.`
+      `[ALARM SERVICE] Load complete: ${configsFromDb.length} rules for ${newTopics.size} topics.`
     );
-    return Array.from(topics);
-  }
 
-  private connectToMqtt(topics: string[]) {
-    const brokerUrl = `mqtt://${process.env.MQTT_BROKER_ADDRESS}:${process.env.MQTT_BROKER_PORT}`;
-    this.mqttClient = mqtt.connect(brokerUrl);
-
-    this.mqttClient.on("connect", () => {
-      console.log(
-        `[ALARM SERVICE] 3. Terhubung ke Broker MQTT di ${brokerUrl}`
+    if (this.mqttClient?.connected) {
+      const topicsToUnsubscribe = [...this.subscribedTopics].filter(
+        (t) => !newTopics.has(t)
       );
-      if (topics.length > 0) {
-        this.mqttClient?.subscribe(topics, (err) => {
+      const topicsToSubscribe = [...newTopics].filter(
+        (t) => !this.subscribedTopics.has(t)
+      );
+
+      if (topicsToUnsubscribe.length > 0) {
+        this.mqttClient.unsubscribe(topicsToUnsubscribe, (err) => {
           if (!err) {
             console.log(
-              `[ALARM SERVICE] 4. Berhasil subscribe ke topik: [${topics.join(
+              `[ALARM SERVICE] Unsubscribed from old topics: [${topicsToUnsubscribe.join(
                 ", "
               )}]`
             );
-          } else {
-            console.error("[ALARM SERVICE] Gagal subscribe ke topik:", err);
           }
         });
+      }
+
+      if (topicsToSubscribe.length > 0) {
+        this.mqttClient.subscribe(topicsToSubscribe, (err) => {
+          if (!err) {
+            console.log(
+              `[ALARM SERVICE] Subscribed to new topics: [${topicsToSubscribe.join(
+                ", "
+              )}]`
+            );
+          }
+        });
+      }
+    }
+
+    this.subscribedTopics = newTopics;
+  }
+
+  private connectToMqtt() {
+    if ((global as any).mqttClient) {
+      (global as any).mqttClient.end(true);
+    }
+
+    const brokerHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+    const brokerPort = 1883;
+    const brokerUrl = `mqtt://${brokerHost}:${brokerPort}`;
+
+    const options = {
+      protocolVersion: 4,
+      clientId: `alarm-monitor-service-${Math.random()
+        .toString(16)
+        .slice(2, 10)}`,
+    };
+
+    this.mqttClient = mqtt.connect(brokerUrl, options);
+
+    (global as any).mqttClient = this.mqttClient;
+
+    this.mqttClient.on("connect", () => {
+      if (this.subscribedTopics.size > 0) {
+        this.mqttClient?.subscribe(Array.from(this.subscribedTopics));
       }
     });
 
@@ -90,14 +135,8 @@ class AlarmMonitorService {
   }
 
   private handleMessage(topic: string, payloadStr: string) {
-    console.log(`\n[ALARM SERVICE] 5. Pesan diterima di topik [${topic}]`);
-    console.log(`   L-- Payload mentah: ${payloadStr}`);
-
     const configs = this.alarmConfigs.get(topic);
     if (!configs) {
-      console.warn(
-        `   L-- Peringatan: Tidak ada konfigurasi alarm untuk topik ini.`
-      );
       return;
     }
 
@@ -107,8 +146,6 @@ class AlarmMonitorService {
         typeof outerPayload.value === "string"
           ? JSON.parse(outerPayload.value)
           : outerPayload.value || outerPayload;
-
-      console.log(`   L-- Payload setelah di-parse:`, payload);
 
       for (const config of configs) {
         this.checkAlarm(config, payload);
@@ -122,7 +159,6 @@ class AlarmMonitorService {
   }
 
   private checkAlarm(config: FullAlarmConfig, payload: any) {
-    console.log(`   L-- 6. Mengecek aturan: "${config.customName}"`);
     const value = payload[config.key];
     if (value === undefined) {
       console.warn(
@@ -130,7 +166,6 @@ class AlarmMonitorService {
       );
       return;
     }
-    console.log(`       L-- Nilai dari key "${config.key}" adalah: ${value}`);
 
     switch (config.keyType) {
       case "THRESHOLD":
@@ -152,23 +187,20 @@ class AlarmMonitorService {
     let isActive = false;
     if (config.maxOnly) {
       isActive = value > (config.maxValue ?? Infinity);
-      console.log(
-        `       L-- [THRESHOLD] Pengecekan MaxOnly: (${value} > ${config.maxValue}) -> ${isActive}`
-      );
     } else {
       isActive =
         value < (config.minValue ?? -Infinity) ||
         value > (config.maxValue ?? Infinity);
-      console.log(
-        `       L-- [THRESHOLD] Pengecekan Min/Max: (${value} < ${config.minValue} || ${value} > ${config.maxValue}) -> ${isActive}`
-      );
     }
+
+    this.alarmStates.set(config.id, { active: isActive });
+
     if (isActive !== prevState) {
-      console.log(
-        `       L-- STATUS BERUBAH! Sebelumnya: ${prevState}, Sekarang: ${isActive}`
-      );
-      this.alarmStates.set(config.id, { active: isActive });
-      this.logAlarmEvent(config, isActive, value);
+      if (isActive) {
+        this.logAlarmEvent(config, true, value);
+      } else if (prevState === true) {
+        this.logAlarmEvent(config, false, value);
+      }
     }
   }
 
@@ -177,15 +209,15 @@ class AlarmMonitorService {
       | boolean
       | undefined;
     const isActive = value === true || value === 1;
-    console.log(
-      `       L-- [DIRECT] Pengecekan: (${value} === true || ${value} === 1) -> ${isActive}`
-    );
+
+    this.alarmStates.set(config.id, { active: isActive });
+
     if (isActive !== prevState) {
-      console.log(
-        `       L-- STATUS BERUBAH! Sebelumnya: ${prevState}, Sekarang: ${isActive}`
-      );
-      this.alarmStates.set(config.id, { active: isActive });
-      this.logAlarmEvent(config, isActive, value);
+      if (isActive) {
+        this.logAlarmEvent(config, true, value);
+      } else if (prevState === true) {
+        this.logAlarmEvent(config, false, value);
+      }
     }
   }
 
@@ -194,19 +226,18 @@ class AlarmMonitorService {
     const prevState =
       (this.alarmStates.get(config.id)?.active as boolean[] | undefined) || [];
     const newActiveState: boolean[] = [];
-    console.log(`       L-- [BIT_VALUE] Mengecek nilai integer: ${value}`);
+
     for (const bitConfig of config.bits) {
       const bitPosition = bitConfig.bitPosition;
       const isBitActive = ((value >> bitPosition) & 1) === 1;
       newActiveState[bitPosition] = isBitActive;
-      console.log(
-        `           L-- Bit Posisi ${bitPosition} ("${bitConfig.customName}"): Status -> ${isBitActive}`
-      );
+
       if (isBitActive !== prevState[bitPosition]) {
-        console.log(
-          `           L-- STATUS BIT BERUBAH! Sebelumnya: ${prevState[bitPosition]}, Sekarang: ${isBitActive}`
-        );
-        this.logAlarmEvent(config, isBitActive, value, bitConfig);
+        if (isBitActive) {
+          this.logAlarmEvent(config, true, value, bitConfig);
+        } else if (prevState[bitPosition] === true) {
+          this.logAlarmEvent(config, false, value, bitConfig);
+        }
       }
     }
     this.alarmStates.set(config.id, { active: newActiveState });
@@ -220,16 +251,17 @@ class AlarmMonitorService {
   ) {
     const alarmName = bitConfig ? bitConfig.customName : config.customName;
     const status = isActive ? AlarmLogStatus.ACTIVE : AlarmLogStatus.CLEARED;
-    console.log(
-      `[ALARM EVENT] 7. Mencatat ke DB: Alarm: "${alarmName}", Status: ${status}, Value: ${value}`
-    );
+    // Buat pesan notifikasi yang deskriptif
+    const notificationMessage = `Alarm "${alarmName}" ${status} with value: ${value}`;
     try {
+      // Blok kode 'if (isActive) { ... } else { ... }' untuk mencatat AlarmLog
       if (isActive) {
         await this.prisma.alarmLog.create({
           data: {
             alarmConfigId: config.id,
             status: AlarmLogStatus.ACTIVE,
             triggeringValue: String(value),
+            ...(bitConfig && { alarmBitConfigId: bitConfig.id }),
           },
         });
       } else {
@@ -237,10 +269,11 @@ class AlarmMonitorService {
           where: {
             alarmConfigId: config.id,
             status: AlarmLogStatus.ACTIVE,
-            AND: { alarmConfig: { customName: alarmName } },
+            ...(bitConfig ? { alarmBitConfigId: bitConfig.id } : {}),
           },
           orderBy: { timestamp: "desc" },
         });
+
         if (lastActiveLog) {
           await this.prisma.alarmLog.update({
             where: { id: lastActiveLog.id },
@@ -248,21 +281,37 @@ class AlarmMonitorService {
           });
         }
       }
-      console.log(`   L-- Berhasil mencatat ke database.`);
+
+      const allUsers = await this.prisma.user.findMany({
+        select: { id: true },
+      });
+
+      if (allUsers.length > 0) {
+        await this.prisma.notification.createMany({
+          data: allUsers.map((user) => ({
+            userId: user.id,
+            message: notificationMessage, // Gunakan pesan yang sudah kita buat
+          })),
+        });
+      }
+      // --- AKHIR LOGIKA BARU ---
     } catch (error) {
       console.error(
-        `[ALARM EVENT] Gagal mencatat log untuk "${alarmName}":`,
+        `[ALARM EVENT] Gagal mencatat log atau notifikasi untuk "${alarmName}":`,
         error
       );
     }
   }
 }
 
-let serviceInstance: AlarmMonitorService | null = null;
-export function getAlarmMonitorService() {
-  if (!serviceInstance) {
-    serviceInstance = new AlarmMonitorService();
-    serviceInstance.start();
+const alarmMonitorServiceInstance = new AlarmMonitorService();
+
+let isServiceStarted = false;
+
+export const getAlarmMonitorService = () => {
+  if (!isServiceStarted) {
+    alarmMonitorServiceInstance.start();
+    isServiceStarted = true;
   }
-  return serviceInstance;
-}
+  return alarmMonitorServiceInstance;
+};

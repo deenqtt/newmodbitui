@@ -1,21 +1,24 @@
 // File: app/api/users/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from "@prisma/client";
+// Hapus impor PrismaClient, kita tidak butuh itu di sini
+import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-// Ganti helper lama dengan yang baru
 import { getAuthFromCookie } from "@/lib/auth";
 
-const prisma = new PrismaClient();
+// highlight-start
+// GANTI baris 'new PrismaClient()' DENGAN IMPORT DARI lib/prisma
+import { prisma } from "@/lib/prisma";
+// highlight-end
 
 // GET semua pengguna (hanya Admin)
 export async function GET(request: Request) {
-  // Gunakan helper baru yang async
   const auth = await getAuthFromCookie(request);
   console.log("Auth from cookie:", auth);
   if (!auth || auth.role !== Role.ADMIN) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
+  // Sekarang ini menggunakan koneksi yang sama dan efisien
   const users = await prisma.user.findMany({
     select: {
       id: true,
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    // Ini juga akan menggunakan koneksi yang efisien
     const newUser = await prisma.user.create({
       data: {
         email,

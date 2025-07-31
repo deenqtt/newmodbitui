@@ -3,7 +3,8 @@ import { PrismaClient } from "@prisma/client";
 // --- PATH DIPERBAIKI ---
 // Keluar dari folder 'lib' (..) lalu masuk ke folder 'services'
 import { getAlarmMonitorService } from "./services/alarm-monitor";
-// import { getCalculationService } from "../services/calculation-service"; // <-- Dinonaktifkan sementara
+import { getZkTecoService } from "./services/zkteco-service"; // <-- 1. TAMBAHKAN IMPORT INI
+import { getCalculationService } from "./services/calculation-service"; // <-- 1. TAMBAHKAN IMPORT INI
 
 // Deklarasikan variabel global untuk menyimpan instance prisma
 declare global {
@@ -26,12 +27,14 @@ if (typeof window === "undefined") {
   if (process.env.NODE_ENV === "production") {
     // Di production, jalankan service sekali saja
     getAlarmMonitorService();
-    // getCalculationService(); // <-- Dinonaktifkan sementara
+    getCalculationService();
+    getZkTecoService();
   } else {
     // Di development, pastikan service hanya dibuat sekali untuk menghindari duplikasi saat hot-reload
     if (!(global as any).servicesStarted) {
       getAlarmMonitorService();
-      // getCalculationService(); // <-- Dinonaktifkan sementara
+      getCalculationService();
+      getZkTecoService();
       (global as any).servicesStarted = true;
     }
   }

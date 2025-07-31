@@ -7,6 +7,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 
+// --- 1. IMPORT MQTT PROVIDER ---
+import { MqttProvider } from "@/contexts/MqttContext";
+
 // Impor komponen UI yang dibutuhkan
 import {
   DropdownMenu,
@@ -20,8 +23,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LogOut, Loader2, Users } from "lucide-react";
 
+import { NotificationBell } from "@/components/notification-bell";
+
 // Helper untuk mengubah path URL menjadi judul yang rapi
-// Contoh: "/system-config/user-management" -> "System Config / User Management"
 function generateTitleFromPathname(pathname: string): string {
   if (pathname === "/") return "Main Dashboard";
   return pathname
@@ -82,15 +86,17 @@ function MainHeader() {
   return (
     <header className="flex h-16 items-center justify-between gap-4 border-b bg-white dark:bg-gray-950 px-4 md:px-6">
       <div className="flex items-center gap-4">
-        {/* Tombol trigger untuk desktop (collapse/expand) */}
         <SidebarTrigger className="hidden lg:flex" />
-        {/* Tombol trigger untuk mobile (hamburger) */}
         <SidebarTrigger className="lg:hidden" />
         <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
           {title}
         </h1>
       </div>
-      <UserNav />
+
+      <div className="flex items-center gap-2">
+        <NotificationBell />
+        <UserNav />
+      </div>
     </header>
   );
 }
@@ -107,8 +113,11 @@ export default function DashboardLayout({
         <AppSidebar />
         <div className="flex flex-col flex-1">
           <MainHeader />
-          {/* Konten halaman akan dirender di sini */}
-          {children}
+          {/* --- 2. BUNGKUS KONTEN DENGAN MQTT PROVIDER --- */}
+          <MqttProvider>
+            {/* Konten halaman akan dirender di sini */}
+            {children}
+          </MqttProvider>
         </div>
       </div>
     </SidebarProvider>

@@ -144,7 +144,7 @@ export async function PUT(
       );
     }
 
-    // --- NEW LOGIC: Update associated DeviceExternal if customName changes ---
+    // --- LOGIKA KUNCI: Update DeviceExternal jika customName berubah ---
     // 1. Ambil konfigurasi PUE yang sudah ada untuk mendapatkan apiTopicUniqId dan customName lama
     const oldPueConfig = await prisma.pueConfiguration.findUnique({
       where: { id },
@@ -158,7 +158,7 @@ export async function PUT(
       );
     }
 
-    // Jika customName berubah DAN ada apiTopicUniqId yang terkait
+    // 2. Jika customName berubah DAN ada apiTopicUniqId yang terkait
     if (oldPueConfig.customName !== customName && oldPueConfig.apiTopicUniqId) {
       const sanitizedCustomName = customName.replace(/\s+/g, "_");
       const newTopic = `IOT/PUE/${sanitizedCustomName}`;
@@ -183,7 +183,7 @@ export async function PUT(
           );
         }
 
-        // Update DeviceExternal yang terkait
+        // 3. Update DeviceExternal yang terkait
         await prisma.deviceExternal.update({
           where: { uniqId: oldPueConfig.apiTopicUniqId },
           data: {
@@ -208,7 +208,7 @@ export async function PUT(
         );
       }
     }
-    // --- END NEW LOGIC ---
+    // --- END LOGIC ---
 
     const updatedPueConfig = await prisma.pueConfiguration.update({
       where: { id },
@@ -231,7 +231,7 @@ export async function PUT(
 }
 
 /**
- * FUNGSI DELETE: Menghapus konfigurasi PUE.
+ * FUNGSI DELETE: Menghapus konfigurasi PUE dan DeviceExternal terkait.
  */
 export async function DELETE(
   request: NextRequest,
@@ -245,7 +245,7 @@ export async function DELETE(
   const { id } = params;
 
   try {
-    // Ambil apiTopicUniqId sebelum menghapus
+    // Ambil apiTopicUniqId sebelum menghapus untuk menghapus DeviceExternal terkait
     const pueConfig = await prisma.pueConfiguration.findUnique({
       where: { id },
       select: { apiTopicUniqId: true },
@@ -258,12 +258,12 @@ export async function DELETE(
       );
     }
 
-    // Hapus konfigurasi PUE
+    // Hapus konfigurasi PUE. Prisma akan menangani penghapusan kaskade jika diatur di schema.
     await prisma.pueConfiguration.delete({
       where: { id },
     });
 
-    // Jika ada apiTopicUniqId, hapus juga DeviceExternal yang terkait
+    // Jika ada apiTopicUniqId, hapus juga DeviceExternal yang terkait secara eksplisit
     if (pueConfig.apiTopicUniqId) {
       await prisma.deviceExternal.delete({
         where: { uniqId: pueConfig.apiTopicUniqId },
@@ -272,10 +272,21 @@ export async function DELETE(
     triggerMqttServiceUpdate(); // <-- PANGGIL SETELAH DELETE BERHASIL
 
     return NextResponse.json({
-      message: "PUE configuration deleted successfully",
+      message: "PUE configuration and associated device deleted successfully",
     });
   } catch (error: any) {
     console.error(`Error deleting PUE configuration with ID ${id}:`, error);
+    // Handle kasus jika device tidak bisa dihapus karena relasi lain
+    if (error.code === "P2014") {
+      // Kode error Prisma untuk konflik relasi
+      return NextResponse.json(
+        {
+          message:
+            "Could not delete associated device. It might be in use by another configuration.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { message: "Failed to delete PUE configuration.", error: error.message },
       { status: 500 }
