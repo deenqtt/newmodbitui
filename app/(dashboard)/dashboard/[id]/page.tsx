@@ -50,6 +50,15 @@ import { BasicTrendChartConfigModal } from "@/components/widgets/BasicTrendChart
 import { PowerAnalyzerChartConfigModal } from "@/components/widgets/PowerAnalyzerChart/PowerAnalyzerChartConfigModal";
 import { EnergyTargetChartConfigModal } from "@/components/widgets/EnergyTargetChart/EnergyTargetChartConfigModal";
 import { PowerGenerateChartConfigModal } from "@/components/widgets/PowerGenerateChart/PowerGenerateChartConfigModal";
+import { ButtonControlModbusConfigModal } from "@/components/widgets/ButtonControlModbus/ButtonControlModbusConfigModal";
+import { ButtonControlModularConfigModal } from "@/components/widgets/ButtonControlModular/ButtonControlModularConfigModal";
+import { AlarmLogListConfigModal } from "@/components/widgets/AlarmLogList/AlarmLogListConfigModal";
+import { AlarmSummaryConfigModal } from "@/components/widgets/AlarmSummary/AlarmSummaryConfigModal";
+import { DashboardShortcutConfigModal } from "@/components/widgets/DashboardShortcut/DashboardShortcutConfigModal";
+import { CameraSnapshotConfigModal } from "@/components/widgets/CameraSnapshot/CameraSnapshotConfigModal";
+import { SldContainerConfigModal } from "@/components/widgets/SldContainer/SldContainerConfigModal";
+import { AccessControllerStatusConfigModal } from "@/components/widgets/AccessControllerStatus/AccessControllerStatusConfigModal"; // <-- IMPORT BARU
+import { LockAccessControlConfigModal } from "@/components/widgets/LockAccessControl/LockAccessControlConfigModal";
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -175,6 +184,15 @@ export default function DashboardEditorPage({
           "Power Analyzer Chart",
           "Energy Target Chart",
           "Power Generate Chart",
+          "Button Control Modbus",
+          "Button Control Modular",
+          "Alarm Log List",
+          "Alarm Summary",
+          "Dashboard Shortcut",
+          "Camera Last Snapshot",
+          "SLD Diagram – Container",
+          "Access Controller Status",
+          "Lock Access Control",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -192,18 +210,45 @@ export default function DashboardEditorPage({
   const handleSaveWidgetConfig = (configData: any) => {
     if (!configuringWidget) return;
 
+    // --- PERBAIKAN: Atur ukuran default dan minimal di sini ---
     let defaultWidth = 4;
-    let defaultHeight = 3;
+    let defaultHeight = 4;
+    let minW = 2;
+    let minH = 2;
 
-    if (configuringWidget.name === "Grouped Icon Status") {
-      defaultWidth = 5;
-      defaultHeight = 5;
-    } else if (configuringWidget.name === "Single Value Card") {
-      defaultWidth = 3;
-      defaultHeight = 3;
-    } else if (configuringWidget.name === "Analogue gauges") {
-      defaultWidth = 4;
-      defaultHeight = 4;
+    switch (configuringWidget.name) {
+      case "Access Controller Status":
+        defaultWidth = 4;
+        defaultHeight = 6;
+        minW = 3;
+        minH = 5;
+        break;
+      case "Single Value Card":
+        defaultWidth = 2;
+        defaultHeight = 2;
+        break;
+      case "Icon Status Card":
+        defaultWidth = 3;
+        defaultHeight = 2;
+        break;
+      case "Grouped Icon Status":
+        defaultWidth = 4;
+        defaultHeight = 5;
+        minW = 3;
+        minH = 4;
+        break;
+      case "Basic Trend Chart":
+        defaultWidth = 3;
+        defaultHeight = 3;
+        break;
+      // Chart besar bisa punya minimal lebih besar
+      case "Power Generate Chart":
+      case "Multi-Series Chart":
+        defaultWidth = 6;
+        defaultHeight = 5;
+        minW = 4;
+        minH = 4;
+        break;
     }
 
     const newItem: WidgetLayout = {
@@ -212,8 +257,8 @@ export default function DashboardEditorPage({
       y: Infinity,
       w: defaultWidth,
       h: defaultHeight,
-      minW: 3,
-      minH: 3,
+      minW: minW,
+      minH: minH,
       widgetType: configuringWidget.name,
       config: configData,
     };
@@ -410,6 +455,76 @@ export default function DashboardEditorPage({
       {isConfigModalOpen &&
         configuringWidget?.name === "Power Generate Chart" && (
           <PowerGenerateChartConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Button Control Modbus" && (
+          <ButtonControlModbusConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Button Control Modular" && (
+          <ButtonControlModularConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen && configuringWidget?.name === "Alarm Log List" && (
+        <AlarmLogListConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "Alarm Summary" && (
+        <AlarmSummaryConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Dashboard Shortcut" && (
+          <DashboardShortcutConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Camera Last Snapshot" && (
+          <CameraSnapshotConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "SLD Diagram – Container" && (
+          <SldContainerConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Access Controller Status" && (
+          <AccessControllerStatusConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Lock Access Control" && (
+          <LockAccessControlConfigModal
             isOpen={isConfigModalOpen}
             onClose={() => setIsConfigModalOpen(false)}
             onSave={handleSaveWidgetConfig}

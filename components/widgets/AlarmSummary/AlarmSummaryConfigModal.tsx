@@ -1,0 +1,72 @@
+// File: components/widgets/AlarmSummary/AlarmSummaryConfigModal.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Swal from "sweetalert2";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (config: any) => void;
+}
+
+export const AlarmSummaryConfigModal = ({ isOpen, onClose, onSave }: Props) => {
+  const [widgetTitle, setWidgetTitle] = useState("Active Alarms");
+
+  useEffect(() => {
+    if (isOpen) {
+      setWidgetTitle("Active Alarms");
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    if (!widgetTitle) {
+      Swal.fire("Incomplete", "Widget Title is required.", "warning");
+      return;
+    }
+    onSave({
+      widgetTitle,
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle className="text-xl">Configure Alarm Summary</DialogTitle>
+          <DialogDescription>
+            Set a title for the alarm summary widget.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-6 p-6">
+          <div className="grid gap-2">
+            <Label>Widget Title</Label>
+            <Input
+              value={widgetTitle}
+              onChange={(e) => setWidgetTitle(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter className="px-6 pb-6 sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSave}>
+            Save Widget
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

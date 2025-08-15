@@ -60,7 +60,7 @@ const defaultMenuConfig: MenuConfigData = {
       "Devices Internal": true,
       "Devices External": true,
       "Devices for Logging": true,
-      "Node Management": true,
+      "Access Controllers": true,
     },
   },
   SystemConfig: {
@@ -70,6 +70,14 @@ const defaultMenuConfig: MenuConfigData = {
       "Power Analyzer": true,
       "Menu Display": true,
       "System Backup": true,
+    },
+  },
+  LoRaWAN: {
+    enabled: true,
+    submenus: {
+      "Device List": true,
+      "Device Profiles": true,
+      Applications: true,
     },
   },
   SecurityAccess: {
@@ -109,6 +117,7 @@ const menuOrder = [
   "Monitoring",
   "Devices",
   "SystemConfig",
+  "LoRaWAN",
   "SecurityAccess",
   "Network",
   "Automation",
@@ -123,7 +132,10 @@ const iconMap: { [key: string]: React.ElementType } = {
   "Devices Internal": HardDrive,
   "Devices External": HardDrive,
   "Devices for Logging": HardDrive,
-  "Node Management": GitBranch,
+  "Access Controllers": Lock,
+  "Device List": ListTree,
+  "Device Profiles": Package,
+  Applications: GitBranch,
   "User Management": Users,
   "Power Analyzer": Power,
   "Menu Display": Menu,

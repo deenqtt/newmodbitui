@@ -33,7 +33,6 @@ class CalculationService {
   }
 
   public async start() {
-    console.log("✅ [CALC SERVICE] Starting Calculation Service...");
     this.connectToMqtt();
     await this.refreshConfigurations();
 
@@ -47,8 +46,6 @@ class CalculationService {
   }
 
   private async refreshConfigurations() {
-    console.log("[CALC SERVICE] Refreshing configurations...");
-
     const billConfigs = await this.prisma.billConfiguration.findMany({
       include: { publishTargetDevice: true },
     });
@@ -137,16 +134,8 @@ class CalculationService {
     ]);
 
     this.configs = allConfigs;
-    console.log(
-      `[CALC SERVICE] Load complete: ${this.configs.length} calculation rules found.`
-    );
 
     if (this.mqttClient?.connected && topicsToSubscribe.size > 0) {
-      console.log(
-        `[CALC SERVICE] Subscribing to topics: [${Array.from(
-          topicsToSubscribe
-        ).join(", ")}]`
-      );
       this.mqttClient.subscribe(Array.from(topicsToSubscribe));
     }
   }
@@ -230,10 +219,6 @@ class CalculationService {
       Timestamp: new Date().toISOString(),
     };
     this.mqttClient.publish(topic, JSON.stringify(finalPayload));
-    console.log(
-      `[CALC SERVICE] Published to ${topic}:`,
-      JSON.stringify(valuePayload)
-    );
   }
 
   private calculateAndPublishBill(

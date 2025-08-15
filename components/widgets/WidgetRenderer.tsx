@@ -19,7 +19,15 @@ import { BasicTrendChartWidget } from "./BasicTrendChart/BasicTrendChartWidget";
 import { PowerAnalyzerChartWidget } from "./PowerAnalyzerChart/PowerAnalyzerChartWidget";
 import { EnergyTargetChartWidget } from "./EnergyTargetChart/EnergyTargetChartWidget";
 import { PowerGenerateChartWidget } from "./PowerGenerateChart/PowerGenerateChartWidget";
-
+import { ButtonControlModbusWidget } from "./ButtonControlModbus/ButtonControlModbusWidget";
+import { ButtonControlModularWidget } from "./ButtonControlModular/ButtonControlModularWidget";
+import { AlarmLogListWidget } from "./AlarmLogList/AlarmLogListWidget";
+import { AlarmSummaryWidget } from "./AlarmSummary/AlarmSummaryWidget";
+import { DashboardShortcutWidget } from "./DashboardShortcut/DashboardShortcutWidget";
+import { CameraSnapshotWidget } from "./CameraSnapshot/CameraSnapshotWidget";
+import { SldContainerWidget } from "./SldContainer/SldContainerWidget";
+import { AccessControllerStatusWidget } from "./AccessControllerStatus/AccessControllerStatusWidget"; // <-- IMPORT BARU
+import { LockAccessControlWidget } from "./LockAccessControl/LockAccessControlWidget";
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 
 interface Props {
@@ -49,25 +57,18 @@ export const WidgetRenderer = ({ item }: Props) => {
   switch (widgetType) {
     case "Single Value Card":
       return <SingleValueCardWidget config={config} />;
-
     case "Icon Status Card":
       return <IconStatusCardWidget config={config} />;
-
     case "Grouped Icon Status":
       return <GroupedIconStatusWidget config={config} />;
-
     case "Analogue gauges":
       return <AnalogueGaugeWidget config={config} />;
-
     case "Temperature Indicator Bar":
       return <TemperatureIndicatorBarWidget config={config} />;
-
     case "Calculated Parameter Card":
       return <CalculatedParameterWidget config={config} />;
-
     case "Running Hours Log":
       return <RunningHoursLogWidget config={config} />;
-
     case "Energy Usage – Last Month":
       return <EnergyUsageWidget config={config} />;
     case "Energy Usage – Current Month":
@@ -82,18 +83,34 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <ChartLineWidget config={config} />;
     case "Chart Bar":
       return <ChartBarWidget config={config} />;
-
     case "Multi-Series Chart":
       return <MultiSeriesChartWidget config={config} />;
     case "Basic Trend Chart":
       return <BasicTrendChartWidget config={config} />;
-
     case "Power Analyzer Chart":
       return <PowerAnalyzerChartWidget config={config} />;
     case "Energy Target Chart":
       return <EnergyTargetChartWidget config={config} />;
     case "Power Generate Chart":
       return <PowerGenerateChartWidget config={config} />;
+    case "Button Control Modbus":
+      return <ButtonControlModbusWidget config={config} />;
+    case "Button Control Modular":
+      return <ButtonControlModularWidget config={config} />;
+    case "Alarm Log List":
+      return <AlarmLogListWidget config={config} />;
+    case "Alarm Summary":
+      return <AlarmSummaryWidget config={config} />;
+    case "Dashboard Shortcut":
+      return <DashboardShortcutWidget config={config} />;
+    case "Camera Last Snapshot":
+      return <CameraSnapshotWidget config={config} />;
+    case "SLD Diagram – Container":
+      return <SldContainerWidget config={config} />;
+    case "Access Controller Status":
+      return <AccessControllerStatusWidget config={config} />; // <-- CASE BARU
+    case "Lock Access Control":
+      return <LockAccessControlWidget config={config} />; // <-- CASE BARU
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

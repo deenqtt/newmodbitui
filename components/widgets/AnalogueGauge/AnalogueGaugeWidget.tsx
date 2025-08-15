@@ -1,7 +1,13 @@
 // File: components/widgets/AnalogueGauge/AnalogueGaugeWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useMqtt } from "@/contexts/MqttContext";
 import GaugeChart from "react-gauge-chart";
 import { Loader2, AlertTriangle } from "lucide-react";
@@ -28,6 +34,22 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
   );
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [topic, setTopic] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [fontSize, setFontSize] = useState(12);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width } = entry.contentRect;
+        // Atur ukuran font berdasarkan lebar widget
+        setFontSize(Math.max(10, width / 18));
+      }
+    });
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!config.deviceUniqId) {
@@ -102,52 +124,91 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
       : 0;
 
   const renderContent = () => {
-    if (status === "loading") {
-      return <Loader2 className="h-12 w-12 animate-spin text-primary" />;
+    if (
+      status === "loading" ||
+      (status === "waiting" && currentValue === null)
+    ) {
+      return <Loader2 className="h-1/3 w-1/3 animate-spin text-primary" />;
     }
     if (status === "error") {
       return (
         <div className="flex flex-col items-center justify-center text-center text-destructive p-2">
-          <AlertTriangle className="h-10 w-10 mb-2" />
-          <p className="text-sm font-semibold">{errorMessage}</p>
+          <AlertTriangle className="h-1/2 w-1/2 mb-2" />
+          <p className="text-xs font-semibold">{errorMessage}</p>
         </div>
       );
     }
 
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center">
+      <div className="w-full h-full flex flex-col items-center justify-center relative">
         <GaugeChart
           id={`gauge-chart-${config.deviceUniqId}`}
-          nrOfLevels={20}
-          colors={["#22c55e", "#facc15", "#ef4444"]}
+          nrOfLevels={30}
+          colors={["#22c55e", "#f59e0b", "#ef4444"]}
           arcWidth={0.3}
-          percent={Math.max(0, Math.min(1, gaugePercent))} // Clamp between 0 and 1
-          textColor="#374151"
-          hideText={true} // Sembunyikan teks default agar kita bisa buat custom
+          percent={Math.max(0, Math.min(1, gaugePercent))}
+          textColor="transparent" // Sembunyikan teks default
           animate={true}
           animDelay={100}
-        />
-        <div className="text-center -mt-8">
-          {currentValue !== null ? (
-            <>
-              <p className="text-2xl font-bold text-primary">
-                {currentValue.toLocaleString(undefined, {
+          // Tampilkan nilai custom di tengah
+          formatTextValue={() =>
+            currentValue !== null
+              ? currentValue.toLocaleString(undefined, {
                   maximumFractionDigits: 1,
-                })}
-              </p>
-              <p className="text-sm text-muted-foreground">{units}</p>
-            </>
-          ) : (
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                })
+              : ""
+          }
+          // Atur ukuran font custom
+          textComponent={({ value }) => (
+            <text
+              x="50%"
+              y="85%"
+              textAnchor="middle"
+              dy="0.35em"
+              style={{
+                fontSize: `${fontSize * 1.8}px`,
+                fill: "#1e293b",
+                fontWeight: "bold",
+              }}
+            >
+              {value}
+            </text>
           )}
+        />
+        {/* Label Min dan Max */}
+        <div className="absolute bottom-4 w-full flex justify-between px-4">
+          <span
+            className="text-xs text-muted-foreground"
+            style={{ fontSize: `${fontSize * 0.8}px` }}
+          >
+            {minValue}
+          </span>
+          <span
+            className="font-semibold text-primary"
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {units}
+          </span>
+          <span
+            className="text-xs text-muted-foreground"
+            style={{ fontSize: `${fontSize * 0.8}px` }}
+          >
+            {maxValue}
+          </span>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move">
-      <h3 className="font-semibold text-md text-center truncate mb-2">
+    <div
+      ref={containerRef}
+      className="w-full h-full flex flex-col items-center justify-center p-2 cursor-move"
+    >
+      <h3
+        className="font-semibold text-center truncate px-2"
+        style={{ fontSize: `${fontSize}px` }}
+      >
         {config.customName}
       </h3>
       <div className="flex-1 w-full flex items-center justify-center">

@@ -42,7 +42,7 @@ const defaultMenuConfig: MenuConfig = {
       "Devices Internal": true,
       "Devices External": true,
       "Devices for Logging": true,
-      "Node Management": true,
+      "Access Controllers": true,
     },
   },
   SystemConfig: {
@@ -52,6 +52,14 @@ const defaultMenuConfig: MenuConfig = {
       "Power Analyzer": true,
       "Menu Display": true,
       "System Backup": true,
+    },
+  },
+  LoRaWAN: {
+    enabled: true,
+    submenus: {
+      "Device List": true,
+      "Device Profiles": true,
+      Applications: true,
     },
   },
   SecurityAccess: {

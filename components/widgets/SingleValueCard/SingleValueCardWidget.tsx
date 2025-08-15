@@ -1,7 +1,7 @@
 // File: components/widgets/SingleValueCard/SingleValueCardWidget.tsx
 "use client";
 
-import {
+import React, {
   useState,
   useEffect,
   useCallback,
@@ -9,7 +9,7 @@ import {
   useLayoutEffect,
 } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, ChevronRightSquare } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -19,6 +19,7 @@ interface Props {
     deviceUniqId: string;
     selectedKey: string;
     multiply?: number;
+    units?: string; // Menambahkan units
   };
 }
 
@@ -33,32 +34,25 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [topic, setTopic] = useState<string | null>(null);
 
-  // --- START: Logika untuk Font Responsif ---
+  // --- Logika untuk Font Responsif ---
   const containerRef = useRef<HTMLDivElement>(null);
-  const [fontSize, setFontSize] = useState(16); // Ukuran font default
+  const [valueFontSize, setValueFontSize] = useState(24);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Observer untuk mendeteksi perubahan ukuran container
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
-        // Rumus untuk menghitung ukuran font baru, disesuaikan agar pas
-        // Dibagi 5 agar tidak terlalu besar, dan tinggi dibagi 2.5
-        const newSize = Math.min(width / 5, height / 2.5);
-        // Pastikan font tidak lebih kecil dari 12px
-        setFontSize(Math.max(12, newSize));
+        const baseSize = Math.min(width / 4, height / 2);
+        setValueFontSize(Math.max(16, baseSize)); // Pastikan tidak terlalu kecil
       }
     });
 
     resizeObserver.observe(container);
-
-    // Cleanup observer
     return () => resizeObserver.disconnect();
   }, []);
-  // --- END: Logika untuk Font Responsif ---
 
   useEffect(() => {
     if (!config.deviceUniqId) {
@@ -128,65 +122,57 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   ]);
 
   const renderContent = () => {
-    switch (status) {
-      case "loading":
-      case "waiting":
-        return <Loader2 className="h-1/4 w-1/4 animate-spin text-primary" />;
-      case "error":
-        return (
-          <div className="flex flex-col items-center justify-center text-center text-destructive p-2">
-            <AlertTriangle className="h-1/3 w-1/3 mb-1" />
-            <p className="text-xs font-semibold" style={{ fontSize: "12px" }}>
-              {errorMessage}
-            </p>
-          </div>
-        );
-      case "ok":
-        if (displayValue === null)
-          return (
-            <Loader2 className="h-1/4 w-1/4 animate-spin text-muted-foreground" />
-          );
-        const unit = typeof displayValue === "number" ? "" : "";
-        return (
-          <div
-            className="text-center overflow-hidden"
-            title={config.customName}
-          >
-            <p
-              className="font-bold tracking-tighter text-primary truncate"
-              style={{ fontSize: `${fontSize}px`, lineHeight: 1.1 }}
-            >
-              {typeof displayValue === "number"
-                ? displayValue.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })
-                : String(displayValue)}
-              <span
-                className="font-medium text-muted-foreground ml-1 sm:ml-2"
-                style={{ fontSize: `${fontSize * 0.5}px` }}
-              >
-                {unit}
-              </span>
-            </p>
-            <p
-              className="text-muted-foreground truncate"
-              style={{ fontSize: `${fontSize * 0.25}px`, marginTop: "4px" }}
-            >
-              {config.customName}
-            </p>
-          </div>
-        );
-      default:
-        return null;
+    if (
+      status === "loading" ||
+      (status === "waiting" && displayValue === null)
+    ) {
+      return (
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+      );
     }
+    if (status === "error") {
+      return (
+        <div className="flex flex-col items-center justify-center text-center text-destructive p-2">
+          <AlertTriangle className="h-8 w-8 mb-2" />
+          <p className="text-sm font-semibold">{errorMessage}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-center">
+        <p
+          className="font-bold tracking-tighter text-primary truncate"
+          style={{ fontSize: `${valueFontSize}px`, lineHeight: 1.1 }}
+        >
+          {typeof displayValue === "number"
+            ? displayValue.toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+              })
+            : String(displayValue)}
+          <span
+            className="font-medium text-muted-foreground ml-1"
+            style={{ fontSize: `${valueFontSize * 0.5}px` }}
+          >
+            {config.units}
+          </span>
+        </p>
+      </div>
+    );
   };
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full flex flex-col items-center justify-center p-2 cursor-move"
+      className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move"
     >
-      {renderContent()}
+      <div className="flex items-center text-sm font-medium text-muted-foreground mb-2">
+        <ChevronRightSquare className="h-4 w-4 mr-2" />
+        <p className="truncate">{config.customName}</p>
+      </div>
+      <div className="flex-1 w-full flex items-center justify-center">
+        {renderContent()}
+      </div>
     </div>
   );
 };

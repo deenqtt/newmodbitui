@@ -1,87 +1,105 @@
-// File: app/api/cctv/[id]/stream/route.ts
-
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import Stream from "node-rtsp-stream";
-import { TransformStream } from "stream/web";
+import { spawn } from "child_process";
 
-// Variabel untuk menyimpan stream yang aktif agar bisa di-manage
-const activeStreams: { [key: string]: any } = {};
+export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const cctvId = params.id;
+  const { id } = params;
+
+  if (!id || typeof id !== "string") {
+    console.error("[STREAM] Error: Invalid or missing CCTV ID.");
+    return new Response("Invalid CCTV ID provided", { status: 400 });
+  }
 
   try {
-    const cctvConfig = await prisma.cctv.findUnique({
-      where: { id: cctvId },
+    const cctv = await prisma.cctv.findUnique({
+      where: { id },
     });
 
-    if (!cctvConfig) {
-      return new NextResponse("CCTV configuration not found", { status: 404 });
+    if (!cctv) {
+      console.error(
+        `[STREAM] Error: CCTV with ID ${id} not found in database.`
+      );
+      return new Response("CCTV configuration not found", { status: 404 });
     }
+    console.log(`[STREAM] Found CCTV: "${cctv.name}"`);
 
-    // Hentikan stream lama jika ada untuk ID ini untuk memastikan kita pakai config terbaru
-    if (activeStreams[cctvId]) {
-      activeStreams[cctvId].stop();
-    }
+    const { name, ipAddress, port, channel, username, password, resolution } =
+      cctv;
+    const auth =
+      username && password
+        ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
+        : "";
+    const rtspUrl = `rtsp://${auth}${ipAddress}:${port}/${channel || ""}`;
 
-    // Bangun URL RTSP dari konfigurasi di database
-    const rtspUrl = `rtsp://${cctvConfig.username}:${cctvConfig.password}@${
-      cctvConfig.ipAddress
-    }:${cctvConfig.port}/${cctvConfig.channel || ""}`;
+    const stream = new ReadableStream({
+      start(controller) {
+        let isClosed = false;
 
-    // Buat response yang bisa kita tulis secara streaming
-    const responseStream = new TransformStream();
-    const writer = responseStream.writable.getWriter();
+        const ffmpegArgs = [
+          "-rtsp_transport",
+          "tcp",
+          "-i",
+          rtspUrl,
+          "-f",
+          "mjpeg",
+          "-q:v",
+          "5",
+          "-vf",
+          "fps=5",
+          "-s",
+          resolution || "640x480",
+          "pipe:1",
+        ];
 
-    const stream = new Stream({
-      name: cctvConfig.name,
-      streamUrl: rtspUrl,
-      wsPort: 0, // Port WebSocket acak, tidak kita gunakan tapi wajib diisi
-      ffmpegOptions: {
-        "-stats": "",
-        "-r": String(cctvConfig.framerate || 15),
-        "-s": cctvConfig.resolution || "640x480",
-        "-b:v": `${cctvConfig.bitrate || 1024}k`,
+        const ffmpegProcess = spawn("ffmpeg", ffmpegArgs);
+
+        ffmpegProcess.stdout.on("data", (chunk) => {
+          if (!isClosed) controller.enqueue(chunk);
+        });
+
+        ffmpegProcess.stderr.on("data", (data) => {
+          console.error(`[FFMPEG STDERR ${name}]: ${data.toString()}`);
+        });
+
+        const closeStream = (reason: string) => {
+          if (!isClosed) {
+            isClosed = true;
+
+            ffmpegProcess.kill("SIGKILL");
+            try {
+              controller.close();
+            } catch (e) {}
+          }
+        };
+
+        request.signal.addEventListener("abort", () =>
+          closeStream("Client disconnected")
+        );
+        ffmpegProcess.on("close", (code) =>
+          closeStream(`FFMPEG process exited with code ${code}`)
+        );
+        ffmpegProcess.on("error", (err) => {
+          console.error(`[STREAM] FFMPEG process error for "${name}":`, err);
+          closeStream("FFMPEG process error");
+        });
       },
     });
 
-    // Saat FFMPEG menghasilkan data frame MJPEG, tulis ke response browser
-    stream.on("data", (data) => {
-      try {
-        writer.write(data);
-      } catch (e) {
-        console.warn("Could not write to stream, client likely disconnected.");
-      }
-    });
-
-    activeStreams[cctvId] = stream;
-
-    // Jika browser menutup koneksi, hentikan proses FFMPEG untuk hemat resource
-    request.signal.onabort = () => {
-      console.log(`Stream for ${cctvConfig.name} stopped by client.`);
-      stream.stop();
-      delete activeStreams[cctvId];
-      try {
-        writer.close();
-      } catch (e) {}
-    };
-
-    // Kirim response streaming ke browser
-    return new NextResponse(responseStream.readable, {
+    return new Response(stream, {
       headers: {
-        "Content-Type": "multipart/x-mixed-replace; boundary=ffserver",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Content-Type": "multipart/x-mixed-replace; boundary=frame",
+        "Cache-Control": "no-cache",
         Pragma: "no-cache",
         Expires: "0",
-        Connection: "keep-alive",
       },
     });
   } catch (error) {
-    console.error(`[CCTV_STREAM_ERROR] for ID ${cctvId}:`, error);
-    return new NextResponse("Failed to start stream", { status: 500 });
+    console.error(`[CCTV_STREAM_ERROR] General error for ID ${id}:`, error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }

@@ -27,7 +27,6 @@ class ZkTecoService {
   }
 
   public async start() {
-    console.log("✅ [ZKTECO SERVICE] Starting ZKTeco Service...");
     this.connectToMqtt();
     await this.refreshConfigurations();
 
@@ -41,11 +40,7 @@ class ZkTecoService {
   }
 
   private async refreshConfigurations() {
-    console.log("[ZKTECO SERVICE] Refreshing ZKTeco device configurations...");
     this.activeDevices = await this.prisma.zkTecoDevice.findMany();
-    console.log(
-      `[ZKTECO SERVICE] Found ${this.activeDevices.length} active devices.`
-    );
 
     const topicsToSubscribe = new Set<string>();
     for (const device of this.activeDevices) {
@@ -57,10 +52,6 @@ class ZkTecoService {
     }
 
     if (this.mqttClient?.connected && topicsToSubscribe.size > 0) {
-      console.log(
-        `[ZKTECO SERVICE] Subscribing to dynamic topics:`,
-        Array.from(topicsToSubscribe)
-      );
       this.mqttClient.subscribe(Array.from(topicsToSubscribe));
     }
   }
@@ -80,7 +71,6 @@ class ZkTecoService {
     (global as any).zkTecoMqttClient = this.mqttClient;
 
     this.mqttClient.on("connect", () => {
-      console.log(`[ZKTECO SERVICE] Terhubung ke Broker MQTT di ${brokerUrl}`);
       // --- BARU: Penuhi "janji" bahwa koneksi sudah siap ---
       this.resolveMqttReady();
       this.refreshConfigurations();
@@ -100,8 +90,6 @@ class ZkTecoService {
   }
 
   private async handleMqttMessage(topic: string, payloadStr: string) {
-    console.log(`[ZKTECO SERVICE] Message on ${topic}: ${payloadStr}`);
-
     const topicParts = topic.split("_");
     if (topicParts.length < 2) return;
     const topicIdentifierFromMqtt = topicParts[1];
@@ -125,14 +113,8 @@ class ZkTecoService {
         data: { status: "CONNECTED" },
       });
       device.status = "CONNECTED";
-      console.log(
-        `[ZKTECO SERVICE] Heartbeat received. Status for ${device.name} updated to CONNECTED.`
-      );
     }
     const timeout = setTimeout(async () => {
-      console.log(
-        `[ZKTECO SERVICE] No heartbeat from ${device.name} for 30s. Setting status to DISCONNECTED.`
-      );
       await this.prisma.zkTecoDevice.update({
         where: { id: device.id },
         data: { status: "DISCONNECTED" },
@@ -160,32 +142,20 @@ class ZkTecoService {
             zkTecoDeviceId: device.id,
           },
         });
-        console.log(
-          `[ZKTECO SERVICE] Synced: Upserted user UID ${Data.UID} for ${device.name}`
-        );
       } else if (Mode === "delete_user" && Status === "success") {
         await this.prisma.zkTecoUser.deleteMany({
           where: { uid: Data.UID, zkTecoDeviceId: device.id },
         });
-        console.log(
-          `[ZKTECO SERVICE] Synced: Deleted user UID ${Data.UID} from ${device.name}`
-        );
       } else if (Mode === "register_card" && Status === "success") {
         await this.prisma.zkTecoUser.updateMany({
           where: { uid: Data.uid, zkTecoDeviceId: device.id },
           data: { card: String(Data.card) },
         });
-        console.log(
-          `[ZKTECO SERVICE] Synced: Registered card for UID ${Data.uid} on ${device.name}`
-        );
       } else if (Mode === "delete_card" && Status === "success") {
         await this.prisma.zkTecoUser.updateMany({
           where: { uid: Data.uid, zkTecoDeviceId: device.id },
           data: { card: null },
         });
-        console.log(
-          `[ZKTECO SERVICE] Synced: Deleted card for UID ${Data.uid} on ${device.name}`
-        );
       } else if (Mode === "register_fp" && Status === "success") {
         const user = await this.prisma.zkTecoUser.findUnique({
           where: {
@@ -208,9 +178,6 @@ class ZkTecoService {
             where: { id: user.id },
             data: { fingerprints: updatedFingers },
           });
-          console.log(
-            `[ZKTECO SERVICE] Synced: Registered fingerprint FID ${Data.fid} for UID ${Data.uid} on ${device.name}`
-          );
         }
       } else if (Mode === "delete_fp" && Status === "success") {
         const user = await this.prisma.zkTecoUser.findUnique({
@@ -228,9 +195,6 @@ class ZkTecoService {
             where: { id: user.id },
             data: { fingerprints: updatedFingers },
           });
-          console.log(
-            `[ZKTECO SERVICE] Synced: Deleted fingerprint FID ${Data.fid} for UID ${Data.uid} on ${device.name}`
-          );
         }
       } else if (Status && Status.toLowerCase().includes("error")) {
         console.error(
@@ -262,7 +226,7 @@ class ZkTecoService {
 
     const deviceTopicKey = device.topicIdentifier.toLowerCase();
     const topic = `acs_${deviceTopicKey}_command`;
-    console.log(`[ZKTECO SERVICE] PUBLISHING to ${topic}: ${command}`);
+
     try {
       this.mqttClient!.publish(topic, command, (err) => {
         if (err) {

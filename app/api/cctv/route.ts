@@ -7,7 +7,6 @@ import { Role } from "@prisma/client";
 
 // FUNGSI GET: Mengambil semua data CCTV
 export async function GET(request: NextRequest) {
-  // ... (Fungsi GET tidak berubah dari sebelumnya)
   const cctvConfigs = await prisma.cctv.findMany({
     orderBy: { createdAt: "asc" },
   });
@@ -23,7 +22,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    // Sesuaikan dengan field baru di model Prisma
     const {
       name,
       ipAddress,
@@ -42,17 +40,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // PENTING: Di aplikasi production, enkripsi 'password' di sini sebelum menyimpannya
-    // Contoh: const hashedPassword = await bcrypt.hash(password, 10);
-
     const newCctv = await prisma.cctv.create({
       data: {
         name,
         ipAddress,
-        port: Number(port), // Pastikan port adalah angka
+        port: Number(port),
         channel,
         username,
-        password, // Simpan password (sebaiknya yang sudah dienkripsi)
+        password,
         resolution,
         framerate: framerate ? Number(framerate) : undefined,
         bitrate: bitrate ? Number(bitrate) : undefined,

@@ -54,7 +54,7 @@ interface Props {
   onSave: (config: any) => void;
 }
 
-// Komponen Form untuk satu item (diperbarui dengan logika MQTT)
+// Komponen Form untuk satu item
 const ItemForm = ({
   item,
   updateItem,
@@ -96,19 +96,16 @@ const ItemForm = ({
       (d) => d.uniqId === item.deviceUniqId
     );
     const newTopic = selectedDevice?.topic;
-
     if (subscribedTopicRef.current && subscribedTopicRef.current !== newTopic) {
       unsubscribe(subscribedTopicRef.current, handleMqttMessage);
       subscribedTopicRef.current = null;
     }
-
     if (newTopic && newTopic !== subscribedTopicRef.current) {
       setAvailableKeys([]);
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
     }
-
     return () => {
       if (subscribedTopicRef.current) {
         unsubscribe(subscribedTopicRef.current, handleMqttMessage);
@@ -125,7 +122,7 @@ const ItemForm = ({
 
   const handleDeviceChange = (value: string) => {
     updateItem(item.id, "deviceUniqId", value);
-    updateItem(item.id, "selectedKey", null); // Reset key saat device berubah
+    updateItem(item.id, "selectedKey", null);
   };
 
   return (
@@ -138,60 +135,58 @@ const ItemForm = ({
       >
         <Trash2 className="h-4 w-4 text-destructive" />
       </Button>
-      <div className="grid gap-2">
-        <Label>Custom Name</Label>
-        <Input
-          value={item.customName}
-          onChange={(e) => updateItem(item.id, "customName", e.target.value)}
-          placeholder="e.g., Room Temperature"
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label>Device</Label>
-        {isLoadingDevices ? (
-          <Skeleton className="h-10 w-full" />
-        ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <Label>Custom Name</Label>
+          <Input
+            value={item.customName}
+            onChange={(e) => updateItem(item.id, "customName", e.target.value)}
+            placeholder="e.g., Room Temperature"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label>Device</Label>
+          {isLoadingDevices ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <Select
+              onValueChange={handleDeviceChange}
+              value={item.deviceUniqId || ""}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a device" />
+              </SelectTrigger>
+              <SelectContent>
+                {allDevices.map((d) => (
+                  <SelectItem key={d.uniqId} value={d.uniqId}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label>Data Key</Label>
           <Select
-            onValueChange={handleDeviceChange}
-            value={item.deviceUniqId || ""}
+            onValueChange={(value) => updateItem(item.id, "selectedKey", value)}
+            value={item.selectedKey || ""}
+            disabled={!item.deviceUniqId || availableKeys.length === 0}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select a device" />
+              <SelectValue
+                placeholder={isWaitingForKey ? "Waiting..." : "Select a key"}
+              />
             </SelectTrigger>
             <SelectContent>
-              {allDevices.map((d) => (
-                <SelectItem key={d.uniqId} value={d.uniqId}>
-                  {d.name}
+              {availableKeys.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {k}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-      </div>
-      <div className="grid gap-2">
-        <Label>Data Key</Label>
-        <Select
-          onValueChange={(value) => updateItem(item.id, "selectedKey", value)}
-          value={item.selectedKey || ""}
-          disabled={!item.deviceUniqId || availableKeys.length === 0}
-        >
-          <SelectTrigger>
-            <SelectValue
-              placeholder={
-                isWaitingForKey ? "Waiting for data..." : "Select a key"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {availableKeys.map((k) => (
-              <SelectItem key={k} value={k}>
-                {k}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+        </div>
         <div className="grid gap-2">
           <Label>Units</Label>
           <Input
@@ -200,13 +195,50 @@ const ItemForm = ({
             placeholder="e.g., °C"
           />
         </div>
-        <div className="grid gap-2">
-          <Label>Multiplier</Label>
-          <Input
-            type="number"
-            value={item.multiply}
-            onChange={(e) => updateItem(item.id, "multiply", e.target.value)}
-          />
+      </div>
+      {/* --- PERBAIKAN: Tambahkan pilihan ikon & warna di sini --- */}
+      <div className="pt-4 border-t">
+        <Label className="text-xs font-semibold">Appearance</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+          <div className="grid gap-2 sm:col-span-3">
+            <div className="grid grid-cols-6 sm:grid-cols-8 gap-1">
+              {iconLibrary.map(({ name, icon: Icon }) => (
+                <button
+                  key={name}
+                  onClick={() => updateItem(item.id, "selectedIcon", name)}
+                  className={`flex items-center justify-center p-2 rounded-md transition-all ${
+                    item.selectedIcon === name
+                      ? "ring-2 ring-blue-500 bg-blue-100"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`iconColor-${item.id}`}>Icon Color</Label>
+            <Input
+              id={`iconColor-${item.id}`}
+              type="color"
+              value={item.iconColor}
+              onChange={(e) => updateItem(item.id, "iconColor", e.target.value)}
+              className="h-10"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`iconBgColor-${item.id}`}>Background</Label>
+            <Input
+              id={`iconBgColor-${item.id}`}
+              type="color"
+              value={item.iconBgColor}
+              onChange={(e) =>
+                updateItem(item.id, "iconBgColor", e.target.value)
+              }
+              className="h-10"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -258,7 +290,7 @@ export const GroupedIconStatusConfigModal = ({
         selectedKey: null,
         units: "",
         multiply: "1",
-        selectedIcon: "Zap", // Ikon default bisa disesuaikan
+        selectedIcon: "Zap",
         iconColor: "#FFFFFF",
         iconBgColor: "#3B82F6",
       },

@@ -1,9 +1,15 @@
 // File: components/widgets/GroupedIconStatus/GroupedIconStatusWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, RadioTower } from "lucide-react";
 import { getIconComponent } from "@/lib/icon-library";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -14,7 +20,7 @@ interface ItemConfig {
   deviceUniqId: string;
   selectedKey: string;
   units: string;
-  multiply: string;
+  multiply: number;
   selectedIcon: string;
   iconColor: string;
   iconBgColor: string;
@@ -56,7 +62,7 @@ const StatusRow = ({ itemConfig }: { itemConfig: ItemConfig }) => {
             : payload.value || {};
         if (innerPayload.hasOwnProperty(itemConfig.selectedKey)) {
           const rawValue = innerPayload[itemConfig.selectedKey];
-          const multiplier = parseFloat(itemConfig.multiply) || 1;
+          const multiplier = itemConfig.multiply || 1;
           const finalValue =
             typeof rawValue === "number" ? rawValue * multiplier : rawValue;
           setDisplayValue(finalValue);
@@ -86,10 +92,10 @@ const StatusRow = ({ itemConfig }: { itemConfig: ItemConfig }) => {
   const IconComponent = getIconComponent(itemConfig.selectedIcon || "Zap");
 
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex items-center gap-3 p-2 rounded-lg bg-background hover:bg-muted/50 transition-colors">
       {IconComponent && (
         <div
-          className="p-2 rounded-md flex items-center justify-center"
+          className="p-2 rounded-md flex items-center justify-center self-start"
           style={{
             backgroundColor: itemConfig.iconBgColor,
             color: itemConfig.iconColor,
@@ -99,23 +105,28 @@ const StatusRow = ({ itemConfig }: { itemConfig: ItemConfig }) => {
         </div>
       )}
       <div className="flex-1 overflow-hidden">
-        <p className="text-sm font-medium truncate">{itemConfig.customName}</p>
-      </div>
-      <div className="font-semibold text-right">
-        {displayValue === null ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <>
-            {typeof displayValue === "number"
-              ? displayValue.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })
-              : displayValue}
-            <span className="ml-1 text-sm font-normal text-muted-foreground">
-              {itemConfig.units}
-            </span>
-          </>
-        )}
+        <p
+          className="text-sm font-medium truncate"
+          title={itemConfig.customName}
+        >
+          {itemConfig.customName}
+        </p>
+        <div className="font-semibold text-primary text-lg">
+          {displayValue === null ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : (
+            <>
+              {typeof displayValue === "number"
+                ? displayValue.toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                  })
+                : displayValue}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">
+                {itemConfig.units}
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -129,6 +140,28 @@ interface Props {
 }
 
 export const GroupedIconStatusWidget = ({ config }: Props) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [columnCount, setColumnCount] = useState(1);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width } = entry.contentRect;
+        // Ganti ke 2 kolom jika lebar widget cukup
+        if (width > 350) {
+          setColumnCount(2);
+        } else {
+          setColumnCount(1);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   if (!config || !config.items) {
     return (
       <div className="p-4 text-destructive text-center">
@@ -140,11 +173,19 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
   return (
     <div className="w-full h-full flex flex-col p-4 cursor-move">
-      <h3 className="font-bold text-lg mb-2 truncate">{config.title}</h3>
-      <div className="flex-1 overflow-y-auto pr-2 space-y-1">
-        {config.items.map((item, index) => (
-          <StatusRow key={index} itemConfig={item} />
-        ))}
+      <div className="flex items-center text-sm font-semibold mb-2">
+        <RadioTower className="h-4 w-4 mr-2" />
+        <h3 className="truncate">{config.title}</h3>
+      </div>
+      <div ref={containerRef} className="flex-1 overflow-y-auto pr-2">
+        <div
+          className="grid gap-x-4 gap-y-2"
+          style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}
+        >
+          {config.items.map((item, index) => (
+            <StatusRow key={index} itemConfig={item} />
+          ))}
+        </div>
       </div>
     </div>
   );

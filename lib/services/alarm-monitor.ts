@@ -59,9 +59,6 @@ class AlarmMonitorService {
     }
 
     this.alarmConfigs = newAlarmConfigs;
-    console.log(
-      `[ALARM SERVICE] Load complete: ${configsFromDb.length} rules for ${newTopics.size} topics.`
-    );
 
     if (this.mqttClient?.connected) {
       const topicsToUnsubscribe = [...this.subscribedTopics].filter(

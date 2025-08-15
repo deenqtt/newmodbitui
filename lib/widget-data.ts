@@ -4,7 +4,7 @@ import {
   Gauge,
   Table,
   ToggleRight,
-  Cube,
+  Box,
   AlertTriangle,
   Camera,
   Zap,
@@ -32,6 +32,7 @@ import {
   PieChart,
   List,
   ShieldCheck,
+  Lock,
 } from "lucide-react";
 
 // Tipe untuk memperjelas struktur data
@@ -78,7 +79,7 @@ export const mainWidgets: MainWidgetCategory[] = [
   {
     name: "3D Visualization",
     category: "3Dimensi",
-    icon: Cube,
+    icon: Box,
     description: "Widget untuk visualisasi objek 3D.",
   },
   {
@@ -220,6 +221,12 @@ export const widgets: Widget[] = [
     icon: Sigma,
     description: "Menampilkan hasil kalkulasi dari beberapa nilai.",
   },
+  {
+    name: "Access Controller Status",
+    category: "Monitoring",
+    icon: Lock,
+    description: "Monitor status real-time dari  Access Lock Controller.",
+  },
 
   // --- Electrical ---
   {
@@ -235,19 +242,6 @@ export const widgets: Widget[] = [
     description: "Single Line Diagram untuk genset atau LV.",
   },
 
-  // --- Toggle Control ---
-  {
-    name: "Multi Toggle Control",
-    category: "Toggle Control",
-    icon: ToggleRight,
-    description: "Beberapa tombol kontrol dalam satu grup.",
-  },
-  {
-    name: "Single Button Control",
-    category: "Toggle Control",
-    icon: Plug,
-    description: "Satu tombol untuk aksi on/off.",
-  },
   {
     name: "Button Control Modbus",
     category: "Toggle Control",
@@ -265,6 +259,12 @@ export const widgets: Widget[] = [
     category: "Toggle Control",
     icon: Plug,
     description: "Tombol kontrol untuk perangkat Modbit.",
+  },
+  {
+    name: "Lock Access Control",
+    category: "Toggle Control",
+    icon: Plug,
+    description: "Tombol kontrol untuk Lock Access.",
   },
 
   // --- 3Dimensi ---

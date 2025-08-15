@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Responsive, WidthProvider, Layout } from "react-grid-layout";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LayoutGrid, AlertCircle } from "lucide-react";
+import { LayoutGrid, AlertCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -32,23 +32,27 @@ export default function MainDashboardPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // --- State baru untuk menangani kasus khusus "tidak ada dashboard" ---
+  const [noDashboardsFound, setNoDashboardsFound] = useState(false);
 
   useEffect(() => {
     const fetchActiveDashboard = async () => {
       setIsLoading(true);
       setError(null);
+      setNoDashboardsFound(false);
       try {
         const response = await fetch(`${API_BASE_URL}/api/dashboards/active`);
         if (!response.ok) {
+          // --- PERBAIKAN: Tangani error 404 secara khusus ---
           if (response.status === 404) {
-            throw new Error(
-              "No active dashboard found. Please create or set one."
-            );
+            setNoDashboardsFound(true);
+          } else {
+            throw new Error("Failed to fetch active dashboard.");
           }
-          throw new Error("Failed to fetch active dashboard.");
+        } else {
+          const data: DashboardData = await response.json();
+          setDashboardData(data);
         }
-        const data: DashboardData = await response.json();
-        setDashboardData(data);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -69,6 +73,26 @@ export default function MainDashboardPage() {
             />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  // --- PERBAIKAN: Tampilan khusus untuk pengguna baru ---
+  if (noDashboardsFound) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
+        <LayoutGrid className="h-12 w-12 text-primary mb-4" />
+        <h2 className="text-2xl font-bold">Welcome!</h2>
+        <p className="text-muted-foreground mb-6 max-w-md">
+          It looks like you don't have any dashboards yet. Let's create your
+          first one to get started.
+        </p>
+        <Link href="/manage-dashboard">
+          <Button size="lg">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Create Your First Dashboard
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -109,7 +133,6 @@ export default function MainDashboardPage() {
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
         rowHeight={30}
-        // --- INI KUNCINYA: MATIKAN INTERAKSI ---
         isDraggable={false}
         isResizable={false}
       >

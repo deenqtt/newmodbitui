@@ -2,8 +2,6 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
-
-// Import komponen UI yang dibutuhkan
 import {
   Card,
   CardContent,
@@ -31,8 +29,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// Import ikon
 import {
   PlusCircle,
   Trash2,
@@ -42,11 +38,8 @@ import {
   Edit,
   Loader2,
 } from "lucide-react";
-
-// Import library untuk notifikasi
 import Swal from "sweetalert2";
 
-// Tipe data untuk CCTV
 interface Cctv {
   id: string;
   name: string;
@@ -54,32 +47,24 @@ interface Cctv {
   port: number;
   channel?: string | null;
   username?: string | null;
-  password?: string | null; // Dibutuhkan untuk form edit
+  password?: string | null;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Komponen Halaman Utama
 function SurveillanceCctvPage() {
   const { connectionStatus } = useMqtt();
   const [cctvList, setCctvList] = useState<Cctv[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // State untuk modal (Add/Edit)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCctv, setEditingCctv] = useState<Cctv | null>(null);
   const [form, setForm] = useState<Partial<Cctv>>({});
-
-  // State untuk preview
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const fetchCctv = async () => {
     try {
-      // Set loading true hanya jika tabel belum ada isinya
-      if (cctvList.length === 0) {
-        setIsLoading(true);
-      }
+      if (cctvList.length === 0) setIsLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/cctv`);
       if (!response.ok) throw new Error("Failed to fetch CCTV data");
       const data = await response.json();
@@ -100,24 +85,22 @@ function SurveillanceCctvPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Fungsi untuk membuka modal Add
   const handleAddClick = () => {
     setEditingCctv(null);
     setForm({
       name: "",
       ipAddress: "",
       port: 554,
-      channel: "101",
+      channel: "", // <-- PERUBAHAN UTAMA DI SINI
       username: "admin",
       password: "",
     });
     setIsModalOpen(true);
   };
 
-  // Fungsi untuk membuka modal Edit
   const handleEditClick = (cctv: Cctv) => {
     setEditingCctv(cctv);
-    setForm({ ...cctv, password: "" }); // Kosongkan password di form demi keamanan
+    setForm({ ...cctv, password: "" });
     setIsModalOpen(true);
   };
 
@@ -127,7 +110,6 @@ function SurveillanceCctvPage() {
       ? `${API_BASE_URL}/api/cctv/${editingCctv.id}`
       : `${API_BASE_URL}/api/cctv`;
     const method = editingCctv ? "PUT" : "POST";
-
     try {
       const response = await fetch(url, {
         method,
@@ -150,7 +132,7 @@ function SurveillanceCctvPage() {
     }
   };
 
-  const handleDelete = async (cctv: Cctv) => {
+  const handleDelete = (cctv: Cctv) => {
     Swal.fire({
       title: `Delete ${cctv.name}?`,
       text: "You won't be able to revert this!",
@@ -158,7 +140,6 @@ function SurveillanceCctvPage() {
       showCancelButton: true,
       confirmButtonText: "Yes, delete it!",
       confirmButtonColor: "#d33",
-      cancelButtonText: "Cancel",
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
@@ -179,13 +160,16 @@ function SurveillanceCctvPage() {
     });
   };
 
-  const handlePreview = (cctvId: string) => {
+  const handlePreview = (id: string) => {
     setIsPreviewLoading(true);
-    setPreviewUrl(`${API_BASE_URL}/api/cctv/${cctvId}/stream`);
+    setPreviewUrl(
+      `${API_BASE_URL}/api/cctv/${id}/stream?t=${new Date().getTime()}`
+    );
   };
 
   const closePreview = () => {
     setPreviewUrl(null);
+    setIsPreviewLoading(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -245,29 +229,17 @@ function SurveillanceCctvPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  Array.from({ length: 4 }).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[150px]" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[120px]" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[50px]" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[80px]" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Skeleton className="h-8 w-[220px] float-right" />
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={5}>
+                        <Skeleton className="h-8 w-full" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : cctvList.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center h-24">
-                      No cameras configured yet.
+                      No cameras configured.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -277,11 +249,10 @@ function SurveillanceCctvPage() {
                       <TableCell>{cctv.ipAddress}</TableCell>
                       <TableCell>{cctv.port}</TableCell>
                       <TableCell>{cctv.username || "N/A"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="mr-2"
                           onClick={() => handlePreview(cctv.id)}
                         >
                           <Video className="h-4 w-4 mr-1" /> Preview
@@ -289,7 +260,6 @@ function SurveillanceCctvPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="mr-2"
                           onClick={() => handleEditClick(cctv)}
                         >
                           <Edit className="h-4 w-4" />
@@ -312,7 +282,6 @@ function SurveillanceCctvPage() {
         </Card>
       </main>
 
-      {/* Modal untuk Add/Edit */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <form onSubmit={handleFormSubmit}>
@@ -405,32 +374,27 @@ function SurveillanceCctvPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Preview Stream */}
       <Dialog open={!!previewUrl} onOpenChange={closePreview}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Live Preview</DialogTitle>
           </DialogHeader>
           <div className="aspect-video w-full bg-slate-900 rounded-md overflow-hidden flex items-center justify-center">
-            {isPreviewLoading && (
-              <Loader2 className="h-8 w-8 animate-spin text-white" />
-            )}
+            {/* Tampilkan gambar secara langsung tanpa loading state */}
             {previewUrl && (
               <img
                 src={previewUrl}
                 alt="CCTV Live Stream"
-                className={`w-full h-full object-contain ${
-                  isPreviewLoading ? "hidden" : "block"
-                }`}
-                onLoad={() => setIsPreviewLoading(false)}
+                className="w-full h-full object-contain" // Hapus class "hidden"
+                // Hapus props onLoad
                 onError={() => {
-                  setIsPreviewLoading(false);
+                  // Pertahankan onError untuk menangani jika URL benar-benar error
+                  closePreview();
                   Swal.fire(
                     "Stream Error",
-                    "Could not load the video stream. Please check the configuration and network.",
+                    "Could not load video stream. Check config and network.",
                     "error"
                   );
-                  setPreviewUrl(null); // Tutup dialog jika stream error
                 }}
               />
             )}
@@ -441,7 +405,6 @@ function SurveillanceCctvPage() {
   );
 }
 
-// Komponen Wrapper
 export default function SurveillanceCctvPageWithProvider() {
   return (
     <MqttProvider>

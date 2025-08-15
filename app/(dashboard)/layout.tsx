@@ -3,14 +3,12 @@
 
 import type React from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link"; // <-- 1. IMPORT LINK
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/contexts/AuthContext";
-
-// --- 1. IMPORT MQTT PROVIDER ---
 import { MqttProvider } from "@/contexts/MqttContext";
 
-// Impor komponen UI yang dibutuhkan
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +19,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, Loader2, Users } from "lucide-react";
+import { LogOut, Loader2, Settings } from "lucide-react"; // <-- 2. IMPORT SETTINGS ICON
 
 import { NotificationBell } from "@/components/notification-bell";
 
-// Helper untuk mengubah path URL menjadi judul yang rapi
 function generateTitleFromPathname(pathname: string): string {
   if (pathname === "/") return "Main Dashboard";
   return pathname
@@ -37,7 +34,6 @@ function generateTitleFromPathname(pathname: string): string {
     .join(" / ");
 }
 
-// Komponen untuk navigasi pengguna
 function UserNav() {
   const { user, logout, isLoading } = useAuth();
 
@@ -78,7 +74,6 @@ function UserNav() {
   );
 }
 
-// Komponen Header utama yang dinamis
 function MainHeader() {
   const pathname = usePathname();
   const title = generateTitleFromPathname(pathname);
@@ -94,6 +89,13 @@ function MainHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* --- PERBAIKAN: Tambahkan teks ke tombol --- */}
+        <Link href="/manage-dashboard">
+          <Button variant="outline">
+            <Settings className="h-4 w-4 mr-2" />
+            Manage
+          </Button>
+        </Link>
         <NotificationBell />
         <UserNav />
       </div>
@@ -101,7 +103,6 @@ function MainHeader() {
   );
 }
 
-// Layout utama untuk dasbor
 export default function DashboardLayout({
   children,
 }: {
@@ -113,11 +114,7 @@ export default function DashboardLayout({
         <AppSidebar />
         <div className="flex flex-col flex-1">
           <MainHeader />
-          {/* --- 2. BUNGKUS KONTEN DENGAN MQTT PROVIDER --- */}
-          <MqttProvider>
-            {/* Konten halaman akan dirender di sini */}
-            {children}
-          </MqttProvider>
+          <MqttProvider>{children}</MqttProvider>
         </div>
       </div>
     </SidebarProvider>

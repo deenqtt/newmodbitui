@@ -272,3 +272,64 @@ model EnergyTarget {
 
   @@unique([loggingConfigId, year])
 }
+
+model AccessController {
+  id            String    @id @default(cuid())
+  name          String
+  ipAddress     String  @unique
+  macAddress    String?   @unique // <-- Kunci untuk discovery
+  status        String    @default("offline")
+  lockCount     Int       @default(0)
+  doorStatus    Int[]
+  lockAddresses Int[]
+  firmware      String?
+  lastSeen      DateTime? // <-- Kunci untuk health-check
+  createdAt     DateTime  @default(now())
+    uptime      String?
+  freeHeap    Int?
+  totalHeap   Int?
+  spiffsUsed  Int?
+  spiffsTotal Int?
+  logFileSize Int?
+  updatedAt     DateTime  @updatedAt
+  activityLogs  ActivityLog[]
+}
+
+// Model untuk menyimpan setiap log aktivitas
+model ActivityLog {
+  id           String   @id @default(cuid())
+  controllerId String
+  
+  // Relasi ke controller: Setiap log dimiliki oleh satu controller
+  controller   AccessController @relation(fields: [controllerId], references: [id], onDelete: Cascade)
+
+  timestamp    DateTime // Waktu kejadian dari ESP32
+  message      String   // Pesan yang mudah dibaca, e.g., "Lock 1 event by IC Card (Card: 12345)"
+  details      Json?    // Data mentah dalam format JSON untuk detail tambahan
+
+  createdAt    DateTime @default(now()) // Waktu kapan log ini disimpan di server
+}
+// Model untuk merepresentasikan perangkat LoRa fisik
+model LoraDevice {
+  id        String       @id @default(cuid())
+  devEui    String       @unique // ID unik dari perangkat LoRa
+  name      String
+  lastSeen  DateTime?
+  
+  // Relasi: Satu perangkat punya banyak data
+  data      DeviceData[]
+}
+
+// Model untuk menyimpan setiap data yang dikirim oleh sensor
+model DeviceData {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  
+  // Relasi ke perangkatnya
+  device      LoraDevice @relation(fields: [deviceId], references: [id])
+  deviceId    String
+
+  // Kolom JSON untuk menyimpan data sensor apa pun (fleksibel)
+  // Contoh: { "temperature": 28.5, "humidity": 75, "battery": 90 }
+  data        Json
+}
