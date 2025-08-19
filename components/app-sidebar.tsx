@@ -126,6 +126,35 @@ const menuOrder = [
   "Analytics",
 ];
 
+// <-- DITAMBAHKAN: Definisikan urutan yang diinginkan untuk setiap submenu
+const submenuOrder: { [key: string]: string[] } = {
+  Devices: [
+    "Devices Internal",
+    "Devices External",
+    "Devices for Logging",
+    "Access Controllers",
+  ],
+  SystemConfig: [
+    "User Management",
+    "Power Analyzer",
+    "Menu Display",
+    "System Backup",
+  ],
+  LoRaWAN: ["Device List", "Device Profiles", "Applications"],
+  SecurityAccess: ["Device Access", "Surveillance CCTV"],
+  Network: ["Communication Setup", "Register SNMP", "MQTT Broker"],
+  Automation: [
+    "Automated Scheduling",
+    "Smart Logic Automation",
+    "Voice Command",
+    "Automation Values",
+    "Dynamic Payload",
+    "Static Payload",
+  ],
+  Alarms: ["Alarm Management", "Alarm Log Reports"],
+  VoiceRecognition: ["Relay Control", "Relay STT"],
+};
+
 // Pemetaan dari nama submenu ke komponen ikon
 const iconMap: { [key: string]: React.ElementType } = {
   "Main Dashboard": LayoutDashboard,
@@ -194,38 +223,41 @@ export function AppSidebar() {
   }, []);
 
   const navigation = useMemo(() => {
-    // 1. Mulai dari array 'menuOrder' yang sudah pasti urutannya
-    return (
-      menuOrder
-        .map((menuKey) => {
-          // 2. Ambil data menu dari state 'menuConfig' berdasarkan urutan 'menuKey'
-          const menuData = menuConfig[menuKey];
-          // 3. Kembalikan array [key, data] agar strukturnya mirip Object.entries
-          return [menuKey, menuData];
-        })
-        // 4. Proses filter dan map selanjutnya tidak perlu diubah
-        .filter(([, menuData]) => menuData && menuData.enabled)
-        .map(([menuKey, menuData]) => ({
-          title: formatGroupTitle(menuKey as string),
-          items: Object.entries((menuData as any).submenus)
-            .filter(([, submenuEnabled]) => submenuEnabled)
-            .map(([submenuTitle]) => {
-              let url = `/${toKebabCase(menuKey as string)}/${toKebabCase(
-                submenuTitle
-              )}`;
-              if (submenuTitle === "Main Dashboard") {
-                url = "/";
-              }
-              return {
-                title: submenuTitle,
-                url: url,
-                icon: iconMap[submenuTitle] || Menu,
-              };
-            }),
-        }))
-        .filter((group) => group.items.length > 0)
-    );
-  }, [menuConfig]); // Dependensi tetap 'menuConfig'
+    return menuOrder
+      .map((menuKey) => {
+        const menuData = menuConfig[menuKey];
+        return [menuKey, menuData];
+      })
+      .filter(([, menuData]) => menuData && menuData.enabled)
+      .map(([menuKey, menuData]) => ({
+        title: formatGroupTitle(menuKey as string),
+        items: Object.entries((menuData as any).submenus)
+          .filter(([, submenuEnabled]) => submenuEnabled)
+          // <-- DITAMBAHKAN: Blok untuk sorting submenu
+          .sort(([submenuTitleA], [submenuTitleB]) => {
+            const orderArray = submenuOrder[menuKey as string] || [];
+            return (
+              orderArray.indexOf(submenuTitleA) -
+              orderArray.indexOf(submenuTitleB)
+            );
+          })
+          // Blok sorting selesai
+          .map(([submenuTitle]) => {
+            let url = `/${toKebabCase(menuKey as string)}/${toKebabCase(
+              submenuTitle
+            )}`;
+            if (submenuTitle === "Main Dashboard") {
+              url = "/";
+            }
+            return {
+              title: submenuTitle,
+              url: url,
+              icon: iconMap[submenuTitle] || Menu,
+            };
+          }),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [menuConfig]);
 
   return (
     <Sidebar>

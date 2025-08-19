@@ -33,6 +33,8 @@ import {
   List,
   ShieldCheck,
   Lock,
+  Move3D,
+  Radio,
 } from "lucide-react";
 
 // Tipe untuk memperjelas struktur data
@@ -64,12 +66,7 @@ export const mainWidgets: MainWidgetCategory[] = [
     icon: Gauge,
     description: "Kartu untuk memonitor nilai dan status.",
   },
-  {
-    name: "Electrical Diagrams",
-    category: "Electrical",
-    icon: Zap,
-    description: "Diagram kelistrikan dan status perangkat.",
-  },
+
   {
     name: "Control Widgets",
     category: "Toggle Control",
@@ -228,20 +225,6 @@ export const widgets: Widget[] = [
     description: "Monitor status real-time dari  Access Lock Controller.",
   },
 
-  // --- Electrical ---
-  {
-    name: "SLD Diagram – Container",
-    category: "Electrical",
-    icon: Zap,
-    description: "Single Line Diagram untuk kontainer.",
-  },
-  {
-    name: "SLD Diagram – Mobile Genset/LV",
-    category: "Electrical",
-    icon: Zap,
-    description: "Single Line Diagram untuk genset atau LV.",
-  },
-
   {
     name: "Button Control Modbus",
     category: "Toggle Control",
@@ -275,6 +258,12 @@ export const widgets: Widget[] = [
     description: "Visualisasi 3D dari rak server.",
   },
   {
+    name: "Modular 3D Device View",
+    category: "3Dimensi",
+    description: "3D visualization of modular devices with real-time status",
+    icon: Move3D, // atau icon lain yang sesuai
+  },
+  {
     name: "3D Container View",
     category: "3Dimensi",
     icon: Container,
@@ -284,19 +273,15 @@ export const widgets: Widget[] = [
     name: "3D Containment View",
     category: "3Dimensi",
     icon: Building,
-    description: "Denah 3D dari ruang containment.",
+    description: "3D visualization of server containment with real-time status",
   },
+
   {
-    name: "3D Modular Device View",
+    name: "3D Subrack View",
     category: "3Dimensi",
-    icon: CircuitBoard,
-    description: "Tampilan 3D perangkat modular.",
-  },
-  {
-    name: "Subrack",
-    category: "3Dimensi",
-    icon: Server,
-    description: "Tampilan 3D dari sebuah subrack.",
+    description:
+      "3D visualization of subrack devices with real-time status via MQTT",
+    icon: Server, // atau icon lain yang sesuai
   },
 
   // --- Alarms ---
@@ -327,6 +312,12 @@ export const widgets: Widget[] = [
     category: "Dashboard",
     icon: Table,
     description: "Pintasan untuk navigasi ke dashboard lain.",
+  },
+  {
+    name: "LoRaWAN Device Data", // <-- Nama widget
+    category: "Monitoring", // <-- Masukkan ke kategori Monitoring
+    icon: Radio, // <-- Gunakan ikon yang sesuai
+    description: "Displays real-time data from a selected LoRaWAN device.",
   },
 ];
 

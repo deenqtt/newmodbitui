@@ -1,9 +1,17 @@
 // File: components/widgets/BreakerStatus/BreakerStatusWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle, Power, PowerOff, Zap } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Power,
+  PowerOff,
+  Zap,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 
 // --- PERBAIKAN: Perbarui struktur Props agar sesuai dengan data yang disimpan ---
 interface Props {
@@ -25,12 +33,21 @@ interface Props {
 
 export const BreakerStatusWidget = ({ config }: Props) => {
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [monitoringStatus, setMonitoringStatus] = useState<
     "UNKNOWN" | "ON" | "OFF"
   >("UNKNOWN");
   const [tripStatus, setTripStatus] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [layoutMode, setLayoutMode] = useState<"horizontal" | "vertical">(
+    "vertical"
+  );
+  const [dynamicSizes, setDynamicSizes] = useState({
+    valueFontSize: 24,
+    iconSize: 48,
+    titleFontSize: 16,
+  });
 
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
@@ -84,6 +101,43 @@ export const BreakerStatusWidget = ({ config }: Props) => {
   );
 
   useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        const aspectRatio = width / height;
+
+        // Tentukan mode layout berdasarkan aspek rasio
+        const currentLayoutMode = aspectRatio > 1.3 ? "horizontal" : "vertical";
+        setLayoutMode(currentLayoutMode);
+
+        // Rumus dinamis yang lebih conservative untuk card kecil
+        let baseSize;
+        if (currentLayoutMode === "horizontal") {
+          baseSize = Math.min(width / 12, height / 4.5); // Lebih kecil dari 7 & 2.5
+        } else {
+          // Vertical
+          baseSize = Math.min(width / 10, height / 7.5); // Lebih kecil dari 4 & 4
+        }
+
+        // Multiplier yang lebih kecil untuk menghasilkan font size yang lebih reasonable
+        setDynamicSizes({
+          valueFontSize: Math.max(16, baseSize * 1.2), // Status text size
+          iconSize: Math.max(24, baseSize * 1.8), // Icon size
+          titleFontSize: Math.max(12, baseSize * 0.7), // Title size
+        });
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       !config.monitoring?.deviceTopic ||
       !isReady ||
@@ -124,51 +178,155 @@ export const BreakerStatusWidget = ({ config }: Props) => {
   // Logika prioritas: TRIP > ON/OFF > UNKNOWN
   const finalStatus = tripStatus ? "TRIP" : monitoringStatus;
 
+  const getStatusConfig = (status: string) => {
+    const configs = {
+      TRIP: {
+        icon: Zap,
+        color: "text-amber-600",
+        bgColor: "bg-amber-50",
+        borderColor: "border-amber-200",
+        dotColor: "bg-amber-500",
+        label: "TRIP",
+      },
+      ON: {
+        icon: Power,
+        color: "text-green-600",
+        bgColor: "bg-green-50",
+        borderColor: "border-green-200",
+        dotColor: "bg-green-500",
+        label: "ON",
+      },
+      OFF: {
+        icon: PowerOff,
+        color: "text-red-600",
+        bgColor: "bg-red-50",
+        borderColor: "border-red-200",
+        dotColor: "bg-red-500",
+        label: "OFF",
+      },
+      UNKNOWN: {
+        icon: AlertTriangle,
+        color: "text-gray-500",
+        bgColor: "bg-gray-50",
+        borderColor: "border-gray-200",
+        dotColor: "bg-gray-400",
+        label: "UNKNOWN",
+      },
+    };
+    return configs[status as keyof typeof configs] || configs.UNKNOWN;
+  };
+
+  const statusConfig = getStatusConfig(finalStatus);
+  const StatusIcon = statusConfig.icon;
+
+  const renderConnectionIndicator = () => {
+    const isConnected = connectionStatus === "Connected" && isReady;
+    return (
+      <div className="absolute top-3 right-3 flex items-center gap-1">
+        {isConnected ? (
+          <Wifi className="h-3 w-3 text-green-500" />
+        ) : (
+          <WifiOff className="h-3 w-3 text-red-500" />
+        )}
+        <div
+          className={`w-1.5 h-1.5 rounded-full ${
+            isConnected ? "bg-green-500" : "bg-red-500"
+          }`}
+        />
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center gap-3">
+          <div className="relative">
+            <Loader2 className="h-12 w-12 animate-spin text-gray-400" />
+          </div>
+          <div className="text-sm font-medium text-gray-500">Loading...</div>
+        </div>
       );
     }
 
-    switch (finalStatus) {
-      case "TRIP":
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 text-yellow-500">
-            <Zap className="h-12 w-12" />
-            <span className="text-lg font-bold">TRIP</span>
+    return (
+      <div
+        className={`
+        flex flex-col items-center justify-center gap-4 w-full
+        ${layoutMode === "horizontal" ? "md:flex-row md:gap-6" : ""}
+      `}
+      >
+        {/* Status Icon */}
+        <div className="relative">
+          {/* Pulse effect for active states */}
+          {(finalStatus === "TRIP" || finalStatus === "ON") && (
+            <div
+              className={`absolute inset-0 rounded-full ${statusConfig.dotColor} opacity-20 animate-ping`}
+            />
+          )}
+
+          {/* Icon container */}
+          <div
+            className={`
+            relative p-4 rounded-xl border-2 transition-all duration-300
+            ${statusConfig.bgColor} ${statusConfig.borderColor}
+            hover:scale-105 hover:shadow-lg
+          `}
+          >
+            <StatusIcon
+              className={`${statusConfig.color}`}
+              style={{
+                width: dynamicSizes.iconSize,
+                height: dynamicSizes.iconSize,
+              }}
+            />
           </div>
-        );
-      case "ON":
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 text-green-500">
-            <Power className="h-12 w-12" />
-            <span className="text-lg font-bold">ON</span>
-          </div>
-        );
-      case "OFF":
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 text-red-500">
-            <PowerOff className="h-12 w-12" />
-            <span className="text-lg font-bold">OFF</span>
-          </div>
-        );
-      default: // UNKNOWN
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
-            <AlertTriangle className="h-12 w-12" />
-            <span className="text-lg font-bold">UNKNOWN</span>
-          </div>
-        );
-    }
+
+          {/* Status dot */}
+          <div
+            className={`
+            absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white
+            ${statusConfig.dotColor}
+            ${
+              finalStatus === "TRIP" || finalStatus === "ON"
+                ? "animate-pulse"
+                : ""
+            }
+          `}
+          />
+        </div>
+
+        {/* Status label */}
+        <div
+          className={`font-bold ${statusConfig.color}`}
+          style={{ fontSize: dynamicSizes.valueFontSize }}
+        >
+          {statusConfig.label}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move">
-      <h3 className="font-semibold text-md text-center truncate mb-2">
-        {config.widgetTitle}
-      </h3>
-      <div className="flex-1 w-full flex items-center justify-center">
+    <div
+      ref={containerRef}
+      className="relative w-full h-full bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-move"
+    >
+      {/* Connection indicator */}
+      {renderConnectionIndicator()}
+
+      {/* Header */}
+      <div className="p-4 pb-2 border-b border-gray-100">
+        <h3
+          className="font-semibold text-gray-800 text-center truncate"
+          style={{ fontSize: dynamicSizes.titleFontSize }}
+        >
+          {config.widgetTitle}
+        </h3>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex items-center justify-center p-6">
         {renderContent()}
       </div>
     </div>

@@ -28,6 +28,11 @@ import { CameraSnapshotWidget } from "./CameraSnapshot/CameraSnapshotWidget";
 import { SldContainerWidget } from "./SldContainer/SldContainerWidget";
 import { AccessControllerStatusWidget } from "./AccessControllerStatus/AccessControllerStatusWidget"; // <-- IMPORT BARU
 import { LockAccessControlWidget } from "./LockAccessControl/LockAccessControlWidget";
+import { Modular3dDeviceViewWidget } from "./Modular3dDeviceView/Modular3dDeviceViewWidget";
+import { Subrack3dWidget } from "./Subrack3d/Subrack3dWidget";
+import { Containment3dWidget } from "./Containment3d/Containment3dWidget";
+import { Container3dWidget } from "./Container3d/Container3dWidget";
+
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 
 interface Props {
@@ -111,6 +116,14 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <AccessControllerStatusWidget config={config} />; // <-- CASE BARU
     case "Lock Access Control":
       return <LockAccessControlWidget config={config} />; // <-- CASE BARU
+    case "3D Subrack View":
+      return <Subrack3dWidget config={config} />;
+    case "Modular 3D Device View":
+      return <Modular3dDeviceViewWidget config={config} />;
+    case "3D Containment View":
+      return <Containment3dWidget config={config} />;
+    case "3D Container View":
+      return <Container3dWidget config={config} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">
