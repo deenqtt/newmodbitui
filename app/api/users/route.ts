@@ -1,14 +1,9 @@
 // File: app/api/users/route.ts
 import { NextResponse } from "next/server";
-// Hapus impor PrismaClient, kita tidak butuh itu di sini
 import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { getAuthFromCookie } from "@/lib/auth";
-
-// highlight-start
-// GANTI baris 'new PrismaClient()' DENGAN IMPORT DARI lib/prisma
 import { prisma } from "@/lib/prisma";
-// highlight-end
 
 // GET semua pengguna (hanya Admin)
 export async function GET(request: Request) {
@@ -18,11 +13,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
-  // Sekarang ini menggunakan koneksi yang sama dan efisien
   const users = await prisma.user.findMany({
     select: {
       id: true,
       email: true,
+      phoneNumber: true, // ✨ Tambahkan ini
       role: true,
       createdAt: true,
     },
@@ -38,7 +33,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { email, password, role } = await request.json();
+    // ✨ Tambahkan phoneNumber di sini
+    const { email, password, role, phoneNumber } = await request.json();
     if (!email || !password || !role) {
       return NextResponse.json(
         { message: "Email, password, dan role wajib diisi" },
@@ -47,12 +43,12 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    // Ini juga akan menggunakan koneksi yang efisien
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         role,
+        phoneNumber, // ✨ Tambahkan ini
       },
     });
 
@@ -65,6 +61,7 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+    console.error("Error creating user:", error);
     return NextResponse.json(
       { message: "Terjadi kesalahan saat membuat pengguna" },
       { status: 500 }

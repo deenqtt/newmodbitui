@@ -1,3 +1,5 @@
+// File: app-sidebar.tsx
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -28,6 +30,10 @@ import {
   FileText,
   Package,
   History,
+  Wrench,
+  LogOut,
+  User,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,7 +47,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 // --- Type Definitions ---
 interface Submenus {
@@ -51,7 +62,6 @@ interface MenuConfigData {
   [key: string]: { enabled: boolean; submenus: Submenus };
 }
 
-// Data menu default sebagai fallback
 const defaultMenuConfig: MenuConfigData = {
   Monitoring: { enabled: true, submenus: { "Main Dashboard": true } },
   Devices: {
@@ -112,6 +122,10 @@ const defaultMenuConfig: MenuConfigData = {
     submenus: { "Relay Control": true, "Relay STT": true },
   },
   Analytics: { enabled: true, submenus: { "Devices Log Report": true } },
+  Maintenance: {
+    enabled: true,
+    submenus: { "Schedule Management": true, "Task Reports": true },
+  },
 };
 const menuOrder = [
   "Monitoring",
@@ -124,9 +138,9 @@ const menuOrder = [
   "Alarms",
   "VoiceRecognition",
   "Analytics",
+  "Maintenance",
 ];
 
-// <-- DITAMBAHKAN: Definisikan urutan yang diinginkan untuk setiap submenu
 const submenuOrder: { [key: string]: string[] } = {
   Devices: [
     "Devices Internal",
@@ -153,9 +167,9 @@ const submenuOrder: { [key: string]: string[] } = {
   ],
   Alarms: ["Alarm Management", "Alarm Log Reports"],
   VoiceRecognition: ["Relay Control", "Relay STT"],
+  Maintenance: ["Schedule Management", "Task Reports"],
 };
 
-// Pemetaan dari nama submenu ke komponen ikon
 const iconMap: { [key: string]: React.ElementType } = {
   "Main Dashboard": LayoutDashboard,
   "Devices Internal": HardDrive,
@@ -185,21 +199,65 @@ const iconMap: { [key: string]: React.ElementType } = {
   "Relay Control": Power,
   "Relay STT": Mic,
   "Devices Log Report": FileText,
+  "Schedule Management": Wrench,
+  "Task Reports": History,
 };
 
-// Helper function untuk mengubah string menjadi format kebab-case (untuk URL)
 const toKebabCase = (str: string) =>
   str
     .replace(/([a-z])([A-Z])/g, "$1-$2")
     .replace(/[\s_]+/g, "-")
     .toLowerCase();
 
-// Helper function untuk memformat judul grup menu
 const formatGroupTitle = (key: string) => key.replace(/([A-Z])/g, " $1").trim();
+
+function SidebarUser() {
+  const { user, logout, isLoading } = useAuth();
+  const getInitials = (email: string) =>
+    email ? email.charAt(0).toUpperCase() : "?";
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center gap-3">
+        <Avatar className="h-9 w-9">
+          <AvatarImage src="#" alt="User Avatar" />
+          <AvatarFallback>{getInitials(user.email)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 overflow-hidden">
+          <p className="text-sm font-medium leading-none truncate">
+            {user.email}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">{user.role}</p>
+        </div>
+      </div>
+      {/* Separator dipindahkan ke sini */}
+      <Separator className="my-3" />
+      <Button
+        variant="ghost"
+        className="w-full justify-start rounded-lg text-red-500 bg-red-100 hover:bg-red-300 hover:text-red-600"
+        onClick={logout}
+      >
+        <LogOut className="mr-2 h-4 w-4" />
+        Log out
+      </Button>
+    </div>
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
-
   const [menuConfig, setMenuConfig] =
     useState<MenuConfigData>(defaultMenuConfig);
 
@@ -226,37 +284,39 @@ export function AppSidebar() {
     return menuOrder
       .map((menuKey) => {
         const menuData = menuConfig[menuKey];
-        return [menuKey, menuData];
+        if (!menuData || !menuData.enabled) {
+          return null;
+        }
+        return {
+          title: formatGroupTitle(menuKey as string),
+          items: Object.entries(menuData.submenus)
+            .filter(([, submenuEnabled]) => submenuEnabled)
+            .sort(([submenuTitleA], [submenuTitleB]) => {
+              const orderArray = submenuOrder[menuKey as string] || [];
+              return (
+                orderArray.indexOf(submenuTitleA) -
+                orderArray.indexOf(submenuTitleB)
+              );
+            })
+            .map(([submenuTitle]) => {
+              let url = `/${toKebabCase(menuKey as string)}/${toKebabCase(
+                submenuTitle
+              )}`;
+              if (submenuTitle === "Main Dashboard") {
+                url = "/";
+              }
+              return {
+                title: submenuTitle,
+                url: url,
+                icon: iconMap[submenuTitle] || Menu,
+              };
+            }),
+        };
       })
-      .filter(([, menuData]) => menuData && menuData.enabled)
-      .map(([menuKey, menuData]) => ({
-        title: formatGroupTitle(menuKey as string),
-        items: Object.entries((menuData as any).submenus)
-          .filter(([, submenuEnabled]) => submenuEnabled)
-          // <-- DITAMBAHKAN: Blok untuk sorting submenu
-          .sort(([submenuTitleA], [submenuTitleB]) => {
-            const orderArray = submenuOrder[menuKey as string] || [];
-            return (
-              orderArray.indexOf(submenuTitleA) -
-              orderArray.indexOf(submenuTitleB)
-            );
-          })
-          // Blok sorting selesai
-          .map(([submenuTitle]) => {
-            let url = `/${toKebabCase(menuKey as string)}/${toKebabCase(
-              submenuTitle
-            )}`;
-            if (submenuTitle === "Main Dashboard") {
-              url = "/";
-            }
-            return {
-              title: submenuTitle,
-              url: url,
-              icon: iconMap[submenuTitle] || Menu,
-            };
-          }),
-      }))
-      .filter((group) => group.items.length > 0);
+      .filter(
+        (group): group is { title: string; items: any[] } =>
+          group !== null && group.items.length > 0
+      );
   }, [menuConfig]);
 
   return (
@@ -268,9 +328,7 @@ export function AppSidebar() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Modbo</h1>
-            <p className="text-xs text-muted-foreground">
-              Recognition Platform
-            </p>
+            <p className="text-xs text-muted-foreground">Monitoring Platform</p>
           </div>
         </div>
       </SidebarHeader>
@@ -295,6 +353,9 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
+      <SidebarFooter className="mt-auto">
+        <SidebarUser />
+      </SidebarFooter>
     </Sidebar>
   );
 }

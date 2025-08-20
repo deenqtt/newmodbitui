@@ -1,29 +1,35 @@
 // File: app/api/users/[id]/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from "@prisma/client";
+// Hapus 'PrismaClient' dari impor di sini
+import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-// Ganti helper lama dengan yang baru
 import { getAuthFromCookie } from "@/lib/auth";
 
-const prisma = new PrismaClient();
+// highlight-start
+// GANTI baris 'new PrismaClient()' DENGAN IMPORT DARI lib/prisma
+import { prisma } from "@/lib/prisma";
+// highlight-end
 
 // PUT (update) pengguna (hanya Admin)
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  // Gunakan helper baru yang async untuk membaca cookie
   const auth = await getAuthFromCookie(request);
   if (!auth || auth.role !== Role.ADMIN) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const { email, password, role } = await request.json();
+    // ✨ Tambahkan phoneNumber di sini
+    const { email, password, role, phoneNumber } = await request.json();
     const dataToUpdate: any = {};
 
     if (email) dataToUpdate.email = email;
     if (role) dataToUpdate.role = role;
+    if (phoneNumber !== undefined) {
+      dataToUpdate.phoneNumber = phoneNumber;
+    }
 
     if (password) {
       dataToUpdate.password = await bcrypt.hash(password, 10);

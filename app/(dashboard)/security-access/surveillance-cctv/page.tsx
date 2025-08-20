@@ -1,24 +1,23 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
-import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
+import { useEffect, useState, useRef } from "react";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Camera,
+  MonitorPlay,
+  VideoOff,
+  Play,
+  Pause,
+  VolumeX,
+  Volume2,
+  Circle,
+  Video,
+  Download,
+  Trash,
+  CheckCircle2,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -27,388 +26,594 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  PlusCircle,
-  Trash2,
-  Video,
-  Wifi,
-  WifiOff,
-  Edit,
-  Loader2,
-} from "lucide-react";
-import Swal from "sweetalert2";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cctvService, CctvCamera } from "@/lib/services/cctv-service";
+import Hls from "hls.js";
 
-interface Cctv {
-  id: string;
+interface FetchedStream {
   name: string;
-  ipAddress: string;
-  port: number;
-  channel?: string | null;
-  username?: string | null;
-  password?: string | null;
+  mid: string;
+  status: string;
+  streams: string[];
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+interface FetchedVideo {
+  filename: string;
+  time: string;
+  size: number;
+  href: string;
+  status: number;
+  links: {
+    deleteVideo: string;
+    changeToUnread: string;
+    changeToRead: string;
+  };
+}
 
-function SurveillanceCctvPage() {
-  const { connectionStatus } = useMqtt();
-  const [cctvList, setCctvList] = useState<Cctv[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCctv, setEditingCctv] = useState<Cctv | null>(null);
-  const [form, setForm] = useState<Partial<Cctv>>({});
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+interface MonitorData {
+  camera: CctvCamera;
+  data: FetchedStream;
+  videos?: FetchedVideo[] | null;
+}
 
-  const fetchCctv = async () => {
+const LiveStreamPlayer = ({
+  streamUrl,
+  name,
+}: {
+  streamUrl: string;
+  name: string;
+}) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    let hls: Hls;
+
+    if (videoRef.current) {
+      const video = videoRef.current;
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch((e) => console.error("Video playback error:", e));
+          setIsPlaying(true);
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = streamUrl;
+        video.addEventListener("loadedmetadata", () => {
+          video.play().catch((e) => console.error("Video playback error:", e));
+          setIsPlaying(true);
+        });
+      }
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy();
+      }
+    };
+  }, [streamUrl]);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current
+          .play()
+          .catch((e) => console.error("Video playback error:", e));
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  return (
+    <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
+      <video
+        ref={videoRef}
+        className="w-full h-full object-cover"
+        muted={isMuted}
+        playsInline
+      />
+
+      <div className="absolute top-3 left-3">
+        <Badge className="bg-red-600 hover:bg-red-600 text-white text-xs animate-pulse">
+          <Circle className="h-2 w-2 fill-white mr-1" />
+          LIVE
+        </Badge>
+      </div>
+
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/20">
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={togglePlay}
+            size="sm"
+            variant="secondary"
+            className="bg-black/70 hover:bg-black/90 border-0 text-white"
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
+          <Button
+            onClick={toggleMute}
+            size="sm"
+            variant="secondary"
+            className="bg-black/70 hover:bg-black/90 border-0 text-white"
+          >
+            {isMuted ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const fetchMonitorData = async (
+  camera: CctvCamera
+): Promise<MonitorData | null> => {
+  if (!camera.apiKey || !camera.group) {
+    return null;
+  }
+  const apiUrl = `http://${camera.ipAddress}:${camera.port}/${camera.apiKey}/monitor/${camera.group}`;
+  console.log("Fetching data from URL:", apiUrl);
+
+  try {
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch monitor data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return { camera, data: data[0] };
+  } catch (error: any) {
+    toast.error(
+      `Error loading monitor data for "${camera.name}": ${error.message}`
+    );
+    console.error(`Error details for ${camera.name}:`, error);
+    return null;
+  }
+};
+
+const fetchVideoData = async (
+  monitor: MonitorData
+): Promise<FetchedVideo[] | null> => {
+  const { ipAddress, port, apiKey, group } = monitor.camera;
+  const monitorId = monitor.data.mid;
+  if (!apiKey || !group || !monitorId) {
+    return null;
+  }
+  const videoUrl = `http://${ipAddress}:${port}/${apiKey}/videos/${group}/${monitorId}`;
+  console.log("Fetching videos from URL:", videoUrl);
+
+  try {
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch video data: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.videos || [];
+  } catch (error: any) {
+    toast.error(
+      `Error loading videos for "${monitor.data.name}": ${error.message}`
+    );
+    console.error(`Error details for videos of ${monitor.data.name}:`, error);
+    return null;
+  }
+};
+
+export default function CctvPage() {
+  const [cameras, setCameras] = useState<CctvCamera[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [monitorData, setMonitorData] = useState<MonitorData[]>([]);
+  const [videoData, setVideoData] = useState<MonitorData[]>([]);
+
+  const loadCamerasAndMonitorData = async () => {
+    setLoading(true);
     try {
-      if (cctvList.length === 0) setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/cctv`);
-      if (!response.ok) throw new Error("Failed to fetch CCTV data");
-      const data = await response.json();
-      setCctvList(data);
+      const result = await cctvService.getCameras();
+      if (result.success && result.data) {
+        setCameras(result.data);
+        const monitorPromises = result.data.map(fetchMonitorData);
+        const results = await Promise.all(monitorPromises);
+        const validResults = results.filter(
+          (res) => res !== null
+        ) as MonitorData[];
+        setMonitorData(validResults);
+
+        const videoPromises = validResults.map(async (monitor) => {
+          const videos = await fetchVideoData(monitor);
+          return { ...monitor, videos };
+        });
+        const videoResults = await Promise.all(videoPromises);
+        setVideoData(videoResults);
+      } else {
+        toast.error(result.message || "Failed to load CCTV cameras");
+      }
     } catch (error: any) {
-      Swal.fire("Error", error.message, "error");
+      toast.error(error.message || "Error loading CCTV cameras");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (
+    video: FetchedVideo,
+    monitor: MonitorData
+  ) => {
+    const url =
+      video.status === 1
+        ? `http://${monitor.camera.ipAddress}:${monitor.camera.port}${video.links.changeToRead}`
+        : `http://${monitor.camera.ipAddress}:${monitor.camera.port}${video.links.changeToUnread}`;
+
+    await toast.promise(fetch(url), {
+      loading: "Updating video status...",
+      success: (res) => {
+        if (!res.ok)
+          throw new Error(`Failed to change status: ${res.statusText}`);
+        // Re-fetch data to update the UI
+        loadCamerasAndMonitorData();
+        return "Video status updated successfully!";
+      },
+      error: "Failed to update video status.",
+    });
+  };
+
+  const handleDeleteVideo = async (
+    video: FetchedVideo,
+    monitor: MonitorData
+  ) => {
+    if (window.confirm("Are you sure you want to delete this video?")) {
+      const url = `http://${monitor.camera.ipAddress}:${monitor.camera.port}${video.links.deleteVideo}`;
+      await toast.promise(fetch(url, { method: "GET" }), {
+        // Metode bisa POST/DELETE tergantung API
+        loading: "Deleting video...",
+        success: (res) => {
+          if (!res.ok)
+            throw new Error(`Failed to delete video: ${res.statusText}`);
+          // Re-fetch data to update the UI
+          loadCamerasAndMonitorData();
+          return "Video deleted successfully!";
+        },
+        error: "Failed to delete video.",
+      });
     }
   };
 
   useEffect(() => {
-    fetchCctv();
+    loadCamerasAndMonitorData();
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddClick = () => {
-    setEditingCctv(null);
-    setForm({
-      name: "",
-      ipAddress: "",
-      port: 554,
-      channel: "", // <-- PERUBAHAN UTAMA DI SINI
-      username: "admin",
-      password: "",
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (cctv: Cctv) => {
-    setEditingCctv(cctv);
-    setForm({ ...cctv, password: "" });
-    setIsModalOpen(true);
-  };
-
-  const handleFormSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const url = editingCctv
-      ? `${API_BASE_URL}/api/cctv/${editingCctv.id}`
-      : `${API_BASE_URL}/api/cctv`;
-    const method = editingCctv ? "PUT" : "POST";
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!response.ok)
-        throw new Error(
-          `Failed to ${method === "POST" ? "add" : "update"} CCTV`
-        );
-      Swal.fire(
-        "Success",
-        `CCTV has been ${method === "POST" ? "added" : "updated"}.`,
-        "success"
-      );
-      setIsModalOpen(false);
-      fetchCctv();
-    } catch (error: any) {
-      Swal.fire("Error", error.message, "error");
-    }
-  };
-
-  const handleDelete = (cctv: Cctv) => {
-    Swal.fire({
-      title: `Delete ${cctv.name}?`,
-      text: "You won't be able to revert this!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, delete it!",
-      confirmButtonColor: "#d33",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/cctv/${cctv.id}`, {
-            method: "DELETE",
-          });
-          if (!response.ok) throw new Error("Deletion failed on server.");
-          Swal.fire(
-            "Deleted!",
-            "CCTV configuration has been deleted.",
-            "success"
-          );
-          fetchCctv();
-        } catch (error) {
-          Swal.fire("Error", "Failed to delete the configuration.", "error");
-        }
-      }
-    });
-  };
-
-  const handlePreview = (id: string) => {
-    setIsPreviewLoading(true);
-    setPreviewUrl(
-      `${API_BASE_URL}/api/cctv/${id}/stream?t=${new Date().getTime()}`
+  if (loading) {
+    return (
+      <SidebarInset>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <span className="ml-2">Loading data...</span>
+        </div>
+      </SidebarInset>
     );
-  };
-
-  const closePreview = () => {
-    setPreviewUrl(null);
-    setIsPreviewLoading(false);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Connected":
-        return (
-          <Badge className="bg-green-500 hover:bg-green-600">
-            <Wifi className="h-3 w-3 mr-1" />
-            {status}
-          </Badge>
-        );
-      case "Disconnected":
-      case "Failed to Connect":
-        return (
-          <Badge variant="destructive">
-            <WifiOff className="h-3 w-3 mr-1" />
-            {status}
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}...</Badge>;
-    }
-  };
+  }
 
   return (
-    <>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>CCTV Surveillance</CardTitle>
-              <CardDescription>
-                Manage your CCTV camera configurations.
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>MQTT:</span>
-                {getStatusBadge(connectionStatus)}
-              </div>
-              <Button onClick={handleAddClick}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add New CCTV
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Camera Name</TableHead>
-                  <TableHead>IP Address</TableHead>
-                  <TableHead>Port</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-8 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : cctvList.length === 0 ? (
+    <SidebarInset>
+      <header className="flex h-16 items-center justify-between border-b px-4">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Camera className="h-5 w-5" />
+          <h1 className="text-lg font-semibold">CCTV Data Display</h1>
+        </div>
+      </header>
+
+      <Tabs defaultValue="cameras" className="w-full mt-4 p-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="cameras">Camera Data</TabsTrigger>
+          <TabsTrigger value="monitors">Live Monitors</TabsTrigger>
+          <TabsTrigger value="videos">Videos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cameras" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>CCTV Camera Data ({cameras.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
-                      No cameras configured.
-                    </TableCell>
+                    <TableHead className="w-[50px]">#</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>IP Address</TableHead>
+                    <TableHead>API Key</TableHead>
+                    <TableHead>Group</TableHead>
+                    <TableHead>Resolution</TableHead>
                   </TableRow>
-                ) : (
-                  cctvList.map((cctv) => (
-                    <TableRow key={cctv.id}>
-                      <TableCell className="font-medium">{cctv.name}</TableCell>
-                      <TableCell>{cctv.ipAddress}</TableCell>
-                      <TableCell>{cctv.port}</TableCell>
-                      <TableCell>{cctv.username || "N/A"}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePreview(cctv.id)}
-                        >
-                          <Video className="h-4 w-4 mr-1" /> Preview
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(cctv)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-500 hover:text-red-600"
-                          onClick={() => handleDelete(cctv)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                </TableHeader>
+                <TableBody>
+                  {cameras.length > 0 ? (
+                    cameras.map((camera: CctvCamera, index: number) => (
+                      <TableRow key={camera.id}>
+                        <TableCell className="font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{camera.name}</div>
+                        </TableCell>
+                        <TableCell>
+                          <a
+                            href={`http://${camera.ipAddress}:${camera.port}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {camera.ipAddress}:{camera.port}
+                          </a>
+                        </TableCell>
+                        <TableCell className="w-[80px]">
+                          <span className="block w-full truncate">
+                            {camera.apiKey || "Not set"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {camera.group || "No Group"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {camera.resolution || "640x480"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center text-gray-500"
+                      >
+                        No CCTV cameras found.
                       </TableCell>
                     </TableRow>
-                  ))
+                  )}
+                </TableBody>
+              </Table>
+
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-2">Monitor List</h3>
+                {monitorData.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">#</TableHead>
+                        <TableHead>Monitor Name</TableHead>
+                        <TableHead>Camera Name</TableHead>
+                        <TableHead>MID</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monitorData.map((monitor, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell>{monitor.data.name}</TableCell>
+                          <TableCell>{monitor.camera.name}</TableCell>
+                          <TableCell>{monitor.data.mid}</TableCell>
+                          <TableCell>
+                            <Badge className="bg-green-500 hover:bg-green-500 text-white capitalize">
+                              {monitor.data.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-gray-500">
+                    No active monitors found.
+                  </p>
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </main>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <form onSubmit={handleFormSubmit}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingCctv ? "Edit CCTV" : "Add New CCTV"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Camera Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder="e.g., CCTV Gudang"
-                  value={form.name || ""}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="ipAddress">IP Address</Label>
-                <Input
-                  id="ipAddress"
-                  name="ipAddress"
-                  placeholder="192.168.1.100"
-                  value={form.ipAddress || ""}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="port">Port</Label>
-                  <Input
-                    id="port"
-                    name="port"
-                    type="number"
-                    placeholder="554"
-                    value={form.port || ""}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="channel">Channel/Path</Label>
-                  <Input
-                    id="channel"
-                    name="channel"
-                    placeholder="101"
-                    value={form.channel || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    placeholder="admin"
-                    value={form.username || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Leave blank to keep unchanged"
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save Changes</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="monitors" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Live Monitors ({monitorData.length})</CardTitle>
+              <CardDescription>
+                Displaying live stream data for cameras with a configured API
+                key.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {monitorData.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {monitorData.map((monitor, index) => {
+                    const hlsStreamUrl = monitor.data.streams[0];
+                    const fullUrl = `http://${monitor.camera.ipAddress}:${monitor.camera.port}${hlsStreamUrl}`;
 
-      <Dialog open={!!previewUrl} onOpenChange={closePreview}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Live Preview</DialogTitle>
-          </DialogHeader>
-          <div className="aspect-video w-full bg-slate-900 rounded-md overflow-hidden flex items-center justify-center">
-            {/* Tampilkan gambar secara langsung tanpa loading state */}
-            {previewUrl && (
-              <img
-                src={previewUrl}
-                alt="CCTV Live Stream"
-                className="w-full h-full object-contain" // Hapus class "hidden"
-                // Hapus props onLoad
-                onError={() => {
-                  // Pertahankan onError untuk menangani jika URL benar-benar error
-                  closePreview();
-                  Swal.fire(
-                    "Stream Error",
-                    "Could not load video stream. Check config and network.",
-                    "error"
-                  );
-                }}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
+                    return (
+                      <div key={index} className="space-y-2">
+                        {hlsStreamUrl ? (
+                          <LiveStreamPlayer
+                            streamUrl={fullUrl}
+                            name={monitor.data.name}
+                          />
+                        ) : (
+                          <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden flex flex-col items-center justify-center text-white">
+                            <VideoOff className="h-10 w-10 text-gray-400" />
+                            <span className="mt-2 text-sm">
+                              Stream Not Available
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold">
+                            {monitor.data.name}
+                          </div>
+                          <Badge
+                            variant="default"
+                            className="bg-green-500 hover:bg-green-500 text-white"
+                          >
+                            {monitor.data.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Group: {monitor.camera.group}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8">
+                  <VideoOff className="h-12 w-12 text-gray-400" />
+                  <p className="mt-4 text-center text-gray-500">
+                    No active monitors found or failed to load.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-export default function SurveillanceCctvPageWithProvider() {
-  return (
-    <MqttProvider>
-      <SurveillanceCctvPage />
-    </MqttProvider>
+        {/* Tab Content for Videos */}
+        <TabsContent value="videos" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recorded Videos</CardTitle>
+              <CardDescription>
+                Daftar video yang tersedia untuk setiap monitor.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {videoData.length > 0 ? (
+                videoData.map(
+                  (monitor, monitorIndex) =>
+                    monitor.videos &&
+                    monitor.videos.length > 0 && (
+                      <div key={monitorIndex} className="mb-8">
+                        <h4 className="text-md font-semibold mb-2">
+                          Videos from {monitor.data.name} (
+                          {monitor.videos.length})
+                        </h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>File Name</TableHead>
+                              <TableHead>Time</TableHead>
+                              <TableHead>Size</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">
+                                Actions
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {monitor.videos.map((video, videoIndex) => (
+                              <TableRow key={videoIndex}>
+                                <TableCell className="font-medium">
+                                  {video.filename}
+                                </TableCell>
+                                <TableCell>{video.time}</TableCell>
+                                <TableCell>
+                                  {(video.size / 1024 / 1024).toFixed(2)} MB
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      video.status === 1
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {video.status === 1 ? "Unread" : "Read"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <a
+                                    href={`http://${monitor.camera.ipAddress}:${monitor.camera.port}${video.href}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mr-2"
+                                  >
+                                    <Button variant="outline" size="icon">
+                                      <Play className="h-4 w-4" />
+                                    </Button>
+                                  </a>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="mr-2"
+                                    onClick={() =>
+                                      handleStatusChange(video, monitor)
+                                    }
+                                  >
+                                    {video.status === 1 ? (
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    ) : (
+                                      <Video className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() =>
+                                      handleDeleteVideo(video, monitor)
+                                    }
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                )
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8">
+                  <VideoOff className="h-12 w-12 text-gray-400" />
+                  <p className="mt-4 text-center text-gray-500">
+                    No videos found or failed to load.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </SidebarInset>
   );
 }

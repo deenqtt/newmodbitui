@@ -32,6 +32,8 @@ import { Modular3dDeviceViewWidget } from "./Modular3dDeviceView/Modular3dDevice
 import { Subrack3dWidget } from "./Subrack3d/Subrack3dWidget";
 import { Containment3dWidget } from "./Containment3d/Containment3dWidget";
 import { Container3dWidget } from "./Container3d/Container3dWidget";
+import { CctvMonitorVideosWidget } from "./CctvMonitorVideos/CctvMonitorVideosWidget";
+import { CctvLiveStreamWidget } from "./CctvLiveStream/CctvLiveStreamWidget";
 
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 
@@ -124,6 +126,10 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <Containment3dWidget config={config} />;
     case "3D Container View":
       return <Container3dWidget config={config} />;
+    case "CCTV Monitor Videos":
+      return <CctvMonitorVideosWidget config={config} />;
+    case "CCTV Live Stream":
+      return <CctvLiveStreamWidget config={config} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

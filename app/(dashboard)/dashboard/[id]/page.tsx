@@ -63,6 +63,8 @@ import { Modular3dDeviceViewConfigModal } from "@/components/widgets/Modular3dDe
 import { Subrack3dConfigModal } from "@/components/widgets/Subrack3d/Subrack3dConfigModal";
 import { Containment3dConfigModal } from "@/components/widgets/Containment3d/Containment3dConfigModal";
 import { Container3dConfigModal } from "@/components/widgets/Container3d/Container3dConfigModal";
+import { CctvMonitorVideosConfigModal } from "@/components/widgets/CctvMonitorVideos/CctvMonitorVideosConfigModal";
+import { CctvLiveStreamConfigModal } from "@/components/widgets/CctvLiveStream/CctvLiveStreamConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -202,6 +204,8 @@ export default function DashboardEditorPage({
           "3D Subrack View",
           "3D Containment View",
           "3D Container View",
+          "CCTV Monitor Videos",
+          "CCTV Live Stream",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -255,6 +259,18 @@ export default function DashboardEditorPage({
       case "Multi-Series Chart":
         defaultWidth = 6;
         defaultHeight = 5;
+        minW = 4;
+        minH = 4;
+        break;
+      case "CCTV Monitor Videos":
+        defaultWidth = 4;
+        defaultHeight = 8;
+        minW = 3;
+        minH = 6;
+        break;
+      case "CCTV Live Stream":
+        defaultWidth = 6;
+        defaultHeight = 6;
         minW = 4;
         minH = 4;
         break;
@@ -565,6 +581,20 @@ export default function DashboardEditorPage({
         )}
       {isConfigModalOpen && configuringWidget?.name === "3D Container View" && (
         <Container3dConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "CCTV Monitor Videos" && (
+        <CctvMonitorVideosConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "CCTV Live Stream" && (
+        <CctvLiveStreamConfigModal
           isOpen={isConfigModalOpen}
           onClose={() => setIsConfigModalOpen(false)}
           onSave={handleSaveWidgetConfig}
