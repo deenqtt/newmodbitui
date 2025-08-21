@@ -34,6 +34,9 @@ import { Containment3dWidget } from "./Containment3d/Containment3dWidget";
 import { Container3dWidget } from "./Container3d/Container3dWidget";
 import { CctvMonitorVideosWidget } from "./CctvMonitorVideos/CctvMonitorVideosWidget";
 import { CctvLiveStreamWidget } from "./CctvLiveStream/CctvLiveStreamWidget";
+import { MaintenanceListWidget } from "./MaintenanceList/MaintenanceListWidget";
+import { MaintenanceCalendarWidget } from "./MaintenanceCalendar/MaintenanceCalendarWidget";
+import { MaintenanceStatisticsWidget } from "./MaintenanceStatistics/MaintenanceStatisticsWidget";
 
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 
@@ -130,6 +133,12 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <CctvMonitorVideosWidget config={config} />;
     case "CCTV Live Stream":
       return <CctvLiveStreamWidget config={config} />;
+    case "Maintenance List":
+      return <MaintenanceListWidget config={config} />;
+    case "Maintenance Calendar":
+      return <MaintenanceCalendarWidget config={config} />;
+    case "Maintenance Statistics":
+      return <MaintenanceStatisticsWidget config={config} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

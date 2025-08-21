@@ -36,6 +36,8 @@ import {
   Move3D,
   Radio,
   MonitorPlay,
+  Wrench,
+  Calendar,
 } from "lucide-react";
 
 // Tipe untuk memperjelas struktur data
@@ -97,6 +99,12 @@ export const mainWidgets: MainWidgetCategory[] = [
     category: "Dashboard",
     icon: LayoutPanelLeft,
     description: "Grup dan pintasan antar dashboard.",
+  },
+  {
+    name: "Maintenance Management",
+    category: "Maintenance",
+    icon: Wrench,
+    description: "Widget untuk manajemen dan monitoring maintenance tasks.",
   },
 ];
 
@@ -331,6 +339,26 @@ export const widgets: Widget[] = [
     category: "Monitoring", // <-- Masukkan ke kategori Monitoring
     icon: Radio, // <-- Gunakan ikon yang sesuai
     description: "Displays real-time data from a selected LoRaWAN device.",
+  },
+
+  // --- Maintenance ---
+  {
+    name: "Maintenance List",
+    category: "Maintenance",
+    icon: Wrench,
+    description: "Displays recent maintenance tasks with status and scheduling information.",
+  },
+  {
+    name: "Maintenance Calendar",
+    category: "Maintenance",
+    icon: Calendar,
+    description: "Calendar view of scheduled maintenance tasks and deadlines.",
+  },
+  {
+    name: "Maintenance Statistics",
+    category: "Maintenance",
+    icon: BarChart,
+    description: "Statistical overview of maintenance completion rates and performance metrics.",
   },
 ];
 

@@ -7,15 +7,23 @@ import { getZkTecoService } from "./services/zkteco-service";
 import { getStatsListenerService } from "./services/stats-listener";
 import { getLoraListenerService } from "./services/lora-listener";
 import { getCleanupService } from "./services/cleanup-service"; // <-- 1. IMPORT SERVICE BARU
+import { userSeederService } from "./services/user-seeder-service";
 
 let servicesInitialized = false;
 
-export function initializeBackgroundServices() {
+export async function initializeBackgroundServices() {
   if (servicesInitialized) {
     return;
   }
 
   console.log("Initializing all background services for production...");
+
+  // Seed default users first (if needed)
+  try {
+    await userSeederService.seedDefaultUsers();
+  } catch (error) {
+    console.error("Failed to seed default users:", error);
+  }
 
   getAlarmMonitorService();
   getCalculationService();

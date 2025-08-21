@@ -9,6 +9,6 @@ export async function register() {
     const { initializeBackgroundServices } = await import(
       "./lib/init-services"
     );
-    initializeBackgroundServices();
+    await initializeBackgroundServices();
   }
 }

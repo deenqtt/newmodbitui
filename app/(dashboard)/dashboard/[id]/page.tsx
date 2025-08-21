@@ -65,6 +65,9 @@ import { Containment3dConfigModal } from "@/components/widgets/Containment3d/Con
 import { Container3dConfigModal } from "@/components/widgets/Container3d/Container3dConfigModal";
 import { CctvMonitorVideosConfigModal } from "@/components/widgets/CctvMonitorVideos/CctvMonitorVideosConfigModal";
 import { CctvLiveStreamConfigModal } from "@/components/widgets/CctvLiveStream/CctvLiveStreamConfigModal";
+import { MaintenanceListConfigModal } from "@/components/widgets/MaintenanceList/MaintenanceListConfigModal";
+import { MaintenanceCalendarConfigModal } from "@/components/widgets/MaintenanceCalendar/MaintenanceCalendarConfigModal";
+import { MaintenanceStatisticsConfigModal } from "@/components/widgets/MaintenanceStatistics/MaintenanceStatisticsConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -206,6 +209,9 @@ export default function DashboardEditorPage({
           "3D Container View",
           "CCTV Monitor Videos",
           "CCTV Live Stream",
+          "Maintenance List",
+          "Maintenance Calendar",
+          "Maintenance Statistics",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -274,16 +280,38 @@ export default function DashboardEditorPage({
         minW = 4;
         minH = 4;
         break;
+      case "Maintenance List":
+        defaultWidth = 6;
+        defaultHeight = 8;
+        minW = 4;
+        minH = 6;
+        break;
+      case "Maintenance Calendar":
+        defaultWidth = 8;
+        defaultHeight = 8;
+        minW = 6;
+        minH = 6;
+        break;
+      case "Maintenance Statistics":
+        defaultWidth = 6;
+        defaultHeight = 6;
+        minW = 4;
+        minH = 4;
+        break;
     }
 
+    // Ensure minW and minH are not larger than w and h
+    const safeMinW = Math.min(minW, defaultWidth);
+    const safeMinH = Math.min(minH, defaultHeight);
+    
     const newItem: WidgetLayout = {
       i: `${configuringWidget.name.replace(/\s+/g, "-")}-widget-${Date.now()}`,
       x: (layout.length * defaultWidth) % 12,
       y: Infinity,
       w: defaultWidth,
       h: defaultHeight,
-      minW: minW,
-      minH: minH,
+      minW: safeMinW,
+      minH: safeMinH,
       widgetType: configuringWidget.name,
       config: configData,
     };
@@ -595,6 +623,27 @@ export default function DashboardEditorPage({
       )}
       {isConfigModalOpen && configuringWidget?.name === "CCTV Live Stream" && (
         <CctvLiveStreamConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "Maintenance List" && (
+        <MaintenanceListConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "Maintenance Calendar" && (
+        <MaintenanceCalendarConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen && configuringWidget?.name === "Maintenance Statistics" && (
+        <MaintenanceStatisticsConfigModal
           isOpen={isConfigModalOpen}
           onClose={() => setIsConfigModalOpen(false)}
           onSave={handleSaveWidgetConfig}
