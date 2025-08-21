@@ -35,6 +35,7 @@ import {
   Lock,
   Move3D,
   Radio,
+  MonitorPlay,
 } from "lucide-react";
 
 // Tipe untuk memperjelas struktur data
@@ -304,6 +305,18 @@ export const widgets: Widget[] = [
     category: "Camera",
     icon: Video,
     description: "Menampilkan gambar terakhir dari kamera.",
+  },
+  {
+    name: "CCTV Monitor Videos",
+    category: "Camera",
+    icon: Video,
+    description: "Tampilkan daftar video recorded dari monitor CCTV dengan kontrol playback.",
+  },
+  {
+    name: "CCTV Live Stream",
+    category: "Camera",
+    icon: MonitorPlay,
+    description: "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
   },
 
   // --- Dashboard ---

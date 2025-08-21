@@ -1,9 +1,10 @@
 // File: app/(dashboard)/layout.tsx
+
 "use client";
 
 import type React from "react";
 import { usePathname } from "next/navigation";
-import Link from "next/link"; // <-- 1. IMPORT LINK
+import Link from "next/link";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,9 +20,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, Loader2, Settings } from "lucide-react"; // <-- 2. IMPORT SETTINGS ICON
+import { LogOut, Loader2, Settings } from "lucide-react";
 
 import { NotificationBell } from "@/components/notification-bell";
+import { Separator } from "@/components/ui/separator"; // Import komponen Separator
 
 function generateTitleFromPathname(pathname: string): string {
   if (pathname === "/") return "Main Dashboard";
@@ -83,13 +85,14 @@ function MainHeader() {
       <div className="flex items-center gap-4">
         <SidebarTrigger className="hidden lg:flex" />
         <SidebarTrigger className="lg:hidden" />
+        {/* Tambahkan Separator di sini */}
+        <Separator orientation="vertical" className="h-8" />
         <h1 className="text-lg font-semibold text-gray-800 dark:text-white">
           {title}
         </h1>
       </div>
 
       <div className="flex items-center gap-2">
-        {/* --- PERBAIKAN: Tambahkan teks ke tombol --- */}
         <Link href="/manage-dashboard">
           <Button variant="outline">
             <Settings className="h-4 w-4 mr-2" />

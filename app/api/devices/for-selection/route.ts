@@ -1,22 +1,14 @@
 // File: app/api/devices/for-selection/route.ts
 
 import { NextResponse, NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-// import { getAuthFromCookie } from "@/lib/auth"; // Uncomment jika Anda butuh autentikasi
-// import { Role } from "@prisma/client"; // Uncomment jika Anda butuh autentikasi
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+import { getAuthFromCookie } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  // --- START AUTENTIKASI (Jika Anda memiliki, uncomment dan sesuaikan) ---
-  // const auth = await getAuthFromCookie(request);
-  // if (!auth) {
-  //   return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  // }
-  // if (auth.role !== Role.ADMIN) { // Contoh: hanya ADMIN yang boleh akses
-  //   return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  // }
-  // --- END AUTENTIKASI ---
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const devices = await prisma.deviceExternal.findMany({
