@@ -10,7 +10,8 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 interface DashboardLayoutProps {
   layout: WidgetLayout[];
 }
-export default function DashboardLayout({ layout }: DashboardLayoutProps) {
+
+export function DashboardLayout({ layout }: DashboardLayoutProps) {
   return (
     <ResponsiveGridLayout
       className="layout"

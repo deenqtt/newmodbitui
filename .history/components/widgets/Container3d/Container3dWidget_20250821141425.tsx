@@ -417,7 +417,6 @@ export const Container3dWidget = ({ config }: Props) => {
   ]);
 
   // Create enhanced 3D objects
-  // Create enhanced 3D objects
   const createContainer = useCallback(() => {
     const geometry = new THREE.BoxGeometry(
       containerDimensions.length / 100,
@@ -456,210 +455,6 @@ export const Container3dWidget = ({ config }: Props) => {
     const containerMesh = new THREE.Mesh(geometry, materials);
     containerMeshRef.current = containerMesh;
     return containerMesh;
-  }, []);
-
-  // Create partition walls
-  const createPartition = useCallback((positionX: number) => {
-    const geometry = new THREE.PlaneGeometry(
-      containerDimensions.width / 100,
-      containerDimensions.height / 100
-    );
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xdcdcdc,
-      side: THREE.DoubleSide,
-    });
-
-    const partition = new THREE.Mesh(geometry, material);
-    partition.rotation.y = Math.PI / 2;
-    partition.position.set(
-      positionX / 100,
-      containerDimensions.height / 200,
-      0
-    );
-
-    return partition;
-  }, []);
-
-  // Create cylinder objects
-  const createCylinder = useCallback(
-    (
-      positionX: number,
-      positionY: number,
-      positionZ: number,
-      color: number,
-      dimensions = { radius: 10, height: 50 }
-    ) => {
-      const geometry = new THREE.CylinderGeometry(
-        dimensions.radius / 100,
-        dimensions.radius / 100,
-        dimensions.height / 100,
-        32
-      );
-
-      const material = new THREE.MeshStandardMaterial({ color });
-      const cylinder = new THREE.Mesh(geometry, material);
-      cylinder.position.set(positionX, positionY, positionZ);
-
-      return cylinder;
-    },
-    []
-  );
-
-  // Create cylinder with fillet top
-  const createCylinderWithFillet = useCallback(
-    (
-      positionX: number,
-      positionY: number,
-      positionZ: number,
-      color: number,
-      dimensions = { radius: 20, height: 150 }
-    ) => {
-      const group = new THREE.Group();
-
-      // Main cylinder
-      const cylinderGeometry = new THREE.CylinderGeometry(
-        dimensions.radius / 100,
-        dimensions.radius / 100,
-        dimensions.height / 2 / 100,
-        32
-      );
-
-      const material = new THREE.MeshStandardMaterial({ color });
-      const cylinder = new THREE.Mesh(cylinderGeometry, material);
-      cylinder.position.y = dimensions.height / 4 / 100;
-      group.add(cylinder);
-
-      // Top fillet (hemisphere)
-      const topFilletGeometry = new THREE.SphereGeometry(
-        dimensions.radius / 100,
-        32,
-        16,
-        0,
-        Math.PI * 2,
-        0,
-        Math.PI / 2
-      );
-
-      const topFillet = new THREE.Mesh(topFilletGeometry, material);
-      topFillet.position.y = dimensions.height / 2 / 100;
-      group.add(topFillet);
-
-      group.position.set(positionX, positionY, positionZ);
-      return group;
-    },
-    []
-  );
-
-  // Create horizontal cylinder
-  const createHorizontalCylinder = useCallback(
-    (
-      positionX: number,
-      positionY: number,
-      positionZ: number,
-      color: number,
-      dimensions: { radius: number; height: number }
-    ) => {
-      const cylinder = createCylinder(
-        positionX,
-        positionY,
-        positionZ,
-        color,
-        dimensions
-      );
-      cylinder.rotation.z = Math.PI / 2;
-      return cylinder;
-    },
-    [createCylinder]
-  );
-
-  // Create open tray with holes
-  const createOpenTrayWithHoles = useCallback(
-    (
-      positionX: number,
-      positionY: number,
-      positionZ: number,
-      color: number,
-      dimensions = { width: 30, height: 10, depth: 700 },
-      holeRadius = 2,
-      holeSpacing = 5
-    ) => {
-      const group = new THREE.Group();
-      const width = dimensions.width / 100;
-      const height = dimensions.height / 100;
-      const depth = dimensions.depth / 100;
-
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        side: THREE.DoubleSide,
-      });
-
-      // Create tray with holes using Shape
-      const shape = new THREE.Shape();
-      shape.moveTo(-width / 2, -depth / 2);
-      shape.lineTo(-width / 2, depth / 2);
-      shape.lineTo(width / 2, depth / 2);
-      shape.lineTo(width / 2, -depth / 2);
-      shape.lineTo(-width / 2, -depth / 2);
-
-      // Add holes
-      const holes = [];
-      for (
-        let x = -width / 2 + holeSpacing / 100;
-        x < width / 2;
-        x += holeSpacing / 100
-      ) {
-        for (
-          let y = -depth / 2 + holeSpacing / 100;
-          y < depth / 2;
-          y += holeSpacing / 100
-        ) {
-          const hole = new THREE.Path();
-          hole.absarc(x, y, holeRadius / 100, 0, Math.PI * 2, false);
-          holes.push(hole);
-        }
-      }
-      shape.holes = holes;
-
-      const extrudeSettings = { depth: 0.01, bevelEnabled: false };
-      const bottomGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      const bottom = new THREE.Mesh(bottomGeometry, material);
-      bottom.rotation.x = -Math.PI / 2;
-      bottom.position.y = -height / 2;
-      group.add(bottom);
-
-      // Back wall
-      const backGeometry = new THREE.PlaneGeometry(width, height);
-      const back = new THREE.Mesh(backGeometry, material);
-      back.rotation.y = Math.PI;
-      back.position.z = -depth / 2;
-      group.add(back);
-
-      // Front wall
-      const frontGeometry = new THREE.PlaneGeometry(width, height);
-      const front = new THREE.Mesh(frontGeometry, material);
-      front.position.z = depth / 2;
-      group.add(front);
-
-      group.position.set(positionX, positionY, positionZ);
-      return group;
-    },
-    []
-  );
-
-  // Add edges to object
-  const addEdgesToObject = useCallback((object: THREE.Mesh, color: number) => {
-    const edges = new THREE.EdgesGeometry(object.geometry);
-    const line = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({ color })
-    );
-
-    line.position.copy(object.position);
-    line.rotation.copy(object.rotation);
-    line.scale.copy(object.scale);
-    line.updateMatrixWorld();
-    return line;
   }, []);
 
   const createRack = useCallback(
@@ -868,7 +663,7 @@ export const Container3dWidget = ({ config }: Props) => {
 
     // Create scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
+    scene.background = new THREE.Color(0xf8fafc);
     sceneRef.current = scene;
 
     const width = mountRef.current.clientWidth;
@@ -877,7 +672,6 @@ export const Container3dWidget = ({ config }: Props) => {
     // Create camera
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.set(-5, 5, 8);
-    camera.fov = 50;
     originalCameraPositionRef.current.copy(camera.position);
     cameraRef.current = camera;
 
@@ -903,7 +697,7 @@ export const Container3dWidget = ({ config }: Props) => {
     // Create controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.1;
+    controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
     controls.minDistance = 2;
     controls.maxDistance = 20;
@@ -924,313 +718,6 @@ export const Container3dWidget = ({ config }: Props) => {
     const container = createContainer();
     container.position.y = containerDimensions.height / 200;
     scene.add(container);
-
-    // Add container border
-    const containerBorder = addEdgesToObject(container, 0x000000);
-    container.userData.edges = containerBorder;
-    scene.add(containerBorder);
-
-    // Create partitions
-    const partitionFront = createPartition(-450);
-    const partitionFront1 = createPartition(-609.6);
-    const partitionBack = createPartition(450);
-    const partitionBack1 = createPartition(609.6);
-    scene.add(partitionFront, partitionBack, partitionBack1, partitionFront1);
-
-    // Create additional equipment and panels
-    const framePanelFSS = createRack(-5.5, 1.75, -1, 0x000000, {
-      width: 21,
-      height: 25,
-      depth: 50,
-    });
-    const panelFSS = createRack(-5.5, 1.5, -1, 0xff0000, {
-      width: 20,
-      height: 80,
-      depth: 60,
-    });
-    const framePanelPower = createRack(5.65, 1.01, 0.6, 0x000000, {
-      width: 102,
-      height: 190,
-      depth: 70,
-    });
-    const panelPower = createRack(5.65, 1.01, 0.6, 0xc3c4c5, {
-      width: 100,
-      height: 200,
-      depth: 80,
-    });
-    const accessControl = createRack(-4.55, 1.2, -0.3, 0x0d542e, {
-      width: 30,
-      height: 20,
-      depth: 8,
-    });
-
-    // Create open tray with holes
-    const openTray = createOpenTrayWithHoles(
-      0,
-      2.4,
-      0,
-      0x0077ff,
-      { width: 1100, height: 10, depth: 30 },
-      1.5,
-      5
-    );
-
-    // Create partition door covers
-    const partitionDoorCover1 = createRack(-3.8, 1, -0.7, 0x000000, {
-      width: 100,
-      height: 189,
-      depth: 8,
-    });
-    const partitionDoorCover2 = createRack(3.8, 1, -0.7, 0x000000, {
-      width: 100,
-      height: 189,
-      depth: 8,
-    });
-
-    // Create polycarbonate panels
-    const polycarbonat1 = createRack(
-      -3.8,
-      2.25,
-      -0.7,
-      0xffffff,
-      {
-        width: 100,
-        height: 60,
-        depth: 8,
-      },
-      0.5
-    );
-    const polycarbonat2 = createRack(
-      3.8,
-      2.25,
-      -0.7,
-      0xffffff,
-      {
-        width: 100,
-        height: 60,
-        depth: 8,
-      },
-      0.5
-    );
-    const polycarbonat3 = createRack(
-      0,
-      2.25,
-      -0.2,
-      0xffffff,
-      {
-        width: 8,
-        height: 60,
-        depth: 770,
-      },
-      0.5
-    );
-
-    // Create doors
-    const securityDoor = createRack(-4.5, 1, 0.5, 0xffffff, {
-      width: 100,
-      height: 200,
-      depth: 8,
-    });
-    const frontDoor = createRack(-6.1, 1, 0.5, 0xffffff, {
-      width: 100,
-      height: 200,
-      depth: 8,
-    });
-    const backDoor = createRack(6.1, 1, -0.5, 0xffffff, {
-      width: 100,
-      height: 200,
-      depth: 8,
-    });
-
-    // Create alarm systems
-    const hornAlarm = createRack(
-      -4.5,
-      2.25,
-      0.75,
-      0xff0000,
-      {
-        width: 40,
-        height: 15,
-        depth: 10,
-      },
-      0.5
-    );
-    const buzzerAlarm = createRack(
-      -4.5,
-      2.25,
-      0.25,
-      0xff0000,
-      {
-        width: 15,
-        height: 15,
-        depth: 10,
-      },
-      0.5
-    );
-
-    // Create base floor
-    const baseFloor = createRack(0, -0.165, 0, 0x000000, {
-      width: 243.8,
-      height: 30,
-      depth: 1219.2,
-    });
-
-    // Add all equipment to scene
-    scene.add(
-      baseFloor,
-      framePanelFSS,
-      panelFSS,
-      buzzerAlarm,
-      hornAlarm,
-      panelPower,
-      framePanelPower,
-      accessControl,
-      openTray,
-      partitionDoorCover1,
-      partitionDoorCover2,
-      polycarbonat1,
-      polycarbonat2,
-      polycarbonat3,
-      securityDoor
-    );
-
-    // Create container covers
-    const containerCoverRight = createRack(4.35, 1.295, 1.225, 0xffffff, {
-      width: 1,
-      height: 259.1,
-      depth: 350,
-    });
-    const containerCoverLeft = createRack(-4.35, 1.295, 1.225, 0xffffff, {
-      width: 1,
-      height: 259.1,
-      depth: 350,
-    });
-    const containerCoverBot = createRack(0, 0.15, 1.225, 0xffffff, {
-      width: 1,
-      height: 30,
-      depth: 520,
-    });
-    const containerCoverMid = createRack(
-      0,
-      1.3,
-      1.225,
-      0xffffff,
-      {
-        width: 1,
-        height: 198,
-        depth: 519,
-      },
-      0.1
-    );
-    const containerCoverTop = createRack(0, 2.45, 1.225, 0xffffff, {
-      width: 1,
-      height: 30,
-      depth: 520,
-    });
-
-    // Store container covers references
-    containerCoversRef.current = [
-      containerCoverRight,
-      containerCoverLeft,
-      containerCoverBot,
-      containerCoverMid,
-      containerCoverTop,
-      frontDoor,
-      backDoor,
-    ];
-
-    // Add covers to scene with borders
-    containerCoversRef.current.forEach((cover) => {
-      scene.add(cover);
-      const border = addEdgesToObject(cover, 0x000000);
-      cover.userData.edges = border;
-      scene.add(border);
-    });
-
-    // Create fire suppression system cylinders
-    const cylinderWithFillet = createCylinderWithFillet(
-      -4.75,
-      0.01,
-      -0.75,
-      0xff0000,
-      { radius: 20, height: 250 }
-    );
-    const smallCylinder = createCylinder(-4.75, 1.5, -0.75, 0xff0000, {
-      radius: 3,
-      height: 150,
-    });
-
-    // Create nozzles
-    const nozzle1 = createCylinder(-2, 2.1, -0.75, 0xff0000, {
-      radius: 3,
-      height: 30,
-    });
-    const nozzle2 = createCylinder(2, 2.1, -0.75, 0xff0000, {
-      radius: 3,
-      height: 30,
-    });
-
-    // Create horizontal cylinder for fire suppression
-    const horizontalCylinder = createHorizontalCylinder(
-      -0.75,
-      2.25,
-      -0.75,
-      0xff0000,
-      { radius: 3, height: 800 }
-    );
-
-    // Create smoke detectors
-    const smoke1 = createCylinder(-2.5, 2.555, 0.5, 0xffffff, {
-      radius: 8,
-      height: 7,
-    });
-    const smoke2 = createCylinder(-1, 2.555, 0.5, 0xffffff, {
-      radius: 8,
-      height: 7,
-    });
-    const smoke3 = createCylinder(0.5, 2.555, 0.5, 0xffffff, {
-      radius: 8,
-      height: 7,
-    });
-    const smoke4 = createCylinder(2, 2.555, 0.5, 0xffffff, {
-      radius: 8,
-      height: 7,
-    });
-
-    // Create smoke sensor centers
-    const sensorSmoke1 = createCylinder(-2.5, 2.55, 0.5, 0x000000, {
-      radius: 3,
-      height: 7,
-    });
-    const sensorSmoke2 = createCylinder(-1, 2.55, 0.5, 0x000000, {
-      radius: 3,
-      height: 7,
-    });
-    const sensorSmoke3 = createCylinder(0.5, 2.55, 0.5, 0x000000, {
-      radius: 3,
-      height: 7,
-    });
-    const sensorSmoke4 = createCylinder(2, 2.55, 0.5, 0x000000, {
-      radius: 3,
-      height: 7,
-    });
-
-    // Add all cylinders and sensors to scene
-    scene.add(
-      cylinderWithFillet,
-      smallCylinder,
-      nozzle1,
-      nozzle2,
-      horizontalCylinder,
-      smoke1,
-      smoke2,
-      smoke3,
-      smoke4,
-      sensorSmoke1,
-      sensorSmoke2,
-      sensorSmoke3,
-      sensorSmoke4
-    );
 
     // Create 11 fixed racks
     const racks: { mesh: THREE.Mesh; rackNumber: number }[] = [];
@@ -1265,7 +752,7 @@ export const Container3dWidget = ({ config }: Props) => {
       if (config.topicsTemp[1] && config.topicsTemp[1][i]) {
         const backLabel = createRackLabel(
           rackNumber,
-          positionX,
+          positionY,
           positionY,
           rackDimensions.depth / 200 - 2.25,
           "back"
@@ -1326,12 +813,6 @@ export const Container3dWidget = ({ config }: Props) => {
     createRack,
     createRackLabel,
     createObjectInsideRack,
-    createPartition,
-    createCylinder,
-    createCylinderWithFillet,
-    createHorizontalCylinder,
-    createOpenTrayWithHoles,
-    addEdgesToObject,
     handleResize,
     handleRackClick,
   ]);
@@ -1661,7 +1142,7 @@ export const Container3dWidget = ({ config }: Props) => {
         </div>
 
         {/* Container Type Badge */}
-        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
           <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-1 rounded-full shadow-lg">
             <span className="text-xs font-medium flex items-center space-x-2">
               <Move3D className="h-3 w-3" />

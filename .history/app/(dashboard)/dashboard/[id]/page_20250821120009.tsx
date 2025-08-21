@@ -56,14 +56,14 @@ import { AlarmLogListConfigModal } from "@/components/widgets/AlarmLogList/Alarm
 import { AlarmSummaryConfigModal } from "@/components/widgets/AlarmSummary/AlarmSummaryConfigModal";
 import { DashboardShortcutConfigModal } from "@/components/widgets/DashboardShortcut/DashboardShortcutConfigModal";
 import { CameraSnapshotConfigModal } from "@/components/widgets/CameraSnapshot/CameraSnapshotConfigModal";
-
+import { SldContainerConfigModal } from "@/components/widgets/SldContainer/SldContainerConfigModal";
 import { AccessControllerStatusConfigModal } from "@/components/widgets/AccessControllerStatus/AccessControllerStatusConfigModal"; // <-- IMPORT BARU
 import { LockAccessControlConfigModal } from "@/components/widgets/LockAccessControl/LockAccessControlConfigModal";
 import { Modular3dDeviceViewConfigModal } from "@/components/widgets/Modular3dDeviceView/Modular3dDeviceViewConfigModal";
 import { Subrack3dConfigModal } from "@/components/widgets/Subrack3d/Subrack3dConfigModal";
 import { Containment3dConfigModal } from "@/components/widgets/Containment3d/Containment3dConfigModal";
 import { Container3dConfigModal } from "@/components/widgets/Container3d/Container3dConfigModal";
-import { RackServer3dConfigModal } from "@/components/widgets/RackServer3d/RackServer3dConfigModal";
+
 import { LoRaWANDeviceConfigModal } from "@/components/widgets/LoRaWANDevice/LoRaWANDeviceConfigModal";
 
 import { CctvMonitorVideosConfigModal } from "@/components/widgets/CctvMonitorVideos/CctvMonitorVideosConfigModal";
@@ -203,7 +203,7 @@ export default function DashboardEditorPage({
           "Alarm Summary",
           "Dashboard Shortcut",
           "Camera Last Snapshot",
-
+          "SLD Diagram – Container",
           "Access Controller Status",
           "Lock Access Control",
           "Modular 3D Device View",
@@ -218,7 +218,6 @@ export default function DashboardEditorPage({
           "Maintenance List",
           "Maintenance Calendar",
           "Maintenance Statistics",
-          "3D Rack Server View",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -566,7 +565,14 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
-
+      {isConfigModalOpen &&
+        configuringWidget?.name === "SLD Diagram – Container" && (
+          <SldContainerConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Access Controller Status" && (
           <AccessControllerStatusConfigModal
@@ -662,14 +668,7 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
-      {isConfigModalOpen &&
-        configuringWidget?.name === "3D Rack Server View" && (
-          <RackServer3dConfigModal
-            isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
-            onSave={handleSaveWidgetConfig}
-          />
-        )}
+
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
           {dashboardData?.name}

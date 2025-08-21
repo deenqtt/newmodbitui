@@ -25,7 +25,7 @@ import { AlarmLogListWidget } from "./AlarmLogList/AlarmLogListWidget";
 import { AlarmSummaryWidget } from "./AlarmSummary/AlarmSummaryWidget";
 import { DashboardShortcutWidget } from "./DashboardShortcut/DashboardShortcutWidget";
 import { CameraSnapshotWidget } from "./CameraSnapshot/CameraSnapshotWidget";
-
+import { SldContainerWidget } from "./SldContainer/SldContainerWidget";
 import { AccessControllerStatusWidget } from "./AccessControllerStatus/AccessControllerStatusWidget"; // <-- IMPORT BARU
 import { LockAccessControlWidget } from "./LockAccessControl/LockAccessControlWidget";
 import { Modular3dDeviceViewWidget } from "./Modular3dDeviceView/Modular3dDeviceViewWidget";
@@ -40,7 +40,7 @@ import { CctvLiveStreamWidget } from "./CctvLiveStream/CctvLiveStreamWidget";
 import { MaintenanceListWidget } from "./MaintenanceList/MaintenanceListWidget";
 import { MaintenanceCalendarWidget } from "./MaintenanceCalendar/MaintenanceCalendarWidget";
 import { MaintenanceStatisticsWidget } from "./MaintenanceStatistics/MaintenanceStatisticsWidget";
-import { RackServer3dWidget } from "./RackServer3d/RackServer3dWidget";
+import { RackServer3dWidget } from "./RackServer3d/RackServer3dWidget"; // <-- IMPORT BARU
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 
 interface Props {
@@ -118,7 +118,8 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <DashboardShortcutWidget config={config} />;
     case "Camera Last Snapshot":
       return <CameraSnapshotWidget config={config} />;
-
+    case "SLD Diagram – Container":
+      return <SldContainerWidget config={config} />;
     case "Access Controller Status":
       return <AccessControllerStatusWidget config={config} />; // <-- CASE BARU
     case "Lock Access Control":
@@ -146,8 +147,7 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <MaintenanceCalendarWidget config={config} />;
     case "Maintenance Statistics":
       return <MaintenanceStatisticsWidget config={config} />;
-    case "3D Rack Server View": // <-- CASE BARU
-      return <RackServer3dWidget config={config} />;
+
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

@@ -25,7 +25,7 @@ import { AlarmLogListWidget } from "./AlarmLogList/AlarmLogListWidget";
 import { AlarmSummaryWidget } from "./AlarmSummary/AlarmSummaryWidget";
 import { DashboardShortcutWidget } from "./DashboardShortcut/DashboardShortcutWidget";
 import { CameraSnapshotWidget } from "./CameraSnapshot/CameraSnapshotWidget";
-
+import { SldContainerWidget } from "./SldContainer/SldContainerWidget";
 import { AccessControllerStatusWidget } from "./AccessControllerStatus/AccessControllerStatusWidget"; // <-- IMPORT BARU
 import { LockAccessControlWidget } from "./LockAccessControl/LockAccessControlWidget";
 import { Modular3dDeviceViewWidget } from "./Modular3dDeviceView/Modular3dDeviceViewWidget";
@@ -118,7 +118,8 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <DashboardShortcutWidget config={config} />;
     case "Camera Last Snapshot":
       return <CameraSnapshotWidget config={config} />;
-
+    case "SLD Diagram – Container":
+      return <SldContainerWidget config={config} />;
     case "Access Controller Status":
       return <AccessControllerStatusWidget config={config} />; // <-- CASE BARU
     case "Lock Access Control":
