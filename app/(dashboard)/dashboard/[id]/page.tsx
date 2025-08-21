@@ -63,6 +63,7 @@ import { Modular3dDeviceViewConfigModal } from "@/components/widgets/Modular3dDe
 import { Subrack3dConfigModal } from "@/components/widgets/Subrack3d/Subrack3dConfigModal";
 import { Containment3dConfigModal } from "@/components/widgets/Containment3d/Containment3dConfigModal";
 import { Container3dConfigModal } from "@/components/widgets/Container3d/Container3dConfigModal";
+import { LoRaWANDeviceConfigModal } from "@/components/widgets/LoRaWANDevice/LoRaWANDeviceConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -202,6 +203,7 @@ export default function DashboardEditorPage({
           "3D Subrack View",
           "3D Containment View",
           "3D Container View",
+          "LoRaWAN Device Data",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -547,7 +549,6 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
-
       {isConfigModalOpen && configuringWidget?.name === "3D Subrack View" && (
         <Subrack3dConfigModal
           isOpen={isConfigModalOpen}
@@ -570,6 +571,15 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
+
+      {isConfigModalOpen &&
+        configuringWidget?.name === "LoRaWAN Device Data" && (
+          <LoRaWANDeviceConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
           {dashboardData?.name}

@@ -314,9 +314,9 @@ export const widgets: Widget[] = [
     description: "Pintasan untuk navigasi ke dashboard lain.",
   },
   {
-    name: "LoRaWAN Device Data", // <-- Nama widget
-    category: "Monitoring", // <-- Masukkan ke kategori Monitoring
-    icon: Radio, // <-- Gunakan ikon yang sesuai
+    name: "LoRaWAN Device Data",
+    category: "Monitoring",
+    icon: Radio,
     description: "Displays real-time data from a selected LoRaWAN device.",
   },
 ];
