@@ -1,28 +1,26 @@
-// File: app/api/lorawan/devices/[id]/latest/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Handler untuk GET (Mengambil data terbaru dari satu perangkat berdasarkan ID database)
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } } // <-- Ubah params menjadi { id }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params; // <-- Ambil id dari params
+    const { id } = params;
 
     if (!id) {
-      return NextResponse.json({ error: "Device ID is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Device ID is required" },
+        { status: 400 }
+      );
     }
 
-    // Cari device berdasarkan ID database
     const device = await prisma.loraDevice.findUnique({
-      where: { id }, // <-- Gunakan id untuk mencari
+      where: { id },
       include: {
-         { 
-          orderBy: {
-            timestamp: "desc",
-          },
-          take: 1,
+        data: {
+          orderBy: { timestamp: "desc" },
+          take: 1, // ambil data terbaru
         },
       },
     });

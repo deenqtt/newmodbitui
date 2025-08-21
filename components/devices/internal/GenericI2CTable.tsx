@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
 import Swal from "sweetalert2";
-import Paho from "paho-mqtt";
 
 // --- Komponen UI & Ikon ---
 import { Button } from "@/components/ui/button";
@@ -70,7 +69,7 @@ export function GenericI2CTable({
   partNumberOptions,
   servicesToRestart,
 }: GenericTableProps) {
-  const { client, connectionStatus } = useMqtt();
+  const { publish, subscribe, unsubscribe, connectionStatus } = useMqtt();
 
   // --- State Management ---
   const [devices, setDevices] = useState<Device[]>([]);
@@ -81,66 +80,73 @@ export function GenericI2CTable({
     protocol_setting: {},
   });
 
-  // --- Logika MQTT ---
-  useEffect(() => {
-    if (client && connectionStatus === "Connected") {
-      client.subscribe(responseTopic);
-      client.subscribe("service/response");
+  // --- Message Handler ---
+  const handleMessage = (topic: string, payload: string) => {
+    try {
+      const data = JSON.parse(payload);
 
-      client.onMessageArrived = (message: Paho.Message) => {
-        if (message.destinationName === responseTopic) {
-          try {
-            const payload = JSON.parse(message.payloadString);
-            if (Array.isArray(payload)) {
-              setDevices(payload);
-            } else if (payload.status === "success") {
-              Swal.fire({
-                icon: "success",
-                title: "Success",
-                text: payload.message,
-              }).then(() => getAllData());
-              setIsModalOpen(false);
-            } else if (payload.status === "error") {
-              Swal.fire({
-                icon: "error",
-                title: "Error",
-                text: payload.message,
-              });
-            }
-          } catch (e) {
-            console.error("Error parsing message:", e);
-          }
-        } else if (message.destinationName === "service/response") {
-          // Handle restart response
-          const payload = JSON.parse(message.payloadString);
-          if (payload.result === "success") {
-            Swal.fire({
-              icon: "success",
-              title: "Success",
-              text: payload.message,
-            });
-          } else {
-            Swal.fire({ icon: "error", title: "Error", text: payload.message });
-          }
+      if (topic === responseTopic) {
+        if (Array.isArray(data)) {
+          setDevices(data);
+        } else if (data.status === "success") {
+          Swal.fire({
+            icon: "success",
+            title: "Success",
+            text: data.message,
+          }).then(() => getAllData());
+          setIsModalOpen(false);
+        } else if (data.status === "error") {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: data.message,
+          });
         }
+      } else if (topic === "service/response") {
+        // Handle restart response
+        if (data.result === "success") {
+          Swal.fire({
+            icon: "success",
+            title: "Success",
+            text: data.message,
+          });
+        } else {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: data.message,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing message:", e);
+    }
+  };
+
+  // --- Setup subscriptions ---
+  useEffect(() => {
+    if (connectionStatus === "Connected") {
+      subscribe(responseTopic, handleMessage);
+      subscribe("service/response", handleMessage);
+
+      return () => {
+        unsubscribe(responseTopic, handleMessage);
+        unsubscribe("service/response", handleMessage);
       };
     }
-  }, [client, connectionStatus, responseTopic]);
+  }, [connectionStatus, responseTopic]);
 
   // --- Fungsi Aksi ---
   const sendMessage = (command: object) => {
-    if (!client) return;
-    const message = new Paho.Message(JSON.stringify(command));
-    message.destinationName = commandTopic;
-    client.send(message);
+    publish(commandTopic, JSON.stringify(command));
   };
 
   const getAllData = () => sendMessage({ command: getDataCommand });
+
   const restartServices = () => {
     const command = { action: "restart", services: servicesToRestart };
-    const message = new Paho.Message(JSON.stringify(command));
-    message.destinationName = "service/command";
-    client.send(message);
+    publish("service/command", JSON.stringify(command));
+
     Swal.fire({
       title: "Restarting Services...",
       text: "Please wait.",
@@ -154,12 +160,14 @@ export function GenericI2CTable({
     sendMessage({ command: "addDevice", device: newDevice });
     restartServices();
   };
+
   const updateDevice = () =>
     sendMessage({
       command: "updateDevice",
       old_name: newDevice.profile.name,
       device: newDevice,
     });
+
   const deleteDevice = (deviceName: string) => {
     Swal.fire({
       title: "Anda yakin?",

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
 import Swal from "sweetalert2";
-import Paho from "paho-mqtt";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -84,7 +83,7 @@ const initialDeviceState = {
 };
 
 export function ModbusTable() {
-  const { client, connectionStatus } = useMqtt();
+  const { publish, subscribe, unsubscribe, connectionStatus } = useMqtt();
 
   const [devices, setDevices] = useState<any[]>([]);
   const [deviceCatalog, setDeviceCatalog] = useState<Record<string, any>>({});
@@ -92,7 +91,7 @@ export function ModbusTable() {
   const [isSpecialModalOpen, setIsSpecialModalOpen] = useState(false);
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
-  const [isLoadingDevices, setIsLoadingDevices] = useState(false); // State baru untuk loading tabel
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [newDevice, setNewDevice] = useState<any>(
     JSON.parse(JSON.stringify(initialDeviceState))
   );
@@ -155,90 +154,104 @@ export function ModbusTable() {
     deviceCatalog,
   ]);
 
-  const sendMqttCommand = useCallback(
-    (topic: string, command: object, qos: number = 0) => {
-      if (!client) return;
-      const message = new Paho.Message(JSON.stringify(command));
-      message.destinationName = topic;
-      message.qos = qos;
-      client.send(message);
-    },
-    [client]
-  );
-
   const getAllData = useCallback(() => {
-    setIsLoadingDevices(true); // Mulai loading saat data diminta
-    sendMqttCommand("command_device_modbus", { command: "getDataModbus" });
-  }, [sendMqttCommand]);
+    setIsLoadingDevices(true);
+    publish(
+      "command_device_modbus",
+      JSON.stringify({ command: "getDataModbus" })
+    );
+  }, [publish]);
 
-  const handleMqttMessage = useCallback(
-    (message: Paho.Message) => {
-      let payload;
+  // Message handler function
+  const handleMessage = useCallback(
+    (topic: string, payload: string) => {
+      let parsedPayload;
       try {
-        payload = JSON.parse(message.payloadString);
+        parsedPayload = JSON.parse(payload);
       } catch (error) {
-        if (message.payloadString.startsWith("Ping to")) {
-          showToast("info", message.payloadString);
+        if (payload.startsWith("Ping to")) {
+          showToast("info", payload);
         }
         return;
       }
 
-      if (payload.status === "success" || payload.status === "error") {
-        showToast(payload.status, payload.message);
+      if (
+        parsedPayload.status === "success" ||
+        parsedPayload.status === "error"
+      ) {
+        showToast(parsedPayload.status, parsedPayload.message);
 
-        if (payload.status === "success") {
+        if (parsedPayload.status === "success") {
           setIsModalOpen(false);
           setIsSpecialModalOpen(false);
-          getAllData(); // Panggil getAllData untuk refresh dan handle loading state
+          getAllData();
         }
-      } else if (message.destinationName === "response_device_modbus") {
-        if (Array.isArray(payload)) {
-          setDevices(payload);
-          setIsLoadingDevices(false); // Hentikan loading saat data tabel diterima
-        } else if (typeof payload === "object" && payload !== null) {
+      } else if (topic === "response_device_modbus") {
+        if (Array.isArray(parsedPayload)) {
+          setDevices(parsedPayload);
+          setIsLoadingDevices(false);
+        } else if (
+          typeof parsedPayload === "object" &&
+          parsedPayload !== null
+        ) {
           const currentProtocolInForm =
             newDeviceRef.current.protocol_setting.protocol;
           if (currentProtocolInForm) {
             setDeviceCatalog((prev) => ({
               ...prev,
-              [currentProtocolInForm]: payload,
+              [currentProtocolInForm]: parsedPayload,
             }));
             setIsLoadingCatalog(false);
           }
         }
-      } else if (message.destinationName === "response_service_restart") {
+      } else if (topic === "response_service_restart") {
         Swal.close();
         Swal.fire({
-          icon: payload.status === "success" ? "success" : "error",
+          icon: parsedPayload.status === "success" ? "success" : "error",
           title: "Service Restart",
-          text: payload.message,
+          text: parsedPayload.message,
         });
       }
     },
     [getAllData]
   );
 
+  // Setup subscriptions
   useEffect(() => {
-    if (client && connectionStatus === "Connected") {
-      client.subscribe("response_device_modbus");
-      client.subscribe("response/ping");
-      client.subscribe("response_service_restart");
-
-      client.onMessageArrived = handleMqttMessage;
+    if (connectionStatus === "Connected") {
+      subscribe("response_device_modbus", handleMessage);
+      subscribe("response/ping", handleMessage);
+      subscribe("response_service_restart", handleMessage);
 
       if (devices.length === 0) {
         getAllData();
       }
+
+      return () => {
+        unsubscribe("response_device_modbus", handleMessage);
+        unsubscribe("response/ping", handleMessage);
+        unsubscribe("response_service_restart", handleMessage);
+      };
     }
-  }, [client, connectionStatus, handleMqttMessage, devices.length, getAllData]);
+  }, [
+    connectionStatus,
+    handleMessage,
+    devices.length,
+    getAllData,
+    subscribe,
+    unsubscribe,
+  ]);
 
   const fetchDataByProtocol = (protocol: string) => {
     if (!protocol) return;
     setIsLoadingCatalog(true);
-    sendMqttCommand("command_device_modbus", {
-      command: "getDataSummaryByProtocol",
-      protocol: protocol,
-    });
+    publish(
+      "command_device_modbus",
+      JSON.stringify({
+        command: "getDataSummaryByProtocol",
+        protocol: protocol,
+      })
+    );
   };
 
   const handleProtocolChange = (protocol: string) => {
@@ -268,7 +281,7 @@ export function ModbusTable() {
     if (isUpdateMode) {
       payload.old_name = oldDeviceName;
     }
-    sendMqttCommand("command_device_modbus", payload);
+    publish("command_device_modbus", JSON.stringify(payload));
   };
 
   const deleteDevice = (deviceName: string) => {
@@ -283,10 +296,13 @@ export function ModbusTable() {
       cancelButtonText: "Cancel",
     }).then((result) => {
       if (result.isConfirmed) {
-        sendMqttCommand("command_device_modbus", {
-          command: "deleteDevice",
-          name: deviceName,
-        });
+        publish(
+          "command_device_modbus",
+          JSON.stringify({
+            command: "deleteDevice",
+            name: deviceName,
+          })
+        );
       }
     });
   };
@@ -323,21 +339,18 @@ export function ModbusTable() {
       showConfirmButton: false,
       didOpen: () => Swal.showLoading(),
     });
-    sendMqttCommand(
+    publish(
       "service/command",
-      {
+      JSON.stringify({
         action: "restart",
         services: ["modbus_snmp.service", "mqtt_config.service"],
-      },
-      0
+      })
     );
   };
 
   const pingIp = (ip: string) => {
-    if (!client || !ip) return;
-    const message = new Paho.Message(ip);
-    message.destinationName = "request/ping";
-    client.send(message);
+    if (!ip) return;
+    publish("request/ping", ip);
   };
 
   const renderSharedDynamicFields = () => (

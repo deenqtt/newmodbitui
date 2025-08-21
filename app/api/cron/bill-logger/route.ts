@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Paho from "paho-mqtt";
+export const dynamic = "force-dynamic"; // ✅ Tambahkan baris ini
 
 // --- Fungsi Helper ---
 

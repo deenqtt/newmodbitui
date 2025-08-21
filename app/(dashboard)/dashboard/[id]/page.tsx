@@ -68,6 +68,9 @@ import { LoRaWANDeviceConfigModal } from "@/components/widgets/LoRaWANDevice/LoR
 
 import { CctvMonitorVideosConfigModal } from "@/components/widgets/CctvMonitorVideos/CctvMonitorVideosConfigModal";
 import { CctvLiveStreamConfigModal } from "@/components/widgets/CctvLiveStream/CctvLiveStreamConfigModal";
+import { MaintenanceListConfigModal } from "@/components/widgets/MaintenanceList/MaintenanceListConfigModal";
+import { MaintenanceCalendarConfigModal } from "@/components/widgets/MaintenanceCalendar/MaintenanceCalendarConfigModal";
+import { MaintenanceStatisticsConfigModal } from "@/components/widgets/MaintenanceStatistics/MaintenanceStatisticsConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -212,6 +215,9 @@ export default function DashboardEditorPage({
 
           "CCTV Monitor Videos",
           "CCTV Live Stream",
+          "Maintenance List",
+          "Maintenance Calendar",
+          "Maintenance Statistics",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -280,7 +286,29 @@ export default function DashboardEditorPage({
         minW = 4;
         minH = 4;
         break;
+      case "Maintenance List":
+        defaultWidth = 6;
+        defaultHeight = 8;
+        minW = 4;
+        minH = 6;
+        break;
+      case "Maintenance Calendar":
+        defaultWidth = 8;
+        defaultHeight = 8;
+        minW = 6;
+        minH = 6;
+        break;
+      case "Maintenance Statistics":
+        defaultWidth = 6;
+        defaultHeight = 6;
+        minW = 4;
+        minH = 4;
+        break;
     }
+
+    // Ensure minW and minH are not larger than w and h
+    const safeMinW = Math.min(minW, defaultWidth);
+    const safeMinH = Math.min(minH, defaultHeight);
 
     const newItem: WidgetLayout = {
       i: `${configuringWidget.name.replace(/\s+/g, "-")}-widget-${Date.now()}`,
@@ -288,8 +316,8 @@ export default function DashboardEditorPage({
       y: Infinity,
       w: defaultWidth,
       h: defaultHeight,
-      minW: minW,
-      minH: minH,
+      minW: safeMinW,
+      minH: safeMinH,
       widgetType: configuringWidget.name,
       config: configData,
     };
@@ -616,6 +644,30 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Maintenance List" && (
+        <MaintenanceListConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Maintenance Calendar" && (
+          <MaintenanceCalendarConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Maintenance Statistics" && (
+          <MaintenanceStatisticsConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
 
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">

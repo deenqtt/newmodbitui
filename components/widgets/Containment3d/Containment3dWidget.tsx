@@ -19,9 +19,8 @@ import {
   Thermometer,
   Droplets,
   Shield,
-  AlertCircle,
-  DoorOpen,
-  DoorClosed,
+  X,
+  Clock,
 } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
@@ -37,9 +36,126 @@ interface Props {
 }
 
 interface RackData {
-  temp: string;
-  hum: string;
+  Temperature: number;
+  Humidity: number;
+  device_name?: string;
+  Timestamp?: string;
+  raw?: any;
 }
+
+interface DetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  rackNumber: number;
+  data: RackData | null;
+}
+
+const DetailModal: React.FC<DetailModalProps> = ({
+  isOpen,
+  onClose,
+  rackNumber,
+  data,
+}) => {
+  if (!isOpen) return null;
+
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return "N/A";
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString();
+    } catch {
+      return timestamp;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800">
+            Rack {rackNumber} Details
+          </h3>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onClose}
+            className="h-8 w-8 p-0 rounded-full hover:bg-gray-100"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {data ? (
+          <div className="space-y-4">
+            {/* Temperature */}
+            <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-red-500 rounded-full p-2">
+                  <Thermometer className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-red-600 font-medium">
+                    Temperature
+                  </p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {data.Temperature}°C
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Humidity */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-500 rounded-full p-2">
+                  <Droplets className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-600 font-medium">Humidity</p>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {data.Humidity}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Info */}
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">Last Update:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {formatTimestamp(data.Timestamp)}
+                </span>
+              </div>
+              {data.device_name && (
+                <div className="text-sm text-gray-600">
+                  Device:{" "}
+                  <span className="font-medium">{data.device_name}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Status Indicator */}
+            <div className="flex items-center justify-center space-x-2 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium text-green-700">
+                Live Data
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-gray-400 mb-2">
+              <Thermometer className="h-12 w-12 mx-auto opacity-50" />
+            </div>
+            <p className="text-gray-500">No data available for this rack</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const Containment3dWidget = ({ config }: Props) => {
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
@@ -50,12 +166,16 @@ export const Containment3dWidget = ({ config }: Props) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string>("");
 
+  // Modal state
+  const [selectedRack, setSelectedRack] = useState<number | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
   // State untuk kontrol dengan default values untuk testing
   const [emergencyButtonState, setEmergencyButtonState] =
     useState<boolean>(false);
-  const [frontDoorStatus, setFrontDoorStatus] = useState<boolean>(true); // true = closed, false = open
+  const [frontDoorStatus, setFrontDoorStatus] = useState<boolean>(true);
   const [backDoorStatus, setBackDoorStatus] = useState<boolean>(true);
-  const [solenoidStatus, setSolenoidStatus] = useState<boolean>(false); // true = activated (open ceiling)
+  const [solenoidStatus, setSolenoidStatus] = useState<boolean>(false);
 
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -64,14 +184,17 @@ export const Containment3dWidget = ({ config }: Props) => {
   const controlsRef = useRef<OrbitControls | null>(null);
   const animationRef = useRef<number>(0);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
   // Refs untuk pintu dan ceiling
   const frontDoorsRef = useRef<THREE.Mesh[]>([]);
   const backDoorsRef = useRef<THREE.Mesh[]>([]);
   const ceilingPartsRef = useRef<THREE.Group[]>([]);
   const rackLabelsRef = useRef<THREE.Sprite[]>([]);
+  const clickableObjectsRef = useRef<THREE.Object3D[]>([]);
 
-  // State untuk data rack
+  // State untuk data rack - menggunakan RackData interface
   const [rackValues, setRackValues] = useState<Record<number, RackData>>({});
 
   // Computed values
@@ -84,13 +207,16 @@ export const Containment3dWidget = ({ config }: Props) => {
       return { left, right };
     }
   }, [config.totalRack]);
-
-  // Handle MQTT messages
+  // Handle MQTT messages - FIXED VERSION untuk multiple racks dengan topic yang sama
   const handleMqttMessage = useCallback(
     (receivedTopic: string, payloadString: string) => {
       try {
         const payload = JSON.parse(payloadString);
-        console.log(payload);
+        console.log("Received MQTT message:", {
+          topic: receivedTopic,
+          payload,
+        });
+
         // Handle topic optional (status controls)
         if (receivedTopic === config.topicOptional) {
           // Emergency button
@@ -104,7 +230,7 @@ export const Containment3dWidget = ({ config }: Props) => {
             }
           }
 
-          // Front door - true = closed, false = open
+          // Door statuses
           if (payload["limit switch front door status"] !== undefined) {
             const newState = payload["limit switch front door status"];
             if (frontDoorStatus !== newState) {
@@ -113,7 +239,6 @@ export const Containment3dWidget = ({ config }: Props) => {
             }
           }
 
-          // Back door
           if (payload["limit switch back door status"] !== undefined) {
             const newState = payload["limit switch back door status"];
             if (backDoorStatus !== newState) {
@@ -122,7 +247,6 @@ export const Containment3dWidget = ({ config }: Props) => {
             }
           }
 
-          // Solenoid status - true = ceiling activated (open)
           if (payload["selenoid status"] !== undefined) {
             const newState = payload["selenoid status"];
             if (solenoidStatus !== newState) {
@@ -132,29 +256,69 @@ export const Containment3dWidget = ({ config }: Props) => {
           }
         }
 
-        // Handle rack data topics
-        const topicIndex = config.topics.indexOf(receivedTopic);
-        if (topicIndex !== -1) {
-          const rackNumber = topicIndex + 1;
-          try {
-            const rackData =
-              typeof payload.value === "string"
-                ? JSON.parse(payload.value)
-                : payload.value || {};
+        // Handle rack data topics - FIXED: Handle semua rack yang menggunakan topic yang sama
+        config.topics.forEach((topic, index) => {
+          // Skip jika topic kosong atau tidak match
+          if (!topic || topic !== receivedTopic) return;
 
-            setRackValues((prev) => ({
-              ...prev,
-              [rackNumber]: {
-                temp: rackData.temp || "N/A",
-                hum: rackData.hum || "N/A",
-              },
-            }));
-          } catch (e) {
-            console.error("Failed to parse rack data:", e);
+          const rackNumber = index + 1;
+          console.log(
+            `Processing data for Rack ${rackNumber} from topic: ${receivedTopic}`
+          );
+
+          let rackData: RackData;
+
+          // Parse value field if it's a string
+          if (payload.value && typeof payload.value === "string") {
+            try {
+              const parsedValue = JSON.parse(payload.value);
+              rackData = {
+                Temperature: parsedValue.Temperature || parsedValue.temp || 0,
+                Humidity: parsedValue.Humidity || parsedValue.hum || 0,
+                device_name: payload.device_name,
+                Timestamp: payload.Timestamp,
+                raw: payload,
+              };
+            } catch (e) {
+              console.error(
+                `Failed to parse value field for Rack ${rackNumber}:`,
+                e
+              );
+              // Fallback if parsing fails
+              rackData = {
+                Temperature: 0,
+                Humidity: 0,
+                device_name: payload.device_name,
+                Timestamp: payload.Timestamp,
+                raw: payload,
+              };
+            }
+          } else {
+            // Direct access if value is already an object or direct fields
+            rackData = {
+              Temperature: payload.Temperature || payload.temp || 0,
+              Humidity: payload.Humidity || payload.hum || 0,
+              device_name: payload.device_name,
+              Timestamp: payload.Timestamp,
+              raw: payload,
+            };
           }
-        }
+
+          console.log(`Rack ${rackNumber} data:`, rackData);
+
+          // Update state untuk rack ini
+          setRackValues((prev) => ({
+            ...prev,
+            [rackNumber]: rackData,
+          }));
+        });
       } catch (error) {
-        console.error("Failed to parse MQTT payload:", error);
+        console.error(
+          "Failed to parse MQTT payload:",
+          error,
+          "Topic:",
+          receivedTopic
+        );
       }
     },
     [
@@ -172,6 +336,36 @@ export const Containment3dWidget = ({ config }: Props) => {
     setAlertMessage(message);
     setTimeout(() => setAlertMessage(""), 3000);
   };
+
+  // Handle rack click
+  const handleRackClick = (rackNumber: number) => {
+    setSelectedRack(rackNumber);
+    setShowDetailModal(true);
+  };
+
+  // Mouse event handlers for 3D interaction
+  const onMouseClick = useCallback((event: MouseEvent) => {
+    if (!mountRef.current || !cameraRef.current || !sceneRef.current) return;
+
+    const rect = mountRef.current.getBoundingClientRect();
+    mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+    const intersects = raycasterRef.current.intersectObjects(
+      clickableObjectsRef.current,
+      true
+    );
+
+    if (intersects.length > 0) {
+      const clickedObject = intersects[0].object;
+      const rackNumber = clickedObject.userData?.rackNumber;
+
+      if (rackNumber) {
+        handleRackClick(rackNumber);
+      }
+    }
+  }, []);
 
   // Validasi config
   useEffect(() => {
@@ -195,6 +389,8 @@ export const Containment3dWidget = ({ config }: Props) => {
       ...config.topics.filter((t) => t),
       config.topicOptional,
     ].filter((t) => t);
+
+    console.log("Subscribing to topics:", allTopics);
 
     allTopics.forEach((topic) => {
       if (topic) {
@@ -220,97 +416,128 @@ export const Containment3dWidget = ({ config }: Props) => {
     handleMqttMessage,
   ]);
 
-  // Create circular label
+  // Create circular label - optimized
   const createCircularLabel = useCallback(
-    (text: string, backgroundColor: string = "black") => {
+    (text: string, backgroundColor: string = "black", data?: RackData) => {
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       if (!context) return null;
 
-      canvas.width = 128;
-      canvas.height = 128;
+      canvas.width = 256;
+      canvas.height = 256;
 
       // Draw circle
       context.fillStyle = backgroundColor;
       context.beginPath();
-      context.arc(64, 64, 50, 0, Math.PI * 2);
+      context.arc(128, 128, 100, 0, Math.PI * 2);
       context.fill();
 
-      // Draw text
+      // Draw main text (rack number)
       context.fillStyle = backgroundColor === "yellow" ? "black" : "white";
-      context.font = "bold 32px Arial";
+      context.font = "bold 48px Arial";
       context.textAlign = "center";
       context.textBaseline = "middle";
-      context.fillText(text, 64, 64);
+      context.fillText(text, 128, 100);
+
+      // Add temperature and humidity if available
+      if (data && !text.includes("DUMMY")) {
+        context.font = "20px Arial";
+        context.fillText(`${data.Temperature}°C`, 128, 140);
+        context.fillText(`${data.Humidity}%`, 128, 165);
+      }
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.generateMipmaps = false;
+      texture.needsUpdate = true;
       return texture;
     },
     []
   );
 
-  // Get rack label color
+  // Get rack label color - optimized logic
   const getRackLabelColor = useCallback(
     (rackNumber: number) => {
       if (config.dummyRack.includes(rackNumber)) {
         return "gray";
       }
 
-      const payload = rackValues[rackNumber];
-      if (payload) {
-        const temp = parseFloat(payload.temp);
-        const hum = parseFloat(payload.hum);
+      const data = rackValues[rackNumber];
+      if (
+        data &&
+        data.Temperature !== undefined &&
+        data.Humidity !== undefined
+      ) {
+        const temp = data.Temperature;
+        const hum = data.Humidity;
 
-        if (isNaN(temp) || isNaN(hum)) return "black";
-
+        // Critical conditions (red)
         if (temp < 15 || temp > 30 || hum < 30 || hum > 70) {
           return "red";
-        } else if (
+        }
+        // Warning conditions (yellow)
+        else if (
           (temp >= 15 && temp <= 17) ||
           (temp >= 28 && temp <= 30) ||
           (hum >= 30 && hum <= 39) ||
           (hum >= 61 && hum <= 70)
         ) {
           return "yellow";
-        } else if (temp >= 18 && temp <= 27 && hum >= 40 && hum <= 60) {
+        }
+        // Normal conditions (green)
+        else if (temp >= 18 && temp <= 27 && hum >= 40 && hum <= 60) {
           return "green";
         }
       }
-      return "black";
+      return "black"; // No data
     },
     [config.dummyRack, rackValues]
   );
 
-  // Update rack labels
+  // Update rack labels - optimized
   const updateRackLabels = useCallback(() => {
     rackLabelsRef.current.forEach((label, index) => {
       const rackNumber = index + 1;
       const newColor = getRackLabelColor(rackNumber);
+      const data = rackValues[rackNumber];
+      const isDummy = config.dummyRack.includes(rackNumber);
 
-      if (label.userData?.backgroundColor !== newColor) {
-        const newTexture = createCircularLabel(rackNumber.toString(), newColor);
+      if (
+        label.userData?.backgroundColor !== newColor ||
+        label.userData?.lastUpdate !== data?.Timestamp
+      ) {
+        const newTexture = createCircularLabel(
+          isDummy ? "DUMMY" : rackNumber.toString(),
+          newColor,
+          isDummy ? undefined : data
+        );
+
         if (newTexture && label.material instanceof THREE.SpriteMaterial) {
+          // Dispose old texture to prevent memory leaks
+          if (label.material.map) {
+            label.material.map.dispose();
+          }
           label.material.map = newTexture;
-          label.userData = { backgroundColor: newColor };
+          label.userData = {
+            backgroundColor: newColor,
+            lastUpdate: data?.Timestamp,
+            rackNumber: rackNumber,
+          };
         }
       }
     });
-  }, [getRackLabelColor, createCircularLabel]);
+  }, [getRackLabelColor, createCircularLabel, rackValues, config.dummyRack]);
 
   // Animate doors
   const animateDoors = useCallback(() => {
-    // Front doors animation - slide to the right when open
     frontDoorsRef.current.forEach((door) => {
-      const targetX = frontDoorStatus ? 0.0 : 0.5; // move right when open
+      const targetX = frontDoorStatus ? 0.0 : 0.5;
       if (Math.abs(door.position.x - targetX) > 0.01) {
         door.position.x += (targetX - door.position.x) * 0.1;
       }
     });
 
-    // Back doors animation - slide to the left when open
     backDoorsRef.current.forEach((door) => {
-      const targetX = backDoorStatus ? 0.0 : -0.5; // move left when open
+      const targetX = backDoorStatus ? 0.0 : -0.5;
       if (Math.abs(door.position.x - targetX) > 0.01) {
         door.position.x += (targetX - door.position.x) * 0.1;
       }
@@ -319,8 +546,8 @@ export const Containment3dWidget = ({ config }: Props) => {
 
   // Animate ceiling
   const animateCeiling = useCallback(() => {
-    ceilingPartsRef.current.forEach((pivot, index) => {
-      const targetRotation = solenoidStatus ? Math.PI / 2 : 0; // 90 degrees when activated
+    ceilingPartsRef.current.forEach((pivot) => {
+      const targetRotation = solenoidStatus ? Math.PI / 2 : 0;
       const currentRotation = pivot.rotation.z;
 
       if (Math.abs(currentRotation - targetRotation) > 0.01) {
@@ -342,12 +569,26 @@ export const Containment3dWidget = ({ config }: Props) => {
     rendererRef.current.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }, []);
 
-  // Create 3D scene
+  // Create 3D scene - optimized for performance
   const createScene = useCallback(() => {
     if (!mountRef.current) return;
 
     // Clear previous scene
     if (sceneRef.current) {
+      // Dispose of geometries and materials
+      sceneRef.current.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((material) => material.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        }
+      });
+
       while (sceneRef.current.children.length > 0) {
         sceneRef.current.remove(sceneRef.current.children[0]);
       }
@@ -366,6 +607,7 @@ export const Containment3dWidget = ({ config }: Props) => {
     backDoorsRef.current = [];
     ceilingPartsRef.current = [];
     rackLabelsRef.current = [];
+    clickableObjectsRef.current = [];
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -383,8 +625,11 @@ export const Containment3dWidget = ({ config }: Props) => {
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Renderer - optimized settings
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(
       mountRef.current.clientWidth,
@@ -397,15 +642,18 @@ export const Containment3dWidget = ({ config }: Props) => {
     mountRef.current.innerHTML = "";
     mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    // Add mouse event listener
+    renderer.domElement.addEventListener("click", onMouseClick);
+
+    // Lighting - optimized
+    const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 10, 10);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.mapSize.width = 1024; // Reduced for performance
+    directionalLight.shadow.mapSize.height = 1024;
     scene.add(directionalLight);
 
     // Controls
@@ -414,7 +662,7 @@ export const Containment3dWidget = ({ config }: Props) => {
     controls.dampingFactor = 0.1;
     controlsRef.current = controls;
 
-    // Materials
+    // Materials - reused for performance
     const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
     const serverMaterial = new THREE.MeshStandardMaterial({ color: 0x3333ff });
     const dummyServerMaterial = new THREE.MeshStandardMaterial({
@@ -430,96 +678,92 @@ export const Containment3dWidget = ({ config }: Props) => {
     const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
     const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5dc });
 
-    // Create rack function
+    // Shared geometries for performance
+    const rackGeometry = new THREE.BoxGeometry(0.67, 2.0, 1.2);
+    const serverGeometry = new THREE.BoxGeometry(0.62, 0.15, 1.1);
+    const doorGeometry = new THREE.BoxGeometry(0.65, 2.0, 0.03);
+
+    // Create rack function - optimized
     const createRackServer = (rackNumber: number) => {
       const rackGroup = new THREE.Group();
       rackGroup.userData = { rackNumber };
 
-      const rackWidth = 0.67;
-      const rackHeight = 2.0;
-      const rackDepth = 1.2;
       const isDummy = config.dummyRack.includes(rackNumber);
 
-      // Frame - always visible but different material for dummy
-      const frameGeometry = new THREE.BoxGeometry(
-        rackWidth,
-        rackHeight,
-        rackDepth
-      );
+      // Frame
       const frame = new THREE.Mesh(
-        frameGeometry,
+        rackGeometry,
         isDummy
           ? new THREE.MeshStandardMaterial({
               color: 0x666666,
               opacity: 0.5,
               transparent: true,
-              wireframe: true, // wireframe untuk dummy
+              wireframe: true,
             })
           : frameMaterial
       );
       frame.position.z = -0.6;
       frame.castShadow = true;
       frame.receiveShadow = true;
+      frame.userData = { rackNumber, clickable: true };
       rackGroup.add(frame);
+      clickableObjectsRef.current.push(frame);
 
-      // Server units
-      const numUnits = 10;
-      const unitHeight = rackHeight / numUnits;
+      // Server units - reduced count for performance
+      const numUnits = isDummy ? 5 : 8; // Less units for better performance
+      const unitHeight = 2.0 / numUnits;
+
       for (let i = 0; i < numUnits; i++) {
-        const serverGeometry = new THREE.BoxGeometry(
-          rackWidth - 0.05,
-          unitHeight - 0.05,
-          rackDepth - 0.1
-        );
         const serverUnit = new THREE.Mesh(
           serverGeometry,
           isDummy ? dummyServerMaterial : serverMaterial
         );
-        serverUnit.position.y =
-          i * unitHeight - rackHeight / 2 + unitHeight / 2;
+        serverUnit.position.y = i * unitHeight - 1.0 + unitHeight / 2;
         serverUnit.position.z = -0.5;
         serverUnit.castShadow = true;
+        serverUnit.userData = { rackNumber, clickable: true };
 
-        // Add breathing animation for dummy racks
         if (isDummy) {
-          serverUnit.userData = {
-            originalScale: serverUnit.scale.clone(),
-            isDummy: true,
-          };
+          serverUnit.userData.isDummy = true;
+          serverUnit.userData.originalScale = serverUnit.scale.clone();
         }
 
         rackGroup.add(serverUnit);
+        clickableObjectsRef.current.push(serverUnit);
       }
 
-      // Front door
-      const frontDoorGeometry = new THREE.BoxGeometry(
-        rackWidth - 0.02,
-        rackHeight,
-        0.03
-      );
-      const frontDoor = new THREE.Mesh(frontDoorGeometry, doorMaterial);
+      // Doors
+      const frontDoor = new THREE.Mesh(doorGeometry, doorMaterial);
       frontDoor.position.z = 0.1;
-      frontDoor.userData = { position: "front", rack: rackNumber };
+      frontDoor.userData = {
+        position: "front",
+        rack: rackNumber,
+        rackNumber,
+        clickable: true,
+      };
       rackGroup.add(frontDoor);
       frontDoorsRef.current.push(frontDoor);
+      clickableObjectsRef.current.push(frontDoor);
 
-      // Back door
-      const backDoorGeometry = new THREE.BoxGeometry(
-        rackWidth - 0.02,
-        rackHeight,
-        0.03
-      );
-      const backDoor = new THREE.Mesh(backDoorGeometry, doorMaterial);
+      const backDoor = new THREE.Mesh(doorGeometry, doorMaterial);
       backDoor.position.z = -1.2;
-      backDoor.userData = { position: "back", rack: rackNumber };
+      backDoor.userData = {
+        position: "back",
+        rack: rackNumber,
+        rackNumber,
+        clickable: true,
+      };
       rackGroup.add(backDoor);
       backDoorsRef.current.push(backDoor);
+      clickableObjectsRef.current.push(backDoor);
 
       // Label
       const labelTexture = createCircularLabel(
         isDummy ? "DUMMY" : rackNumber.toString(),
-        getRackLabelColor(rackNumber)
+        getRackLabelColor(rackNumber),
+        isDummy ? undefined : rackValues[rackNumber]
       );
+
       if (labelTexture) {
         const spriteMaterial = new THREE.SpriteMaterial({
           map: labelTexture,
@@ -528,9 +772,14 @@ export const Containment3dWidget = ({ config }: Props) => {
         const label = new THREE.Sprite(spriteMaterial);
         label.scale.set(0.5, 0.5, 1);
         label.position.set(0, 1, -1.25);
-        label.userData = { backgroundColor: getRackLabelColor(rackNumber) };
+        label.userData = {
+          backgroundColor: getRackLabelColor(rackNumber),
+          rackNumber,
+          clickable: true,
+        };
         rackGroup.add(label);
         rackLabelsRef.current.push(label);
+        clickableObjectsRef.current.push(label);
       }
 
       return rackGroup;
@@ -543,7 +792,6 @@ export const Containment3dWidget = ({ config }: Props) => {
       isRightRow: boolean
     ) => {
       const rowGroup = new THREE.Group();
-      const rackWidth = 0.67;
 
       for (let i = 0; i < numRacks; i++) {
         const rackNumber = startRackNumber + i;
@@ -558,19 +806,19 @@ export const Containment3dWidget = ({ config }: Props) => {
         rowGroup.add(rackServer);
       }
 
-      // Add covers
+      // Add covers - simplified
       const sideCoverLeft = new THREE.Mesh(
         new THREE.BoxGeometry(0.05, 2.0, 0.5),
         coverMaterial
       );
-      sideCoverLeft.position.x = -(numRacks * rackWidth) / 2 - 0.05;
+      sideCoverLeft.position.x = -(numRacks * 0.67) / 2 - 0.05;
       rowGroup.add(sideCoverLeft);
 
       const sideCoverRight = new THREE.Mesh(
         new THREE.BoxGeometry(0.05, 2.0, 0.5),
         coverMaterial
       );
-      sideCoverRight.position.x = (numRacks * rackWidth) / 2 + 0.05;
+      sideCoverRight.position.x = (numRacks * 0.67) / 2 + 0.05;
       rowGroup.add(sideCoverRight);
 
       const bottomCover = new THREE.Mesh(
@@ -583,7 +831,7 @@ export const Containment3dWidget = ({ config }: Props) => {
       return rowGroup;
     };
 
-    // Create ceiling
+    // Create ceiling - simplified
     const createSplitCeiling = (
       topCoverWidth: number,
       topCoverDepth: number,
@@ -652,20 +900,40 @@ export const Containment3dWidget = ({ config }: Props) => {
       resizeObserverRef.current.observe(mountRef.current);
     }
 
-    // Animation loop
-    const animate = () => {
+    // Animation loop - optimized for performance
+    let lastUpdateTime = 0;
+    const targetFPS = 30; // Limit FPS for better performance on Pi
+    const frameInterval = 1000 / targetFPS;
+
+    const animate = (currentTime: number) => {
       animationRef.current = requestAnimationFrame(animate);
 
-      // Animate dummy racks breathing effect
-      scene.traverse((child) => {
-        if (child.userData?.isDummy) {
-          const time = Date.now() * 0.001;
-          const scale = 1 + Math.sin(time * 2) * 0.05;
-          child.scale.setScalar(scale);
-        }
-      });
+      // Throttle animation updates
+      if (currentTime - lastUpdateTime < frameInterval) {
+        controls.update();
+        renderer.render(scene, camera);
+        return;
+      }
+      lastUpdateTime = currentTime;
 
-      updateRackLabels();
+      // Animate dummy racks breathing effect - reduced frequency
+      if (Math.floor(currentTime / 200) % 3 === 0) {
+        // Update every 600ms
+        scene.traverse((child) => {
+          if (child.userData?.isDummy) {
+            const time = currentTime * 0.001;
+            const scale = 1 + Math.sin(time * 1.5) * 0.03; // Reduced animation intensity
+            child.scale.setScalar(scale);
+          }
+        });
+      }
+
+      // Update labels less frequently
+      if (Math.floor(currentTime / 500) % 2 === 0) {
+        // Update every 1000ms
+        updateRackLabels();
+      }
+
       animateDoors();
       animateCeiling();
 
@@ -673,17 +941,23 @@ export const Containment3dWidget = ({ config }: Props) => {
       renderer.render(scene, camera);
     };
 
-    animate();
+    animate(0);
 
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      renderer.domElement.removeEventListener("click", onMouseClick);
       cancelAnimationFrame(animationRef.current);
 
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
+
+      // Cleanup geometries and materials
+      rackGeometry.dispose();
+      serverGeometry.dispose();
+      doorGeometry.dispose();
     };
   }, [
     config.totalRack,
@@ -695,6 +969,8 @@ export const Containment3dWidget = ({ config }: Props) => {
     animateDoors,
     animateCeiling,
     handleResize,
+    onMouseClick,
+    rackValues,
   ]);
 
   // Initialize scene
@@ -865,6 +1141,31 @@ export const Containment3dWidget = ({ config }: Props) => {
     };
   };
 
+  // Get overall statistics
+  const getOverallStats = () => {
+    const activeRacks = Object.keys(rackValues).filter(
+      (key) => !config.dummyRack.includes(Number(key))
+    );
+
+    const temps = activeRacks
+      .map((key) => rackValues[Number(key)]?.Temperature)
+      .filter((t) => t !== undefined);
+    const hums = activeRacks
+      .map((key) => rackValues[Number(key)]?.Humidity)
+      .filter((h) => h !== undefined);
+
+    const avgTemp =
+      temps.length > 0
+        ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1)
+        : "N/A";
+    const avgHum =
+      hums.length > 0
+        ? (hums.reduce((a, b) => a + b, 0) / hums.length).toFixed(1)
+        : "N/A";
+
+    return { avgTemp, avgHum, activeCount: activeRacks.length };
+  };
+
   // Render content
   const renderContent = () => {
     if (status === "loading") {
@@ -877,13 +1178,22 @@ export const Containment3dWidget = ({ config }: Props) => {
 
     const connectionInfo = getConnectionStatus();
     const ConnectionIcon = connectionInfo.icon;
+    const stats = getOverallStats();
 
     return (
       <div className="relative w-full h-full group">
         {/* 3D Viewport */}
         <div
           ref={mountRef}
-          className="w-full h-full rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 shadow-inner"
+          className="w-full h-full rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 shadow-inner cursor-pointer"
+        />
+
+        {/* Detail Modal */}
+        <DetailModal
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          rackNumber={selectedRack || 0}
+          data={selectedRack ? rackValues[selectedRack] : null}
         />
 
         {/* Alert Message */}
@@ -895,18 +1205,28 @@ export const Containment3dWidget = ({ config }: Props) => {
           </div>
         )}
 
-        {/* Emergency Icon */}
+        {/* Connection Status */}
         <div className="absolute top-3 left-3 z-10">
           <div className="flex items-center space-x-2 bg-white/90 backdrop-blur-xl px-3 py-2 rounded-xl shadow-xl border border-white/30">
+            <ConnectionIcon className={`h-4 w-4 ${connectionInfo.color}`} />
+            <span className="text-sm font-medium text-gray-700">
+              {connectionInfo.text}
+            </span>
+          </div>
+        </div>
+
+        {/* Emergency Status */}
+        <div className="absolute top-3 left-40 z-10">
+          <div className="flex items-center space-x-2 bg-white/90 backdrop-blur-xl px-3 py-2 rounded-xl shadow-xl border border-white/30">
             <Shield
-              className={`h-6 w-6 ${
+              className={`h-4 w-4 ${
                 emergencyButtonState
                   ? "text-red-500 animate-pulse"
                   : "text-green-500"
               }`}
             />
             <span className="text-sm font-medium text-gray-700">
-              Emergency: {emergencyButtonState ? "Active" : "Inactive"}
+              {emergencyButtonState ? "Emergency Active" : "Normal"}
             </span>
           </div>
         </div>
@@ -978,24 +1298,30 @@ export const Containment3dWidget = ({ config }: Props) => {
           </Button>
         </div>
 
-        {/* Status Panel */}
+        {/* Status Panel with Live Data */}
         <div className="absolute bottom-4 right-4 z-10">
           <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 shadow-xl border border-white/30">
-            <div className="flex items-center space-x-3">
-              {/* Temperature */}
-              <div className="flex items-center space-x-2">
+            <div className="space-y-2">
+              {/* Average Temperature */}
+              <div className="flex items-center space-x-3">
                 <Thermometer className="h-4 w-4 text-red-500" />
-                <span className="text-xs text-gray-600">Temp</span>
+                <span className="text-xs text-gray-600">Avg Temp:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {stats.avgTemp !== "N/A" ? `${stats.avgTemp}°C` : "N/A"}
+                </span>
               </div>
 
-              {/* Humidity */}
-              <div className="flex items-center space-x-2">
+              {/* Average Humidity */}
+              <div className="flex items-center space-x-3">
                 <Droplets className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-gray-600">Humidity</span>
+                <span className="text-xs text-gray-600">Avg Hum:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {stats.avgHum !== "N/A" ? `${stats.avgHum}%` : "N/A"}
+                </span>
               </div>
 
               {/* Door Status */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <div
                   className={`w-2 h-2 rounded-full ${
                     frontDoorStatus && backDoorStatus
@@ -1003,17 +1329,23 @@ export const Containment3dWidget = ({ config }: Props) => {
                       : "bg-red-500"
                   }`}
                 />
-                <span className="text-xs text-gray-600">Doors</span>
+                <span className="text-xs text-gray-600">Doors:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {frontDoorStatus && backDoorStatus ? "Closed" : "Open"}
+                </span>
               </div>
 
               {/* Ceiling Status */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <div
                   className={`w-2 h-2 rounded-full ${
                     solenoidStatus ? "bg-orange-500" : "bg-gray-400"
                   }`}
                 />
-                <span className="text-xs text-gray-600">Ceiling</span>
+                <span className="text-xs text-gray-600">Ceiling:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {solenoidStatus ? "Open" : "Closed"}
+                </span>
               </div>
             </div>
           </div>
@@ -1028,8 +1360,18 @@ export const Containment3dWidget = ({ config }: Props) => {
                 {config.customName}
               </div>
               <div className="text-xs text-gray-500">
-                {config.totalRack} Racks • {config.dummyRack.length} Dummy
+                {config.totalRack} Total • {stats.activeCount} Active •{" "}
+                {config.dummyRack.length} Dummy
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Click Instructions */}
+        <div className="absolute top-20 left-3 z-10">
+          <div className="bg-white/90 backdrop-blur-xl px-3 py-2 rounded-xl shadow-xl border border-white/30">
+            <div className="text-xs text-gray-600">
+              💡 Click on any rack to view details
             </div>
           </div>
         </div>
@@ -1045,30 +1387,6 @@ export const Containment3dWidget = ({ config }: Props) => {
             </div>
           </div>
         )}
-
-        {/* Rack Legend */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 shadow-xl border border-white/30">
-            <div className="flex items-center space-x-4 text-xs">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full" />
-                <span className="text-gray-600">Normal</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-                <span className="text-gray-600">Warning</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full" />
-                <span className="text-gray-600">Critical</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-gray-500 rounded-full" />
-                <span className="text-gray-600">Dummy</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     );
   };
@@ -1158,31 +1476,10 @@ export const Containment3dWidget = ({ config }: Props) => {
           background: linear-gradient(180deg, #42a5f5, #2196f3);
         }
 
-        /* Glass morphism enhanced */
-        .glass-enhanced {
-          background: rgba(255, 255, 255, 0.15);
-          backdrop-filter: blur(20px) saturate(180%);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Interactive states */
-        .interactive-element {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .interactive-element:hover {
-          transform: translateY(-2px) scale(1.02);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        .interactive-element:active {
-          transform: translateY(0) scale(0.98);
-        }
-
-        /* Responsive design */
+        /* Responsive design - optimized for Pi */
         @media (max-width: 768px) {
-          .absolute.top-4.left-4 {
+          .absolute.top-4.left-4,
+          .absolute.top-3.left-3 {
             top: 0.5rem;
             left: 0.5rem;
           }
@@ -1198,21 +1495,14 @@ export const Containment3dWidget = ({ config }: Props) => {
             right: 0.5rem;
           }
 
-          .control-panel {
-            flex-direction: column;
-            gap: 0.5rem;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .status-panels {
-            flex-direction: column;
-            gap: 0.5rem;
-          }
-
           .text-xs {
             font-size: 0.7rem;
           }
+        }
+
+        /* Hover effects for clickable elements */
+        .cursor-pointer:hover {
+          filter: brightness(1.05);
         }
       `}</style>
     </Card>
