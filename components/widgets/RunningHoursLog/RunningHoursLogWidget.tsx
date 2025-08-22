@@ -1,10 +1,15 @@
 // File: components/widgets/RunningHoursLog/RunningHoursLogWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle, Clock } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, AlertTriangle, Clock, Activity } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -18,11 +23,46 @@ interface Props {
   };
 }
 
-interface DynamicSizes {
-  valueFontSize: number;
-  iconSize: number;
-  titleFontSize: number;
-}
+// Get status-specific styling
+const getRunningHoursStyle = (status: string, value: number | null) => {
+  if (status !== "ok") {
+    return {
+      border: status === "error" ? "border-red-200" : "border-amber-200",
+      bg: status === "error" ? "bg-red-50" : "bg-amber-50",
+    };
+  }
+
+  // Color based on running hours value (if it's a number)
+  if (typeof value === "number") {
+    if (value < 100) {
+      return {
+        border: "border-emerald-200",
+        bg: "bg-emerald-50", // Low hours - good condition
+      };
+    } else if (value < 1000) {
+      return {
+        border: "border-blue-200",
+        bg: "bg-blue-50", // Medium hours - normal
+      };
+    } else if (value < 5000) {
+      return {
+        border: "border-orange-200",
+        bg: "bg-orange-50", // High hours - attention needed
+      };
+    } else {
+      return {
+        border: "border-red-200",
+        bg: "bg-red-50", // Very high hours - maintenance required
+      };
+    }
+  }
+
+  // Default for non-numeric values
+  return {
+    border: "border-slate-200",
+    bg: "bg-slate-50",
+  };
+};
 
 export const RunningHoursLogWidget = ({ config }: Props) => {
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
@@ -34,47 +74,48 @@ export const RunningHoursLogWidget = ({ config }: Props) => {
   );
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [topic, setTopic] = useState<string | null>(null);
-  const [layoutMode, setLayoutMode] = useState<"horizontal" | "vertical">(
-    "horizontal"
-  );
-  const [dynamicSizes, setDynamicSizes] = useState<DynamicSizes>({
-    valueFontSize: 32,
-    iconSize: 48,
-    titleFontSize: 14,
-  });
 
-  const widgetRef = useRef<HTMLDivElement>(null);
+  // Responsive sizing setup (sama seperti widgets lainnya)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [titleFontSize, setTitleFontSize] = useState(14);
+  const [valueFontSize, setValueFontSize] = useState(24);
+  const [unitFontSize, setUnitFontSize] = useState(12);
 
-  // Responsive sizing dengan ResizeObserver
-  useEffect(() => {
-    if (!widgetRef.current) return;
+  // Enhanced responsive calculation
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        const aspectRatio = width / height;
+    const updateDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
 
-        // Tentukan mode layout berdasarkan aspek rasio
-        const currentLayoutMode = aspectRatio > 1.3 ? "horizontal" : "vertical";
-        setLayoutMode(currentLayoutMode);
+      setDimensions({ width, height });
 
-        // Rumus dinamis yang lebih conservative untuk card kecil
-        let baseSize;
-        if (currentLayoutMode === "horizontal") {
-          baseSize = Math.min(width / 12, height / 3.5);
-        } else {
-          baseSize = Math.min(width / 6, height / 5.5);
-        }
+      // Advanced responsive scaling
+      const area = width * height;
+      const baseScale = Math.sqrt(area) / 100;
+      const minScale = Math.min(width / 150, height / 100);
+      const scale = Math.min(baseScale, minScale);
 
-        setDynamicSizes({
-          valueFontSize: Math.max(16, baseSize * 1.2),
-          iconSize: Math.max(24, baseSize * 1.8),
-          titleFontSize: Math.max(12, baseSize * 0.7),
-        });
-      }
-    });
+      // Dynamic font sizes with better proportions
+      const newValueSize = Math.max(Math.min(width / 6, height / 2.5), 16);
+      const newTitleSize = Math.max(
+        Math.min(width / 15, height / 8, newValueSize * 0.5),
+        10
+      );
+      const newUnitSize = Math.max(newValueSize * 0.35, 10);
 
-    resizeObserver.observe(widgetRef.current);
+      setValueFontSize(newValueSize);
+      setTitleFontSize(newTitleSize);
+      setUnitFontSize(newUnitSize);
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    resizeObserver.observe(container);
+    updateDimensions();
+
     return () => resizeObserver.disconnect();
   }, []);
 
@@ -151,149 +192,209 @@ export const RunningHoursLogWidget = ({ config }: Props) => {
     handleMqttMessage,
   ]);
 
-  // Loading skeleton component
-  const LoadingSkeleton = () => (
-    <div className="w-full flex flex-col items-center justify-center">
-      <div
-        className="bg-gradient-to-r from-muted/50 via-muted to-muted/50 animate-pulse rounded-lg"
-        style={{
-          width: `${dynamicSizes.valueFontSize * 3}px`,
-          height: `${dynamicSizes.valueFontSize * 1.5}px`,
-        }}
-      />
-      <div
-        className="mt-2 bg-gradient-to-r from-muted/50 via-muted to-muted/50 animate-pulse rounded"
-        style={{
-          width: `${dynamicSizes.valueFontSize * 2}px`,
-          height: `${dynamicSizes.titleFontSize * 0.8}px`,
-        }}
-      />
-    </div>
-  );
+  const hoursStyle = getRunningHoursStyle(status, displayValue);
 
-  // Render content with animations
+  const formatValue = (value: string | number | null) => {
+    if (value === null) return "—";
+
+    if (typeof value === "number") {
+      return value.toLocaleString(undefined, {
+        maximumFractionDigits: 1,
+        minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+      });
+    }
+
+    return String(value);
+  };
+
+  const getStatusIcon = () => {
+    if (typeof displayValue === "number") {
+      if (displayValue < 100) return "text-emerald-500";
+      if (displayValue < 1000) return "text-blue-500";
+      if (displayValue < 5000) return "text-orange-500";
+      return "text-red-500";
+    }
+
+    switch (status) {
+      case "ok":
+        return "text-slate-500";
+      case "error":
+        return "text-red-500";
+      default:
+        return "text-amber-500";
+    }
+  };
+
   const renderContent = () => {
-    if (status === "loading") {
+    const isLoading =
+      status === "loading" || (status === "waiting" && displayValue === null);
+
+    if (isLoading) {
       return (
-        <div className="flex items-center justify-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
+        <div className="flex flex-col items-center justify-center gap-3">
+          <div className="relative">
             <Loader2
-              className="animate-spin text-primary"
+              className="animate-spin text-amber-500"
               style={{
-                width: `${dynamicSizes.iconSize}px`,
-                height: `${dynamicSizes.iconSize}px`,
+                width: Math.max(dimensions.width / 8, 24),
+                height: Math.max(dimensions.width / 8, 24),
               }}
             />
-          </motion.div>
+          </div>
+          <p
+            className="text-slate-500 font-medium"
+            style={{ fontSize: `${titleFontSize}px` }}
+          >
+            Loading...
+          </p>
         </div>
       );
     }
 
     if (status === "error") {
       return (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col items-center justify-center text-center p-2"
-        >
+        <div className="flex flex-col items-center justify-center gap-3 text-center">
           <AlertTriangle
-            className="text-destructive mb-2"
+            className="text-red-500"
             style={{
-              width: `${dynamicSizes.iconSize * 0.8}px`,
-              height: `${dynamicSizes.iconSize * 0.8}px`,
+              width: Math.max(dimensions.width / 8, 24),
+              height: Math.max(dimensions.width / 8, 24),
             }}
           />
           <p
-            className="font-semibold text-destructive text-center"
-            style={{
-              fontSize: `${Math.max(12, dynamicSizes.titleFontSize)}px`,
-            }}
+            className="text-red-600 font-semibold max-w-full break-words"
+            style={{ fontSize: `${titleFontSize}px` }}
           >
             {errorMessage}
           </p>
-        </motion.div>
-      );
-    }
-
-    if (displayValue === null || status === "waiting") {
-      return (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <LoadingSkeleton />
-        </motion.div>
+        </div>
       );
     }
 
     return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={displayValue}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="text-center"
-        >
-          <p
-            className="font-bold tracking-tight text-primary truncate"
+      <div className="flex flex-col items-center justify-center text-center w-full">
+        <div className="flex items-baseline justify-center gap-1 w-full">
+          <span
+            className="font-bold tracking-tight text-slate-900 transition-colors duration-200"
             style={{
-              fontSize: `${dynamicSizes.valueFontSize}px`,
-              lineHeight: 1.2,
+              fontSize: `${valueFontSize}px`,
+              lineHeight: 0.9,
             }}
           >
-            {typeof displayValue === "number"
-              ? displayValue.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })
-              : String(displayValue)}
-          </p>
-          <p
-            className="font-medium text-muted-foreground mt-1"
-            style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
-          >
-            {config.units}
-          </p>
-        </motion.div>
-      </AnimatePresence>
+            {formatValue(displayValue)}
+          </span>
+          {config.units && (
+            <span
+              className="font-medium text-slate-500 transition-colors duration-200"
+              style={{
+                fontSize: `${unitFontSize}px`,
+                lineHeight: 1,
+              }}
+            >
+              {config.units}
+            </span>
+          )}
+        </div>
+
+        {/* Hours indicator */}
+        {typeof displayValue === "number" && (
+          <div className="mt-2 flex items-center space-x-1">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                displayValue < 100
+                  ? "bg-emerald-400"
+                  : displayValue < 1000
+                  ? "bg-blue-400"
+                  : displayValue < 5000
+                  ? "bg-orange-400"
+                  : "bg-red-400"
+              } animate-pulse`}
+            />
+            <span
+              className="text-slate-400 font-medium"
+              style={{ fontSize: `${Math.max(unitFontSize * 0.8, 8)}px` }}
+            >
+              {displayValue < 100
+                ? "New"
+                : displayValue < 1000
+                ? "Normal"
+                : displayValue < 5000
+                ? "High"
+                : "Critical"}
+            </span>
+          </div>
+        )}
+      </div>
     );
   };
 
   return (
     <div
-      ref={widgetRef}
-      className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move bg-card/30 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm"
+      ref={containerRef}
+      className={`
+        w-full h-full relative overflow-hidden cursor-move
+        bg-gradient-to-br from-white to-slate-50
+      
+        rounded-xl shadow-sm hover:shadow-md
+        transition-all duration-300 ease-out
+        group
+      `}
+      style={{
+        minWidth: 140,
+        minHeight: 90,
+      }}
     >
-      <motion.div
-        className="flex items-center w-full mb-3"
-        style={{
-          justifyContent: layoutMode === "horizontal" ? "flex-start" : "center",
-        }}
-      >
+      {/* Status indicator */}
+      <div className="absolute top-2 right-2 opacity-75 group-hover:opacity-100 transition-opacity">
         <Clock
-          className="text-muted-foreground mr-2 flex-shrink-0"
+          className={getStatusIcon()}
           style={{
-            width: `${dynamicSizes.iconSize * 0.5}px`,
-            height: `${dynamicSizes.iconSize * 0.5}px`,
+            width: Math.max(titleFontSize * 0.8, 12),
+            height: Math.max(titleFontSize * 0.8, 12),
           }}
         />
-        <p
-          className="font-medium text-muted-foreground truncate"
-          style={{ fontSize: `${dynamicSizes.titleFontSize * 0.9}px` }}
+      </div>
+
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-3">
+        <h3
+          className="font-semibold text-slate-700 truncate text-left"
+          style={{
+            fontSize: `${titleFontSize}px`,
+            lineHeight: 1.2,
+          }}
+          title={config.customName}
         >
           {config.customName}
-        </p>
-      </motion.div>
+        </h3>
+      </div>
 
-      <div className="flex-1 w-full flex items-center justify-center">
+      {/* Main content area */}
+      <div className="absolute inset-0 pt-12 pb-4 px-4 flex items-center justify-center">
         {renderContent()}
       </div>
+
+      {/* Running indicator */}
+      <div className="absolute bottom-2 left-2 opacity-50 group-hover:opacity-75 transition-opacity">
+        <div className="flex items-center space-x-1">
+          <Activity
+            className="text-slate-400"
+            style={{
+              width: `${Math.max(titleFontSize * 0.6, 8)}px`,
+              height: `${Math.max(titleFontSize * 0.6, 8)}px`,
+            }}
+          />
+          <span
+            className="text-slate-400 font-medium uppercase tracking-wider"
+            style={{ fontSize: `${Math.max(titleFontSize * 0.6, 8)}px` }}
+          >
+            HOURS
+          </span>
+        </div>
+      </div>
+
+      {/* Subtle gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };
