@@ -88,6 +88,7 @@ const defaultMenuConfig: MenuConfigData = {
       "Device List": true,
       "Device Profiles": true,
       Applications: true,
+      Gateways: true,
     },
   },
   SecurityAccess: {

@@ -299,6 +299,60 @@ model DeviceData {
   device    LoraDevice @relation(fields: [deviceId], references: [id])
 }
 
+model LoraGateway {
+  id          String         @id @default(cuid())
+  gatewayId   String         @unique // Gateway ID dari topic MQTT
+  name        String
+  description String?
+  lastSeen    DateTime?
+  isOnline    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  stats       GatewayStats[]
+}
+
+model GatewayStats {
+  id                              String      @id @default(cuid())
+  gatewayId                       String
+  timestamp                       DateTime
+  
+  // Upstream Statistics
+  rfPacketsReceived               Int         @default(0)
+  rfPacketsOk                     Int         @default(0)
+  rfPacketsBad                    Int         @default(0)
+  rfPacketsNocrc                  Int         @default(0)
+  rfPacketsForwarded              Int         @default(0)
+  upstreamPayloadBytes            Int         @default(0)
+  upstreamDatagramsSent           Int         @default(0)
+  upstreamNetworkBytes            Int         @default(0)
+  upstreamAckRatio                Float       @default(0)
+  crcOkRatio                      Float       @default(0)
+  crcFailRatio                    Float       @default(0)
+  noCrcRatio                      Float       @default(0)
+  
+  // Downstream Statistics
+  pullDataSent                    Int         @default(0)
+  pullAckReceived                 Int         @default(0)
+  downstreamDatagramsReceived     Int         @default(0)
+  downstreamNetworkBytes          Int         @default(0)
+  downstreamPayloadBytes          Int         @default(0)
+  txOk                            Int         @default(0)
+  txErrors                        Int         @default(0)
+  downstreamAckRatio              Float       @default(0)
+  
+  // SX1302 Status
+  counterInst     String      @default("0")
+  counterPps      String      @default("0")
+ 
+  
+  // Beacon Status
+  beaconQueued                    Int         @default(0)
+  beaconSent                      Int         @default(0)
+  beaconRejected                  Int         @default(0)
+  
+  createdAt                       DateTime    @default(now())
+  gateway                         LoraGateway @relation(fields: [gatewayId], references: [id])
+}
 enum Role {
   ADMIN
   USER

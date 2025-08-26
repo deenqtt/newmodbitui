@@ -8,6 +8,7 @@ import { getStatsListenerService } from "./services/stats-listener";
 import { getLoraListenerService } from "./services/lora-listener";
 import { getCleanupService } from "./services/cleanup-service"; // <-- 1. IMPORT SERVICE BARU
 import { userSeederService } from "./services/user-seeder-service";
+import { getGatewayStatsListenerService } from "./services/gateway-stats-listener";
 
 let servicesInitialized = false;
 
@@ -33,7 +34,7 @@ export async function initializeBackgroundServices() {
   getStatsListenerService();
   getLoraListenerService();
   getCleanupService(); // <-- 2. PANGGIL SERVICE BARU DI SINI
-
+  getGatewayStatsListenerService();
   servicesInitialized = true;
   console.log("All background services started.");
 }
