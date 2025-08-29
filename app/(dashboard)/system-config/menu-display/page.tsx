@@ -61,6 +61,7 @@ const defaultMenuConfig: MenuConfig = {
       "Device Profiles": true,
       Applications: true,
       Gateways: true,
+      "EC25-Modem": true,
     },
   },
   SecurityAccess: {

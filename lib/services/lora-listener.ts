@@ -2,8 +2,7 @@ import { prisma } from "@/lib/prisma";
 import mqtt from "mqtt";
 
 // --- KONFIGURASI ---
-const MQTT_BROKER_URL =
-  process.env.MQTT_BROKER_URL || "mqtt://52.74.91.79:1883";
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || "ws://52.74.91.79:9000";
 // Topik ini akan menangkap semua event 'up' dari semua perangkat di semua aplikasi
 const LORA_UPLINK_TOPIC = "application/+/device/+/event/up";
 

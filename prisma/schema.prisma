@@ -312,47 +312,197 @@ model LoraGateway {
 }
 
 model GatewayStats {
-  id                              String      @id @default(cuid())
-  gatewayId                       String
-  timestamp                       DateTime
-  
+  id        String   @id @default(cuid())
+  gatewayId String
+  timestamp DateTime
+
   // Upstream Statistics
-  rfPacketsReceived               Int         @default(0)
-  rfPacketsOk                     Int         @default(0)
-  rfPacketsBad                    Int         @default(0)
-  rfPacketsNocrc                  Int         @default(0)
-  rfPacketsForwarded              Int         @default(0)
-  upstreamPayloadBytes            Int         @default(0)
-  upstreamDatagramsSent           Int         @default(0)
-  upstreamNetworkBytes            Int         @default(0)
-  upstreamAckRatio                Float       @default(0)
-  crcOkRatio                      Float       @default(0)
-  crcFailRatio                    Float       @default(0)
-  noCrcRatio                      Float       @default(0)
-  
+  rfPacketsReceived     Int   @default(0)
+  rfPacketsOk           Int   @default(0)
+  rfPacketsBad          Int   @default(0)
+  rfPacketsNocrc        Int   @default(0)
+  rfPacketsForwarded    Int   @default(0)
+  upstreamPayloadBytes  Int   @default(0)
+  upstreamDatagramsSent Int   @default(0)
+  upstreamNetworkBytes  Int   @default(0)
+  upstreamAckRatio      Float @default(0)
+  crcOkRatio            Float @default(0)
+  crcFailRatio          Float @default(0)
+  noCrcRatio            Float @default(0)
+
   // Downstream Statistics
-  pullDataSent                    Int         @default(0)
-  pullAckReceived                 Int         @default(0)
-  downstreamDatagramsReceived     Int         @default(0)
-  downstreamNetworkBytes          Int         @default(0)
-  downstreamPayloadBytes          Int         @default(0)
-  txOk                            Int         @default(0)
-  txErrors                        Int         @default(0)
-  downstreamAckRatio              Float       @default(0)
-  
+  pullDataSent                Int   @default(0)
+  pullAckReceived             Int   @default(0)
+  downstreamDatagramsReceived Int   @default(0)
+  downstreamNetworkBytes      Int   @default(0)
+  downstreamPayloadBytes      Int   @default(0)
+  txOk                        Int   @default(0)
+  txErrors                    Int   @default(0)
+  downstreamAckRatio          Float @default(0)
+
   // SX1302 Status
-  counterInst     String      @default("0")
-  counterPps      String      @default("0")
- 
-  
+  counterInst String @default("0")
+  counterPps  String @default("0")
+
   // Beacon Status
-  beaconQueued                    Int         @default(0)
-  beaconSent                      Int         @default(0)
-  beaconRejected                  Int         @default(0)
-  
-  createdAt                       DateTime    @default(now())
-  gateway                         LoraGateway @relation(fields: [gatewayId], references: [id])
+  beaconQueued   Int @default(0)
+  beaconSent     Int @default(0)
+  beaconRejected Int @default(0)
+
+  createdAt DateTime    @default(now())
+  gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
 }
+
+model EC25Modem {
+  id           String  @id @default(cuid())
+  imei         String  @unique
+  manufacturer String?
+  model        String?
+  revision     String?
+
+  // Connection status
+  connected Boolean  @default(false)
+  lastSeen  DateTime @default(now())
+
+  // Current network status (latest data, bukan log)
+  currentOperator           String?
+  currentRegistrationStatus String?
+  currentNetworkType        String?
+  currentSignalStrength     Int?
+  currentSignalQuality      Int?
+
+  // Detailed signal info
+  currentRsrp   Float?
+  currentRsrq   Float?
+  currentSinr   Float?
+  currentCellId String?
+
+  // Current GPS position (latest data, bukan log)
+  currentLatitude     Float?
+  currentLongitude    Float?
+  currentAltitude     Float?
+  currentSpeed        Float?
+  currentSatellites   Int?
+  currentGpsFixStatus String?
+
+  // Configuration
+  configApn      String?
+  configUsername String?
+  configPin      String?
+
+  // Relations to historical data
+  networkHistory EC25NetworkData[]
+  gpsHistory     EC25GpsData[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ec25_modems")
+}
+
+// Historical network data - hanya disimpan saat ada perubahan signifikan
+model EC25NetworkData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
+
+  operator           String?
+  registrationStatus String?
+  networkType        String?
+  signalStrength     Int?
+  signalQuality      Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@map("ec25_network_data")
+}
+
+// Historical GPS data - hanya disimpan saat ada perubahan lokasi signifikan
+model EC25GpsData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
+
+  fixStatus  String?
+  latitude   Float?
+  longitude  Float?
+  altitude   Float?
+  speed      Float?
+  satellites Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@index([latitude, longitude])
+  @@map("ec25_gps_data")
+}
+
+// Service health monitoring
+model EC25ServiceHealth {
+  id            String    @id @default(cuid())
+  serviceId     String    @unique
+  status        String
+  lastSeen      DateTime
+  lastHeartbeat DateTime?
+  uptime        Float?
+  memoryUsage   String? // JSON string
+  data          String? // JSON string for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ec25_service_health")
+}
+
+// Service status logs - untuk audit trail
+model EC25ServiceLog {
+  id        String  @id @default(cuid())
+  serviceId String
+  status    String
+  uptime    Float?
+  data      String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceId, createdAt])
+  @@map("ec25_service_logs")
+}
+
+// Alerts dari modem service
+model EC25Alert {
+  id             String    @id @default(cuid())
+  type           String
+  message        String
+  severity       String // info, warning, error, critical
+  requiresAction Boolean   @default(false)
+  details        String? // JSON string
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resolved, createdAt])
+  @@index([severity, createdAt])
+  @@map("ec25_alerts")
+}
+
+// Command logs - untuk audit trail commands
+model EC25CommandLog {
+  id      String  @id @default(cuid())
+  command String
+  status  String
+  message String?
+  data    String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([command, createdAt])
+  @@map("ec25_command_logs")
+}
+
 enum Role {
   ADMIN
   USER
