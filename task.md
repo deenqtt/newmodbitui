@@ -7,6 +7,10 @@ COMPLETE TASK :
 - Maintenance List Widget
 - Maintenance Calender Widget
 - WhatsApp Ingeration Service
+- Seeder data User
+- User Management
+- Sidebar
+- Layout
 
 OUTS :
 
@@ -20,11 +24,7 @@ OUTS :
 
 CHANGES :
 
-- User Management
-- Sidebar
-- Layout
 - Login Page
-- Seeder User
 
 CCTV MONITOR FORM :
 
