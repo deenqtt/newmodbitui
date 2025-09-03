@@ -1,7 +1,9 @@
+// File: app/api/power-analyzer/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromCookie } from "@/lib/auth"; // Asumsi path helper auth Anda
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- 1. IMPORT
+import { getAuthFromCookie } from "@/lib/auth";
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * GET: Mengambil semua PowerAnalyzerConfiguration
@@ -15,13 +17,21 @@ export async function GET(request: NextRequest) {
   try {
     const configs = await prisma.powerAnalyzerConfiguration.findMany({
       include: {
-        apiTopic: true, // Sertakan detail topic untuk frontend
+        apiTopic: true,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
-    return NextResponse.json(configs);
+
+    // Parse JSON strings back to objects untuk frontend
+    const parsedConfigs = configs.map((config) => ({
+      ...config,
+      pduList: config.pduList ? JSON.parse(config.pduList) : [],
+      mainPower: config.mainPower ? JSON.parse(config.mainPower) : {},
+    }));
+
+    return NextResponse.json(parsedConfigs);
   } catch (error: any) {
     console.error("Error fetching Power Analyzer configs:", error);
     return NextResponse.json(
@@ -31,7 +41,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- INI BAGIAN YANG TERLEWAT ---
 /**
  * POST: Membuat PowerAnalyzerConfiguration baru beserta DeviceExternal untuk API
  */
@@ -70,8 +79,8 @@ export async function POST(request: NextRequest) {
         {
           data: {
             customName,
-            pduList,
-            mainPower,
+            pduList: JSON.stringify(pduList), // Convert to String
+            mainPower: JSON.stringify(mainPower), // Convert to String
             apiTopic: {
               connect: {
                 uniqId: newApiTopic.uniqId,
@@ -86,9 +95,17 @@ export async function POST(request: NextRequest) {
 
       return newPowerAnalyzerConfig;
     });
-    triggerMqttServiceUpdate(); // <-- 2. PANGGIL FUNGSI DI SINI
 
-    return NextResponse.json(newConfig, { status: 201 });
+    triggerMqttServiceUpdate();
+
+    // Parse response untuk frontend
+    const responseConfig = {
+      ...newConfig,
+      pduList: JSON.parse(newConfig.pduList || "[]"),
+      mainPower: JSON.parse(newConfig.mainPower || "{}"),
+    };
+
+    return NextResponse.json(responseConfig, { status: 201 });
   } catch (error: any) {
     if (error.code === "P2002") {
       const target = error.meta?.target as string[];
@@ -108,7 +125,6 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-
     console.error("Error creating Power Analyzer config:", error);
     return NextResponse.json(
       { message: "Failed to create configuration", error: error.message },

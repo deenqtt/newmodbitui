@@ -1,9 +1,9 @@
 // File: app/api/pue-configs/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthFromCookie } from "@/lib/auth"; // Pastikan path ini benar
+import { getAuthFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- IMPORT
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * Helper untuk validasi struktur JSON PDU dan Main Power
@@ -76,7 +76,15 @@ export async function GET(request: NextRequest) {
         createdAt: "desc",
       },
     });
-    return NextResponse.json(pueConfigs);
+
+    // Parse JSON strings back to objects untuk frontend
+    const parsedConfigs = pueConfigs.map((config) => ({
+      ...config,
+      pduList: config.pduList ? JSON.parse(config.pduList) : [],
+      mainPower: config.mainPower ? JSON.parse(config.mainPower) : {},
+    }));
+
+    return NextResponse.json(parsedConfigs);
   } catch (error) {
     console.error("Error fetching PUE configurations:", error);
     return NextResponse.json(
@@ -147,14 +155,22 @@ export async function POST(request: NextRequest) {
       data: {
         customName,
         type: "pue",
-        apiTopicUniqId: apiTopic.uniqId, // <-- Gunakan uniqId dari DeviceExternal
-        pduList: validatedPduList, // Prisma akan otomatis mengonversi ke JSONB
-        mainPower: validatedMainPower, // Prisma akan otomatis mengonversi ke JSONB
+        apiTopicUniqId: apiTopic.uniqId,
+        pduList: JSON.stringify(validatedPduList), // Convert to String
+        mainPower: JSON.stringify(validatedMainPower), // Convert to String
       },
     });
-    triggerMqttServiceUpdate(); // <-- PANGGIL FUNGSI DI SINI
 
-    return NextResponse.json(newPueConfig, { status: 201 });
+    triggerMqttServiceUpdate();
+
+    // Parse response untuk frontend
+    const responseConfig = {
+      ...newPueConfig,
+      pduList: JSON.parse(newPueConfig.pduList || "[]"),
+      mainPower: JSON.parse(newPueConfig.mainPower || "{}"),
+    };
+
+    return NextResponse.json(responseConfig, { status: 201 });
   } catch (error: any) {
     console.error("Error creating PUE configuration:", error);
     return NextResponse.json(

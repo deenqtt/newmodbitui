@@ -1,6 +1,7 @@
+// prisma/schema.prisma - SQLite version
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"] // untuk RPi
 }
 
 datasource db {
@@ -25,14 +26,14 @@ model User {
 
 model Maintenance {
   id           Int               @id @default(autoincrement())
-  name         String
-  description  String?
+  name         String            @db.VarChar(200)
+  description  String?           @db.VarChar(1000)
   startTask    DateTime
   endTask      DateTime
   assignTo     String
   targetType   MaintenanceTarget
   targetId     String
-  status       String            @default("Scheduled")
+  status       String            @default("Scheduled") @db.VarChar(50)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   isActive     Boolean           @default(true)
@@ -48,7 +49,7 @@ model DeviceExternal {
   address                     String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime                    @updatedAt
-  lastPayload                 String?
+  lastPayload                 Json?
   lastUpdatedByMqtt           DateTime?
   alarmConfigs                AlarmConfiguration[]
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
@@ -112,8 +113,8 @@ model PueConfiguration {
   customName     String          @unique
   type           String          @default("pue")
   apiTopicUniqId String?         @unique
-  pduList        String?
-  mainPower      String?
+  pduList        Json?
+  mainPower      Json?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   apiTopic       DeviceExternal? @relation("PueApiTopic", fields: [apiTopicUniqId], references: [uniqId])
@@ -125,14 +126,14 @@ model PowerAnalyzerConfiguration {
   apiTopicUniqId String?         @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  mainPower      String?
-  pduList        String?
+  mainPower      Json?
+  pduList        Json?
   apiTopic       DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
 }
 
 model MenuConfiguration {
   id        String   @id @default(cuid())
-  structure String
+  structure Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -200,7 +201,7 @@ model ZkTecoUser {
   name           String
   password       String?
   card           String?
-  fingerprints   String?
+  fingerprints   Json?
   zkTecoDeviceId String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -229,7 +230,7 @@ model Cctv {
 model DashboardLayout {
   id        String   @id @default(cuid())
   name      String
-  layout    String
+  layout    Json
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,7 +245,7 @@ model EnergyTarget {
   id              String   @id @default(cuid())
   loggingConfigId String   @unique
   year            Int
-  monthlyTargets  String
+  monthlyTargets  Json
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -260,8 +261,8 @@ model AccessController {
   firmware      String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  doorStatus    String?
-  lockAddresses String?
+  doorStatus    Int[]
+  lockAddresses Int[]
   lastSeen      DateTime?
   macAddress    String?       @unique
   freeHeap      Int?
@@ -278,7 +279,7 @@ model ActivityLog {
   controllerId String
   timestamp    DateTime
   message      String
-  details      String?
+  details      Json?
   createdAt    DateTime         @default(now())
   controller   AccessController @relation(fields: [controllerId], references: [id], onDelete: Cascade)
 }
@@ -295,13 +296,13 @@ model DeviceData {
   id        String     @id @default(cuid())
   timestamp DateTime   @default(now())
   deviceId  String
-  data      String
+  data      Json
   device    LoraDevice @relation(fields: [deviceId], references: [id])
 }
 
 model LoraGateway {
   id          String         @id @default(cuid())
-  gatewayId   String         @unique
+  gatewayId   String         @unique // Gateway ID dari topic MQTT
   name        String
   description String?
   lastSeen    DateTime?
@@ -316,6 +317,7 @@ model GatewayStats {
   gatewayId String
   timestamp DateTime
 
+  // Upstream Statistics
   rfPacketsReceived     Int   @default(0)
   rfPacketsOk           Int   @default(0)
   rfPacketsBad          Int   @default(0)
@@ -329,6 +331,7 @@ model GatewayStats {
   crcFailRatio          Float @default(0)
   noCrcRatio            Float @default(0)
 
+  // Downstream Statistics
   pullDataSent                Int   @default(0)
   pullAckReceived             Int   @default(0)
   downstreamDatagramsReceived Int   @default(0)
@@ -338,9 +341,11 @@ model GatewayStats {
   txErrors                    Int   @default(0)
   downstreamAckRatio          Float @default(0)
 
+  // SX1302 Status
   counterInst String @default("0")
   counterPps  String @default("0")
 
+  // Beacon Status
   beaconQueued   Int @default(0)
   beaconSent     Int @default(0)
   beaconRejected Int @default(0)
@@ -356,20 +361,24 @@ model EC25Modem {
   model        String?
   revision     String?
 
+  // Connection status
   connected Boolean  @default(false)
   lastSeen  DateTime @default(now())
 
+  // Current network status (latest data, bukan log)
   currentOperator           String?
   currentRegistrationStatus String?
   currentNetworkType        String?
   currentSignalStrength     Int?
   currentSignalQuality      Int?
 
+  // Detailed signal info
   currentRsrp   Float?
   currentRsrq   Float?
   currentSinr   Float?
   currentCellId String?
 
+  // Current GPS position (latest data, bukan log)
   currentLatitude     Float?
   currentLongitude    Float?
   currentAltitude     Float?
@@ -377,10 +386,12 @@ model EC25Modem {
   currentSatellites   Int?
   currentGpsFixStatus String?
 
+  // Configuration
   configApn      String?
   configUsername String?
   configPin      String?
 
+  // Relations to historical data
   networkHistory EC25NetworkData[]
   gpsHistory     EC25GpsData[]
 
@@ -390,6 +401,7 @@ model EC25Modem {
   @@map("ec25_modems")
 }
 
+// Historical network data - hanya disimpan saat ada perubahan signifikan
 model EC25NetworkData {
   id      String    @id @default(cuid())
   modemId String
@@ -407,6 +419,7 @@ model EC25NetworkData {
   @@map("ec25_network_data")
 }
 
+// Historical GPS data - hanya disimpan saat ada perubahan lokasi signifikan
 model EC25GpsData {
   id      String    @id @default(cuid())
   modemId String
@@ -426,6 +439,7 @@ model EC25GpsData {
   @@map("ec25_gps_data")
 }
 
+// Service health monitoring
 model EC25ServiceHealth {
   id            String    @id @default(cuid())
   serviceId     String    @unique
@@ -433,8 +447,8 @@ model EC25ServiceHealth {
   lastSeen      DateTime
   lastHeartbeat DateTime?
   uptime        Float?
-  memoryUsage   String?
-  data          String?
+  memoryUsage   String? // JSON string
+  data          String? // JSON string for additional data
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -442,12 +456,13 @@ model EC25ServiceHealth {
   @@map("ec25_service_health")
 }
 
+// Service status logs - untuk audit trail
 model EC25ServiceLog {
   id        String  @id @default(cuid())
   serviceId String
   status    String
   uptime    Float?
-  data      String?
+  data      String? // JSON string
 
   createdAt DateTime @default(now())
 
@@ -455,13 +470,14 @@ model EC25ServiceLog {
   @@map("ec25_service_logs")
 }
 
+// Alerts dari modem service
 model EC25Alert {
   id             String    @id @default(cuid())
   type           String
   message        String
-  severity       String
+  severity       String // info, warning, error, critical
   requiresAction Boolean   @default(false)
-  details        String?
+  details        String? // JSON string
   resolved       Boolean   @default(false)
   resolvedAt     DateTime?
   resolvedBy     String?
@@ -474,12 +490,13 @@ model EC25Alert {
   @@map("ec25_alerts")
 }
 
+// Command logs - untuk audit trail commands
 model EC25CommandLog {
   id      String  @id @default(cuid())
   command String
   status  String
   message String?
-  data    String?
+  data    String? // JSON string
 
   createdAt DateTime @default(now())
 

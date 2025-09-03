@@ -2,8 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromCookie } from "@/lib/auth"; // Sesuaikan jika Anda menggunakan auth
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- 1. IMPORT
+import { getAuthFromCookie } from "@/lib/auth";
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * GET: Mengambil satu PowerAnalyzerConfiguration berdasarkan ID
@@ -29,7 +29,15 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(config);
+
+    // Parse JSON strings back to objects untuk frontend
+    const parsedConfig = {
+      ...config,
+      pduList: config.pduList ? JSON.parse(config.pduList) : [],
+      mainPower: config.mainPower ? JSON.parse(config.mainPower) : {},
+    };
+
+    return NextResponse.json(parsedConfig);
   } catch (error: any) {
     console.error(`Error fetching config ${params.id}:`, error);
     return NextResponse.json(
@@ -53,8 +61,6 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    // --- PERBAIKAN UTAMA DI SINI ---
-    // Backend sekarang mengharapkan pduList dan mainPower, bukan listSensors
     const { customName, pduList, mainPower } = body;
 
     // Validasi dasar
@@ -76,8 +82,8 @@ export async function PUT(
         where: { id: params.id },
         data: {
           customName,
-          pduList,
-          mainPower,
+          pduList: JSON.stringify(pduList), // Convert to String
+          mainPower: JSON.stringify(mainPower), // Convert to String
         },
         include: { apiTopic: true },
       });
@@ -93,9 +99,17 @@ export async function PUT(
       }
       return config;
     });
-    triggerMqttServiceUpdate(); // <-- 2. PANGGIL FUNGSI DI SINI
 
-    return NextResponse.json(updatedConfig);
+    triggerMqttServiceUpdate();
+
+    // Parse response untuk frontend
+    const responseConfig = {
+      ...updatedConfig,
+      pduList: JSON.parse(updatedConfig.pduList || "[]"),
+      mainPower: JSON.parse(updatedConfig.mainPower || "{}"),
+    };
+
+    return NextResponse.json(responseConfig);
   } catch (error: any) {
     if (error.code === "P2002") {
       return NextResponse.json(
@@ -142,7 +156,8 @@ export async function DELETE(
         });
       }
     });
-    triggerMqttServiceUpdate(); // <-- 3. PANGGIL FUNGSI DI SINI
+
+    triggerMqttServiceUpdate();
 
     return NextResponse.json(
       { message: "Configuration deleted successfully" },
