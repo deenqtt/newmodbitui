@@ -71,6 +71,7 @@ import { CctvLiveStreamConfigModal } from "@/components/widgets/CctvLiveStream/C
 import { MaintenanceListConfigModal } from "@/components/widgets/MaintenanceList/MaintenanceListConfigModal";
 import { MaintenanceCalendarConfigModal } from "@/components/widgets/MaintenanceCalendar/MaintenanceCalendarConfigModal";
 import { MaintenanceStatisticsConfigModal } from "@/components/widgets/MaintenanceStatistics/MaintenanceStatisticsConfigModal";
+import { ZigbeeDeviceConfigModal } from "@/components/widgets/ZigbeeDevice/ZigbeeDeviceConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -83,7 +84,7 @@ interface WidgetLayout extends Layout {
 interface DashboardData {
   id: string;
   name: string;
-  layout: WidgetLayout[];
+  layout: WidgetLayout[] | string; // ✅ Can be either string or array
 }
 
 export default function DashboardEditorPage({
@@ -124,10 +125,23 @@ export default function DashboardEditorPage({
         );
         if (!response.ok) throw new Error("Dashboard not found");
         const data: DashboardData = await response.json();
-        setDashboardData(data);
-        const initial = Array.isArray(data.layout) ? data.layout : [];
-        setLayout(initial);
-        setInitialLayout(_.cloneDeep(initial));
+
+        // ✅ Better parsing with error handling
+        let parsedLayout: WidgetLayout[] = [];
+        if (typeof data.layout === "string") {
+          try {
+            parsedLayout = JSON.parse(data.layout);
+          } catch (e) {
+            console.error("Failed to parse layout:", e);
+            parsedLayout = [];
+          }
+        } else if (Array.isArray(data.layout)) {
+          parsedLayout = data.layout;
+        }
+
+        setDashboardData({ ...data, layout: parsedLayout });
+        setLayout(parsedLayout);
+        setInitialLayout(_.cloneDeep(parsedLayout));
       } catch (error: any) {
         Swal.fire("Error", error.message, "error");
         router.push("/manage-dashboard");
@@ -147,14 +161,14 @@ export default function DashboardEditorPage({
     });
     setLayout(updatedLayout);
   };
-
   const handleSaveLayout = async () => {
     setIsSaving(true);
     try {
+      // ✅ Send layout directly - don't stringify it here if backend handles it
       await fetch(`${API_BASE_URL}/api/dashboards/${dashboardId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ layout }),
+        body: JSON.stringify({ layout }), // ✅ Send as array, let backend handle stringification
       });
       setInitialLayout(_.cloneDeep(layout));
       Swal.fire({
@@ -166,7 +180,8 @@ export default function DashboardEditorPage({
         timer: 2000,
       });
     } catch (error: any) {
-      Swal.fire("Error", error.message, "error");
+      console.error("Save error:", error);
+      Swal.fire("Error", error.message || "Failed to save layout", "error");
     } finally {
       setIsSaving(false);
     }
@@ -219,6 +234,7 @@ export default function DashboardEditorPage({
           "Maintenance Calendar",
           "Maintenance Statistics",
           "3D Rack Server View",
+          "Zigbee Device",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -566,7 +582,6 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
-
       {isConfigModalOpen &&
         configuringWidget?.name === "Access Controller Status" && (
           <AccessControllerStatusConfigModal
@@ -613,7 +628,6 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
-
       {isConfigModalOpen &&
         configuringWidget?.name === "LoRaWAN Device Data" && (
           <LoRaWANDeviceConfigModal
@@ -622,7 +636,6 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
-
       {isConfigModalOpen &&
         configuringWidget?.name === "CCTV Monitor Videos" && (
           <CctvMonitorVideosConfigModal
@@ -638,7 +651,6 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
-
       {isConfigModalOpen && configuringWidget?.name === "Maintenance List" && (
         <MaintenanceListConfigModal
           isOpen={isConfigModalOpen}
@@ -670,6 +682,14 @@ export default function DashboardEditorPage({
             onSave={handleSaveWidgetConfig}
           />
         )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Zigbee Device" && (
+        <ZigbeeDeviceConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
           {dashboardData?.name}
@@ -788,7 +808,7 @@ export default function DashboardEditorPage({
         <div className="relative">
           <ResponsiveGridLayout
             className="layout rounded-xl min-h-[80vh] bg-muted/40"
-            layouts={{ lg: layout }}
+            layouts={{ lg: Array.isArray(layout) ? layout : [] }}
             breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
             cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
             rowHeight={30}
@@ -797,28 +817,29 @@ export default function DashboardEditorPage({
             isResizable
             draggableCancel=".no-drag"
           >
-            {layout.map((item) => {
-              return (
-                <div
-                  key={item.i}
-                  className="bg-background rounded-lg shadow-sm border flex flex-col group overflow-hidden relative"
-                >
-                  <div className="absolute top-1 right-1 z-10">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="no-drag h-6 w-6 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full"
-                      onClick={() => removeWidget(item.i)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+            {Array.isArray(layout) &&
+              layout.map((item) => {
+                return (
+                  <div
+                    key={item.i}
+                    className="bg-background rounded-lg shadow-sm border flex flex-col group overflow-hidden relative"
+                  >
+                    <div className="absolute top-1 right-1 z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="no-drag h-6 w-6 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full"
+                        onClick={() => removeWidget(item.i)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="flex-1 w-full h-full">
+                      <WidgetRenderer item={item} />
+                    </div>
                   </div>
-                  <div className="flex-1 w-full h-full">
-                    <WidgetRenderer item={item} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </ResponsiveGridLayout>
 
           {layout.length === 0 && (

@@ -106,6 +106,12 @@ export const mainWidgets: MainWidgetCategory[] = [
     icon: Wrench,
     description: "Widget untuk manajemen dan monitoring maintenance tasks.",
   },
+  {
+    name: "IoT Devices",
+    category: "IoT",
+    icon: Zap, // atau Zap
+    description: "Monitor and control IoT devices across different protocols.",
+  },
 ];
 
 // Daftar semua widget dengan ikon dan deskripsi unik untuk setiap widget
@@ -233,6 +239,13 @@ export const widgets: Widget[] = [
     icon: Lock,
     description: "Monitor status real-time dari  Access Lock Controller.",
   },
+  {
+    name: "Zigbee Device",
+    category: "IoT", // atau tetap "Monitoring" kalau mau di grup monitoring
+    icon: Zap,
+    description:
+      "Monitor and control Zigbee devices connected to your network.",
+  },
 
   {
     name: "Button Control Modbus",
@@ -318,13 +331,15 @@ export const widgets: Widget[] = [
     name: "CCTV Monitor Videos",
     category: "Camera",
     icon: Video,
-    description: "Tampilkan daftar video recorded dari monitor CCTV dengan kontrol playback.",
+    description:
+      "Tampilkan daftar video recorded dari monitor CCTV dengan kontrol playback.",
   },
   {
     name: "CCTV Live Stream",
     category: "Camera",
     icon: MonitorPlay,
-    description: "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
+    description:
+      "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
   },
 
   // --- Dashboard ---
@@ -346,7 +361,8 @@ export const widgets: Widget[] = [
     name: "Maintenance List",
     category: "Maintenance",
     icon: Wrench,
-    description: "Displays recent maintenance tasks with status and scheduling information.",
+    description:
+      "Displays recent maintenance tasks with status and scheduling information.",
   },
   {
     name: "Maintenance Calendar",
@@ -358,7 +374,8 @@ export const widgets: Widget[] = [
     name: "Maintenance Statistics",
     category: "Maintenance",
     icon: BarChart,
-    description: "Statistical overview of maintenance completion rates and performance metrics.",
+    description:
+      "Statistical overview of maintenance completion rates and performance metrics.",
   },
 ];
 

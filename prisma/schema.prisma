@@ -22,7 +22,24 @@ model User {
   assignedMaintenances Maintenance[]     @relation("AssignedToUser")
   notifications        Notification[]
 }
-
+// Tambah ke schema.prisma
+model ZigbeeDevice {
+  id                String   @id @default(cuid())
+  deviceId          String   @unique  // 0x00158d0004851829
+  friendlyName      String   
+  deviceType        String   // sensor, switch, bulb, etc
+  manufacturer      String?  
+  modelId           String?
+  capabilities      Json     // attributes yang supported
+  lastSeen          DateTime?
+  isOnline          Boolean  @default(false)
+  currentState      Json?    // current device state
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  maintenances      Maintenance[]
+}
 model Maintenance {
   id           Int               @id @default(autoincrement())
   name         String
@@ -38,6 +55,9 @@ model Maintenance {
   isActive     Boolean           @default(true)
   assignedTo   User              @relation("AssignedToUser", fields: [assignTo], references: [id])
   deviceTarget DeviceExternal    @relation(fields: [targetId], references: [id])
+    // NEW: Tambah relasi ke ZigbeeDevice
+  zigbeeDevice ZigbeeDevice?     @relation(fields: [zigbeeDeviceId], references: [id])
+  zigbeeDeviceId String?
 }
 
 model DeviceExternal {
@@ -349,143 +369,6 @@ model GatewayStats {
   gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
 }
 
-model EC25Modem {
-  id           String  @id @default(cuid())
-  imei         String  @unique
-  manufacturer String?
-  model        String?
-  revision     String?
-
-  connected Boolean  @default(false)
-  lastSeen  DateTime @default(now())
-
-  currentOperator           String?
-  currentRegistrationStatus String?
-  currentNetworkType        String?
-  currentSignalStrength     Int?
-  currentSignalQuality      Int?
-
-  currentRsrp   Float?
-  currentRsrq   Float?
-  currentSinr   Float?
-  currentCellId String?
-
-  currentLatitude     Float?
-  currentLongitude    Float?
-  currentAltitude     Float?
-  currentSpeed        Float?
-  currentSatellites   Int?
-  currentGpsFixStatus String?
-
-  configApn      String?
-  configUsername String?
-  configPin      String?
-
-  networkHistory EC25NetworkData[]
-  gpsHistory     EC25GpsData[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ec25_modems")
-}
-
-model EC25NetworkData {
-  id      String    @id @default(cuid())
-  modemId String
-  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
-
-  operator           String?
-  registrationStatus String?
-  networkType        String?
-  signalStrength     Int?
-  signalQuality      Int?
-
-  createdAt DateTime @default(now())
-
-  @@index([modemId, createdAt])
-  @@map("ec25_network_data")
-}
-
-model EC25GpsData {
-  id      String    @id @default(cuid())
-  modemId String
-  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
-
-  fixStatus  String?
-  latitude   Float?
-  longitude  Float?
-  altitude   Float?
-  speed      Float?
-  satellites Int?
-
-  createdAt DateTime @default(now())
-
-  @@index([modemId, createdAt])
-  @@index([latitude, longitude])
-  @@map("ec25_gps_data")
-}
-
-model EC25ServiceHealth {
-  id            String    @id @default(cuid())
-  serviceId     String    @unique
-  status        String
-  lastSeen      DateTime
-  lastHeartbeat DateTime?
-  uptime        Float?
-  memoryUsage   String?
-  data          String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ec25_service_health")
-}
-
-model EC25ServiceLog {
-  id        String  @id @default(cuid())
-  serviceId String
-  status    String
-  uptime    Float?
-  data      String?
-
-  createdAt DateTime @default(now())
-
-  @@index([serviceId, createdAt])
-  @@map("ec25_service_logs")
-}
-
-model EC25Alert {
-  id             String    @id @default(cuid())
-  type           String
-  message        String
-  severity       String
-  requiresAction Boolean   @default(false)
-  details        String?
-  resolved       Boolean   @default(false)
-  resolvedAt     DateTime?
-  resolvedBy     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([resolved, createdAt])
-  @@index([severity, createdAt])
-  @@map("ec25_alerts")
-}
-
-model EC25CommandLog {
-  id      String  @id @default(cuid())
-  command String
-  status  String
-  message String?
-  data    String?
-
-  createdAt DateTime @default(now())
-
-  @@index([command, createdAt])
-  @@map("ec25_command_logs")
-}
 
 enum Role {
   ADMIN

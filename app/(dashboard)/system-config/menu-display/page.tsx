@@ -43,6 +43,7 @@ const defaultMenuConfig: MenuConfig = {
       "Devices External": true,
       "Devices for Logging": true,
       "Access Controllers": true,
+      Zigbee: true,
     },
   },
   SystemConfig: {

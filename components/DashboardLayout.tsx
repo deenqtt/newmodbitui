@@ -10,7 +10,17 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 interface DashboardLayoutProps {
   layout: WidgetLayout[];
 }
+
 export default function DashboardLayout({ layout }: DashboardLayoutProps) {
+  // ✅ Handle empty layout gracefully
+  if (!layout || layout.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">No widgets to display</p>
+      </div>
+    );
+  }
+
   return (
     <ResponsiveGridLayout
       className="layout"

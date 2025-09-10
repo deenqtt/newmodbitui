@@ -11,7 +11,7 @@ import { userSeederService } from "./services/user-seeder-service";
 import { getGatewayStatsListenerService } from "./services/gateway-stats-listener";
 // Import layanan baru Anda
 import { getEc25ListenerService } from "./services/ec25-listener";
-
+import { getZigbeeListenerService } from "./services/zigbee-listener";
 let servicesInitialized = false;
 
 export async function initializeBackgroundServices() {
@@ -40,7 +40,7 @@ export async function initializeBackgroundServices() {
   getGatewayStatsListenerService();
   // Panggil layanan EC25 yang baru
   getEc25ListenerService();
-
+  getZigbeeListenerService();
   servicesInitialized = true;
   console.log("All background services started.");
 }

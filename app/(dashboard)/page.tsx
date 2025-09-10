@@ -6,14 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LayoutGrid, AlertCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
 
 // --- GUNAKAN DYNAMIC IMPORT UNTUK NON-AKTIFKAN SSR ---
 const DashboardLayout = dynamic(() => import("@/components/DashboardLayout"), {
   ssr: false,
   loading: () => <p>Loading dashboard...</p>,
 });
-
-import dynamic from "next/dynamic";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -30,8 +29,29 @@ interface WidgetLayout {
 interface DashboardData {
   id: string;
   name: string;
-  layout: WidgetLayout[];
+  layout: WidgetLayout[] | string; // ✅ Can be string or array
 }
+
+// ✅ Helper function to safely parse layout
+const parseLayoutSafely = (layoutData: any): WidgetLayout[] => {
+  if (!layoutData) return [];
+
+  if (typeof layoutData === "string") {
+    try {
+      const parsed = JSON.parse(layoutData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Failed to parse layout string:", e);
+      return [];
+    }
+  }
+
+  if (Array.isArray(layoutData)) {
+    return layoutData;
+  }
+
+  return [];
+};
 
 export default function MainDashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
@@ -56,7 +76,15 @@ export default function MainDashboardPage() {
           }
         } else {
           const data: DashboardData = await response.json();
-          setDashboardData(data);
+
+          // ✅ Parse the layout properly
+          const parsedLayout = parseLayoutSafely(data.layout);
+          const processedData = {
+            ...data,
+            layout: parsedLayout,
+          };
+
+          setDashboardData(processedData);
         }
       } catch (err: any) {
         setError(err.message);
@@ -114,6 +142,7 @@ export default function MainDashboardPage() {
     );
   }
 
+  // ✅ Check if dashboardData exists and has parsed layout
   if (!dashboardData || dashboardData.layout.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">

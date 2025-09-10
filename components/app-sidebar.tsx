@@ -34,6 +34,7 @@ import {
   LogOut,
   User,
   Loader2,
+  NetworkIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -71,6 +72,7 @@ const defaultMenuConfig: MenuConfigData = {
       "Devices External": true,
       "Devices for Logging": true,
       "Access Controllers": true,
+      Zigbee: true,
     },
   },
   SystemConfig: {
@@ -149,6 +151,7 @@ const submenuOrder: { [key: string]: string[] } = {
     "Devices External",
     "Devices for Logging",
     "Access Controllers",
+    "Zigbee",
   ],
   SystemConfig: [
     "User Management",
@@ -178,6 +181,7 @@ const iconMap: { [key: string]: React.ElementType } = {
   "Devices External": HardDrive,
   "Devices for Logging": HardDrive,
   "Access Controllers": Lock,
+  Zigbee: NetworkIcon,
   "Device List": ListTree,
   "Device Profiles": Package,
   Applications: GitBranch,

@@ -42,6 +42,7 @@ import { MaintenanceCalendarWidget } from "./MaintenanceCalendar/MaintenanceCale
 import { MaintenanceStatisticsWidget } from "./MaintenanceStatistics/MaintenanceStatisticsWidget";
 import { RackServer3dWidget } from "./RackServer3d/RackServer3dWidget";
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
+import { ZigbeeDeviceWidget } from "./ZigbeeDevice/ZigbeeDeviceWidget";
 
 interface Props {
   item: {
@@ -148,6 +149,8 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <MaintenanceStatisticsWidget config={config} />;
     case "3D Rack Server View": // <-- CASE BARU
       return <RackServer3dWidget config={config} />;
+    case "Zigbee Device":
+      return <ZigbeeDeviceWidget config={config} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">
