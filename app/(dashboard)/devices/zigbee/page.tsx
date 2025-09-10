@@ -1,4 +1,4 @@
-// File: app/(dashboard)/zigbee/page.tsx - Clean Layout Improvements
+// File: app/(dashboard)/zigbee/page.tsx - Modern Clean Layout
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -39,7 +39,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Lightbulb,
   Thermometer,
@@ -58,11 +63,13 @@ import {
   Zap,
   Activity,
   AlertTriangle,
-  ChevronDown,
-  ChevronRight,
   Power,
   Battery,
   Signal,
+  Router,
+  Search,
+  HardDrive,
+  Network,
 } from "lucide-react";
 
 interface ZigbeeDevice {
@@ -99,11 +106,24 @@ export default function ZigbeePage() {
     modelId: "",
   });
   const [pairingMode, setPairingMode] = useState(false);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pairingCountdown, setPairingCountdown] = useState<number>(0);
   const [pairingInterval, setPairingInterval] = useState<NodeJS.Timer | null>(
     null
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDevice, setSelectedDevice] = useState<ZigbeeDevice | null>(
+    null
+  );
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
+
+  // Filter devices based on search term
+  const filteredDevices = devices.filter(
+    (device) =>
+      device.friendlyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.deviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.modelId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Custom SweetAlert2 configuration
@@ -164,129 +184,6 @@ export default function ZigbeePage() {
     }
   };
 
-  // ========== IMPROVED DELETE FUNCTION ==========
-  const removeDevice = async (
-    device: ZigbeeDevice,
-    method: "smart" | "force" | "database-only" = "smart"
-  ) => {
-    // Show loading with immediate update prediction
-    Swal.fire({
-      title: "Removing Device...",
-      html: `
-      <div class="text-left space-y-2">
-        <p>Device: <strong>${device.friendlyName}</strong></p>
-        <p>Method: <strong>${method.replace("-", " ")}</strong></p>
-        <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-          <div class="text-xs text-blue-600">
-            ${
-              method === "database-only"
-                ? "Removing from interface only..."
-                : "Removing from interface first, then network..."
-            }
-          </div>
-        </div>
-      </div>
-    `,
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
-
-    try {
-      setActionLoading(`remove-${device.deviceId}`);
-
-      // STEP 1: Optimistically remove from UI immediately
-      const updatedDevices = devices.filter(
-        (d) => d.deviceId !== device.deviceId
-      );
-      setDevices(updatedDevices);
-      console.log(
-        `🗑️ [UI] Optimistically removed ${device.friendlyName} from UI`
-      );
-
-      // STEP 2: Send delete request (now with improved backend)
-      const url = `/api/zigbee/devices/${encodeURIComponent(
-        device.deviceId
-      )}?method=${method}`;
-
-      const response = await fetch(url, {
-        method: "DELETE",
-        headers: { "Cache-Control": "no-cache" },
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        // Success - device already removed from UI optimistically
-        if (result.warning) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Device Removed",
-            html: `
-            <div class="text-left space-y-3">
-              <p><strong>Status:</strong> ${result.message}</p>
-              ${
-                result.recommendation
-                  ? `
-                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <p class="text-sm"><strong>Note:</strong> ${result.recommendation}</p>
-                </div>
-              `
-                  : ""
-              }
-            </div>
-          `,
-            confirmButtonText: "Got it",
-            confirmButtonColor: "#f59e0b",
-            timer: 6000,
-            timerProgressBar: true,
-          });
-        } else {
-          Toast.fire({
-            icon: "success",
-            title: "Device Removed",
-            text: `${device.friendlyName} removed successfully`,
-          });
-        }
-
-        console.log(`✅ [UI] Device removal completed successfully`);
-      } else {
-        // Error - revert optimistic update
-        setDevices(devices);
-        throw new Error(result.error || `HTTP ${response.status}`);
-      }
-    } catch (error) {
-      console.error("Remove error:", error);
-
-      // Revert optimistic update on error
-      setDevices(devices);
-
-      await Swal.fire({
-        icon: "error",
-        title: "Remove Failed",
-        html: `
-        <div class="text-left space-y-3">
-          <p><strong>Device:</strong> ${device.friendlyName}</p>
-          <p><strong>Error:</strong> ${
-            error instanceof Error ? error.message : "Unknown error"
-          }</p>
-          
-          <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p class="text-sm"><strong>What happened:</strong></p>
-            <p class="text-sm">Device was not removed due to an error</p>
-          </div>
-        </div>
-      `,
-        confirmButtonColor: "#ef4444",
-      });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   // Enhanced rename with SweetAlert2 input
   const confirmRename = async (device: ZigbeeDevice) => {
     const { value: newName } = await Swal.fire({
@@ -318,7 +215,113 @@ export default function ZigbeePage() {
     }
   };
 
-  // ========== IMPROVED RENAME FUNCTION ==========
+  // Remove device function
+  const removeDevice = async (
+    device: ZigbeeDevice,
+    method: "smart" | "force" | "database-only" = "smart"
+  ) => {
+    Swal.fire({
+      title: "Removing Device...",
+      html: `
+      <div class="text-left space-y-2">
+        <p>Device: <strong>${device.friendlyName}</strong></p>
+        <p>Method: <strong>${method.replace("-", " ")}</strong></p>
+        <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+          <div class="text-xs text-blue-600">
+            ${
+              method === "database-only"
+                ? "Removing from interface only..."
+                : "Removing from interface first, then network..."
+            }
+          </div>
+        </div>
+      </div>
+    `,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      setActionLoading(`remove-${device.deviceId}`);
+
+      const updatedDevices = devices.filter(
+        (d) => d.deviceId !== device.deviceId
+      );
+      setDevices(updatedDevices);
+
+      const url = `/api/zigbee/devices/${encodeURIComponent(
+        device.deviceId
+      )}?method=${method}`;
+
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        if (result.warning) {
+          await Swal.fire({
+            icon: "warning",
+            title: "Device Removed",
+            html: `
+            <div class="text-left space-y-3">
+              <p><strong>Status:</strong> ${result.message}</p>
+              ${
+                result.recommendation
+                  ? `
+                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                  <p class="text-sm"><strong>Note:</strong> ${result.recommendation}</p>
+                </div>
+              `
+                  : ""
+              }
+            </div>
+          `,
+            confirmButtonText: "Got it",
+            confirmButtonColor: "#f59e0b",
+            timer: 6000,
+            timerProgressBar: true,
+          });
+        } else {
+          Toast.fire({
+            icon: "success",
+            title: "Device Removed",
+            text: `${device.friendlyName} removed successfully`,
+          });
+        }
+      } else {
+        setDevices(devices);
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Remove error:", error);
+      setDevices(devices);
+
+      await Swal.fire({
+        icon: "error",
+        title: "Remove Failed",
+        html: `
+        <div class="text-left space-y-3">
+          <p><strong>Device:</strong> ${device.friendlyName}</p>
+          <p><strong>Error:</strong> ${
+            error instanceof Error ? error.message : "Unknown error"
+          }</p>
+        </div>
+      `,
+        confirmButtonColor: "#ef4444",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Rename device function
   const renameDevice = async (device: ZigbeeDevice, newName: string) => {
     Swal.fire({
       title: "Renaming Device...",
@@ -342,14 +345,11 @@ export default function ZigbeePage() {
     try {
       setActionLoading(`rename-${device.deviceId}`);
 
-      // STEP 1: Optimistically update UI
       const updatedDevices = devices.map((d) =>
         d.deviceId === device.deviceId ? { ...d, friendlyName: newName } : d
       );
       setDevices(updatedDevices);
-      console.log(`✏️ [UI] Optimistically renamed to ${newName}`);
 
-      // STEP 2: Send rename request
       const response = await fetch(
         `/api/zigbee/devices/${encodeURIComponent(device.deviceId)}`,
         {
@@ -391,17 +391,12 @@ export default function ZigbeePage() {
             text: `${device.friendlyName} → ${newName}`,
           });
         }
-
-        console.log(`✅ [UI] Rename completed successfully`);
       } else {
-        // Error - revert optimistic update
         setDevices(devices);
         throw new Error(result.error || `HTTP ${response.status}`);
       }
     } catch (error) {
       console.error("Rename error:", error);
-
-      // Revert optimistic update on error
       setDevices(devices);
 
       await Swal.fire({
@@ -414,11 +409,6 @@ export default function ZigbeePage() {
           <p><strong>Error:</strong> ${
             error instanceof Error ? error.message : "Unknown error"
           }</p>
-          
-          <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p class="text-sm"><strong>What happened:</strong></p>
-            <p class="text-sm">Name was not changed due to an error</p>
-          </div>
         </div>
       `,
         confirmButtonColor: "#ef4444",
@@ -427,14 +417,14 @@ export default function ZigbeePage() {
       setActionLoading(null);
     }
   };
-  // Enhanced command function with SweetAlert2
+
+  // Send device command
   const sendDeviceCommand = async (device: ZigbeeDevice, command: any) => {
     const commandKey = `${device.deviceId}-${Object.keys(command)[0]}`;
 
     try {
       setActionLoading(commandKey);
 
-      // Optimistic update
       const updatedDevices = devices.map((d) =>
         d.deviceId === device.deviceId
           ? { ...d, currentState: { ...d.currentState, ...command } }
@@ -452,11 +442,10 @@ export default function ZigbeePage() {
       );
 
       if (!response.ok) {
-        setDevices(devices); // Revert optimistic update
+        setDevices(devices);
         throw new Error(`Command failed: ${response.status}`);
       }
 
-      // Simple success toast for commands
       const commandName = Object.keys(command)[0];
       const commandValue = Object.values(command)[0];
 
@@ -469,7 +458,7 @@ export default function ZigbeePage() {
       setTimeout(() => fetchDevices(), 2000);
     } catch (error) {
       console.error("Command error:", error);
-      setDevices(devices); // Revert optimistic update
+      setDevices(devices);
 
       Toast.fire({
         icon: "error",
@@ -481,7 +470,7 @@ export default function ZigbeePage() {
     }
   };
 
-  // ========== IMPROVED PAIRING FUNCTION ==========
+  // Enhanced pairing function
   const enablePairing = async () => {
     if (pairingMode) {
       await disablePairing();
@@ -513,7 +502,6 @@ export default function ZigbeePage() {
     });
 
     if (result.isConfirmed) {
-      // Show loading
       Swal.fire({
         title: "Enabling Pairing Mode...",
         html: `
@@ -549,7 +537,6 @@ export default function ZigbeePage() {
           setPairingMode(true);
           setPairingCountdown(duration);
 
-          // Start countdown timer
           const countdownInterval = setInterval(() => {
             setPairingCountdown((prev) => {
               if (prev <= 1) {
@@ -599,7 +586,6 @@ export default function ZigbeePage() {
             timerProgressBar: true,
           });
 
-          // Auto-refresh during pairing
           const pairingRefreshInterval = setInterval(() => {
             fetchDevices(false, true);
           }, 5000);
@@ -641,22 +627,17 @@ export default function ZigbeePage() {
     }
   };
 
-  // Enhanced disable pairing dengan proper cleanup
+  // Disable pairing function
   const disablePairing = async () => {
-    console.log(`🛑 [UI] Disabling pairing mode`);
-
     try {
-      // STEP 1: Immediately update UI state untuk responsiveness
       if (pairingInterval) {
         clearInterval(pairingInterval);
         setPairingInterval(null);
       }
 
-      // Set UI to "disabling" state
       const originalCountdown = pairingCountdown;
-      setPairingCountdown(-1); // Special state indicating "disabling"
+      setPairingCountdown(-1);
 
-      // STEP 2: Send disable command dengan timeout protection
       const response = await Promise.race([
         fetch("/api/zigbee/coordinator", {
           method: "POST",
@@ -673,7 +654,6 @@ export default function ZigbeePage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // STEP 3: Successful disable - update UI completely
         setPairingMode(false);
         setPairingCountdown(0);
 
@@ -682,122 +662,209 @@ export default function ZigbeePage() {
           title: "Pairing Stopped",
           text: "Pairing mode disabled successfully",
         });
-
-        console.log(`✅ [UI] Pairing disabled successfully`);
       } else {
         throw new Error(result.error || "Failed to disable pairing");
       }
     } catch (error) {
       console.error("Disable pairing error:", error);
+      setPairingMode(false);
+      setPairingCountdown(0);
 
-      // STEP 4: Handle disable failure
-      const isTimeout =
-        error instanceof Error && error.message.includes("timeout");
-
-      if (isTimeout) {
-        // For timeout: assume it worked but show warning
-        setPairingMode(false);
-        setPairingCountdown(0);
-
-        await Swal.fire({
-          icon: "warning",
-          title: "Pairing Stop Timeout",
-          html: `
-          <div class="text-left space-y-3">
-            <p>The disable command timed out, but pairing may have stopped.</p>
-            
-            <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <p class="text-sm"><strong>What to do:</strong></p>
-              <ul class="text-sm mt-1 space-y-1 ml-4 list-disc">
-                <li>Check if new devices can still pair</li>
-                <li>If pairing is still active, restart the bridge</li>
-                <li>Monitor Zigbee2MQTT logs for confirmation</li>
-              </ul>
-            </div>
-          </div>
-        `,
-          confirmButtonText: "Got it",
-          confirmButtonColor: "#f59e0b",
-        });
-      } else {
-        // For other errors: revert to previous state with option to force stop
-        const result = await Swal.fire({
-          icon: "error",
-          title: "Failed to Stop Pairing",
-          html: `
-          <div class="text-left space-y-3">
-            <p><strong>Error:</strong> ${
-              error instanceof Error ? error.message : "Unknown error"
-            }</p>
-            
-            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-              <p class="text-sm"><strong>Options:</strong></p>
-              <ul class="text-sm mt-1 space-y-1 ml-4 list-disc">
-                <li><strong>Force Stop:</strong> Reset UI state anyway</li>
-                <li><strong>Restart Bridge:</strong> Restart to stop pairing</li>
-                <li><strong>Cancel:</strong> Keep pairing active</li>
-              </ul>
-            </div>
-          </div>
-        `,
-          showCancelButton: true,
-          showDenyButton: true,
-          confirmButtonText: "Force Stop UI",
-          confirmButtonColor: "#f59e0b",
-          denyButtonText: "Restart Bridge",
-          denyButtonColor: "#ef4444",
-          cancelButtonText: "Keep Pairing",
-        });
-
-        if (result.isConfirmed) {
-          // Force stop UI state
-          setPairingMode(false);
-          setPairingCountdown(0);
-
-          Toast.fire({
-            icon: "warning",
-            title: "Force Stopped",
-            text: "UI pairing state cleared (check Zigbee2MQTT)",
-          });
-        } else if (result.isDenied) {
-          // Restart bridge to stop pairing
-          setPairingMode(false);
-          setPairingCountdown(0);
-          await executeCoordinatorAction("restart");
-        } else {
-          // Keep pairing - revert to previous state
-          const remainingTime = originalCountdown > 0 ? originalCountdown : 60;
-          setPairingCountdown(remainingTime);
-
-          // Restart countdown timer
-          const countdownInterval = setInterval(() => {
-            setPairingCountdown((prev) => {
-              if (prev <= 1) {
-                clearInterval(countdownInterval);
-                setPairingMode(false);
-                setPairingInterval(null);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-
-          setPairingInterval(countdownInterval);
-
-          Toast.fire({
-            icon: "info",
-            title: "Pairing Continues",
-            text: "Pairing mode is still active",
-          });
-        }
-      }
+      Toast.fire({
+        icon: "warning",
+        title: "Pairing Stopped",
+        text: "Pairing mode disabled (check logs if unsure)",
+      });
     }
   };
 
-  // Enhanced pairing button dengan better state management
+  // Format countdown display
+  const formatCountdown = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  // Enhanced fetch with better error handling
+  const fetchDevices = useCallback(
+    async (showToast = false, forceRefresh = false) => {
+      try {
+        if (showToast) {
+          setRefreshing(true);
+        }
+
+        const cacheParam = forceRefresh ? `?t=${Date.now()}` : "";
+        const response = await fetch(`/api/zigbee/devices${cacheParam}`, {
+          cache: forceRefresh ? "no-cache" : "default",
+          headers: forceRefresh
+            ? {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+              }
+            : {},
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          const sortedData = data.sort((a: ZigbeeDevice, b: ZigbeeDevice) => {
+            if (a.isOnline !== b.isOnline) {
+              return a.isOnline ? -1 : 1;
+            }
+            return a.friendlyName.localeCompare(b.friendlyName);
+          });
+
+          setDevices(sortedData);
+
+          if (showToast) {
+            const onlineCount = sortedData.filter(
+              (d: ZigbeeDevice) => d.isOnline
+            ).length;
+            Toast.fire({
+              icon: "success",
+              title: "Refreshed",
+              text: `${sortedData.length} devices (${onlineCount} online)`,
+            });
+          }
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (error) {
+        console.error("Error fetching devices:", error);
+        if (showToast) {
+          Toast.fire({
+            icon: "error",
+            title: "Refresh Failed",
+            text: "Failed to fetch devices",
+          });
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    []
+  );
+
+  // Edit dialog handlers
+  const openEditDialog = (device: ZigbeeDevice) => {
+    setEditingDevice(device);
+    setEditData({
+      friendlyName: device.friendlyName,
+      deviceType: device.deviceType,
+      manufacturer: device.manufacturer || "",
+      modelId: device.modelId || "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editingDevice) return;
+
+    if (editData.friendlyName !== editingDevice.friendlyName) {
+      await renameDevice(editingDevice, editData.friendlyName);
+    }
+
+    setEditingDevice(null);
+  };
+
+  // Open device controls dialog
+  const openDeviceControls = (device: ZigbeeDevice) => {
+    setSelectedDevice(device);
+    setIsControlsOpen(true);
+  };
+
+  useEffect(() => {
+    fetchDevices();
+
+    const hasOnlineDevices = devices.some((d) => d.isOnline);
+
+    const interval = setInterval(
+      () => {
+        const currentlyOnline = devices.some((d) => d.isOnline);
+        if (currentlyOnline) {
+          fetchDevices(false, false);
+        } else {
+          fetchDevices(false, true);
+        }
+      },
+      hasOnlineDevices ? 30000 : 60000
+    );
+
+    return () => clearInterval(interval);
+  }, [fetchDevices, devices]);
+
+  // Utility functions
+  const getDeviceIcon = (deviceType: string) => {
+    const icons = {
+      light: <Lightbulb className="h-4 w-4 text-yellow-500" />,
+      color_light: <Lightbulb className="h-4 w-4 text-purple-500" />,
+      temperature_sensor: <Thermometer className="h-4 w-4 text-blue-500" />,
+      humidity_sensor: <Droplets className="h-4 w-4 text-blue-400" />,
+      door_sensor: <DoorOpen className="h-4 w-4 text-gray-500" />,
+      motion_sensor: <Eye className="h-4 w-4 text-green-500" />,
+      water_sensor: <Droplets className="h-4 w-4 text-blue-600" />,
+      switch: <Zap className="h-4 w-4 text-orange-500" />,
+    };
+    return (
+      icons[deviceType as keyof typeof icons] || (
+        <Settings className="h-4 w-4 text-gray-400" />
+      )
+    );
+  };
+
+  const getStatusBadge = (device: ZigbeeDevice) => {
+    if (!device.isOnline) {
+      return (
+        <Badge
+          variant="secondary"
+          className="bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+        >
+          Offline
+        </Badge>
+      );
+    }
+
+    const state = device.currentState;
+    if (state?.state === "ON" || state?.state === true) {
+      return (
+        <Badge
+          variant="default"
+          className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+        >
+          Active
+        </Badge>
+      );
+    }
+    if (state?.state === "OFF" || state?.state === false) {
+      return (
+        <Badge
+          variant="secondary"
+          className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+        >
+          Idle
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge
+        variant="outline"
+        className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+      >
+        Online
+      </Badge>
+    );
+  };
+
+  const formatDeviceType = (deviceType: string) => {
+    return deviceType
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  // Render pairing button
   const renderPairingButton = () => {
     if (pairingCountdown === -1) {
-      // Special "disabling" state
       return (
         <Button disabled className="opacity-60">
           <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
@@ -829,7 +896,7 @@ export default function ZigbeePage() {
     );
   };
 
-  // Update existing pairing status card untuk handle "disabling" state
+  // Render pairing status card
   const renderPairingStatusCard = () => {
     if (pairingCountdown === -1) {
       return (
@@ -877,369 +944,23 @@ export default function ZigbeePage() {
 
     return null;
   };
-  // Format countdown display
-  const formatCountdown = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-  // Enhanced coordinator actions with SweetAlert2
-  // ========== IMPROVED COORDINATOR ACTIONS ==========
-  const executeCoordinatorAction = async (action: string) => {
-    const actionNames = {
-      restart: "Restart Bridge",
-      health_check: "Check Coordinator",
-      clear_database: "Clear Device List",
-      reset_network: "Reset Network",
-      force_remove_all: "Force Remove All Devices",
-      backup: "Backup Configuration",
-    };
 
-    const actionName =
-      actionNames[action as keyof typeof actionNames] || action;
-
-    // Enhanced confirmation dialogs
-    const getConfirmationConfig = (action: string) => {
-      switch (action) {
-        case "reset_network":
-          return {
-            title: `⚠️ ${actionName}?`,
-            html: `<div class="text-left space-y-3">
-            <p class="text-red-600 font-medium">This will completely reset your Zigbee network!</p>
-            <ul class="text-sm space-y-1 ml-4 list-disc">
-              <li>All devices will be unpaired</li>
-              <li>All device names will be lost</li>
-              <li>You'll need to re-pair every device</li>
-            </ul>
-            <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <p class="text-sm text-red-600"><strong>Warning:</strong> This action cannot be undone!</p>
-            </div>
-          </div>`,
-            icon: "warning" as const,
-            confirmButtonColor: "#ef4444",
-          };
-        case "force_remove_all":
-          return {
-            title: `${actionName}?`,
-            html: `<div class="text-left space-y-2">
-            <p>This will forcibly remove ALL devices from the network.</p>
-            <div class="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
-              <p class="text-sm text-orange-600"><strong>Note:</strong> Devices will be unpaired but not factory reset.</p>
-            </div>
-          </div>`,
-            icon: "warning" as const,
-            confirmButtonColor: "#f59e0b",
-          };
-        case "clear_database":
-          return {
-            title: `${actionName}?`,
-            html: "This will remove all devices from the interface but keep them in the Zigbee network. They will reappear when they send data.",
-            icon: "question" as const,
-            confirmButtonColor: "#3b82f6",
-          };
-        default:
-          return {
-            title: `${actionName}?`,
-            html: `This will ${actionName.toLowerCase()}.`,
-            icon: "question" as const,
-            confirmButtonColor: "#3b82f6",
-          };
-      }
-    };
-
-    const config = getConfirmationConfig(action);
-
-    const result = await Swal.fire({
-      title: config.title,
-      html: config.html,
-      icon: config.icon,
-      showCancelButton: true,
-      confirmButtonText: actionName,
-      confirmButtonColor: config.confirmButtonColor,
-      cancelButtonText: "Cancel",
-      customClass: {
-        popup: "swal-wide",
-      },
-    });
-
-    if (result.isConfirmed) {
-      // Show loading
-      Swal.fire({
-        title: `${actionName}...`,
-        html: `
-        <div class="text-left space-y-2">
-          <p>Executing: <strong>${actionName}</strong></p>
-          <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-            <div class="text-xs text-blue-600">Processing command...</div>
-          </div>
-        </div>
-      `,
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-      });
-
-      try {
-        // Use unified coordinator API
-        const response = await fetch("/api/zigbee/coordinator", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-          },
-          body: JSON.stringify({ action }),
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          await Swal.fire({
-            icon: "success",
-            title: "Action Completed",
-            html: `
-            <div class="text-left space-y-3">
-              <p><strong>Action:</strong> ${actionName}</p>
-              <p><strong>Status:</strong> ${result.message}</p>
-              ${
-                result.recommendation
-                  ? `
-                <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-                  <p class="text-sm"><strong>Note:</strong> ${result.recommendation}</p>
-                </div>
-              `
-                  : ""
-              }
-              ${
-                result.warning
-                  ? `
-                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <p class="text-sm text-yellow-600"><strong>Warning:</strong> ${result.warning}</p>
-                </div>
-              `
-                  : ""
-              }
-            </div>
-          `,
-            confirmButtonColor: "#10b981",
-            timer: action === "reset_network" ? 10000 : 6000,
-            timerProgressBar: true,
-          });
-
-          // Auto-refresh for actions that modify device list
-          if (
-            ["clear_database", "reset_network", "force_remove_all"].includes(
-              action
-            )
-          ) {
-            console.log(`🔄 [UI] Auto-refreshing after ${action}`);
-            setTimeout(() => {
-              fetchDevices(true);
-            }, 2000);
-          }
-        } else {
-          throw new Error(result.error || "Action failed");
-        }
-      } catch (error) {
-        console.error("Coordinator action error:", error);
-
-        await Swal.fire({
-          icon: "error",
-          title: "Action Failed",
-          html: `
-          <div class="text-left space-y-2">
-            <p><strong>Action:</strong> ${actionName}</p>
-            <p><strong>Error:</strong> ${
-              error instanceof Error ? error.message : "Unknown error"
-            }</p>
-            <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <p class="text-sm text-red-600">Check Zigbee2MQTT logs for more details</p>
-            </div>
-          </div>
-        `,
-          confirmButtonColor: "#ef4444",
-        });
-      }
-    }
-  };
-
-  // Enhanced fetch with better error handling and caching
-  const fetchDevices = useCallback(
-    async (showToast = false, forceRefresh = false) => {
-      try {
-        if (showToast) {
-          setRefreshing(true);
-        }
-
-        const cacheParam = forceRefresh ? `?t=${Date.now()}` : "";
-        const response = await fetch(`/api/zigbee/devices${cacheParam}`, {
-          cache: forceRefresh ? "no-cache" : "default",
-          headers: forceRefresh
-            ? {
-                "Cache-Control": "no-cache",
-                Pragma: "no-cache",
-              }
-            : {},
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          // Sort devices: online first, then by name
-          const sortedData = data.sort((a: ZigbeeDevice, b: ZigbeeDevice) => {
-            if (a.isOnline !== b.isOnline) {
-              return a.isOnline ? -1 : 1;
-            }
-            return a.friendlyName.localeCompare(b.friendlyName);
-          });
-
-          setDevices(sortedData);
-
-          if (showToast) {
-            const onlineCount = sortedData.filter(
-              (d: ZigbeeDevice) => d.isOnline
-            ).length;
-            Toast.fire({
-              icon: "success",
-              title: "Refreshed",
-              text: `${sortedData.length} devices (${onlineCount} online)`,
-            });
-          }
-
-          console.log(`📊 [UI] Loaded ${sortedData.length} devices`);
-        } else {
-          throw new Error(`HTTP ${response.status}`);
-        }
-      } catch (error) {
-        console.error("Error fetching devices:", error);
-        if (showToast) {
-          Toast.fire({
-            icon: "error",
-            title: "Refresh Failed",
-            text: "Failed to fetch devices",
-          });
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
-
-  // Toggle row expansion
-  const toggleRow = (deviceId: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(deviceId)) {
-      newExpanded.delete(deviceId);
-    } else {
-      newExpanded.add(deviceId);
-    }
-    setExpandedRows(newExpanded);
-  };
-
-  // Edit dialog handlers
-  const openEditDialog = (device: ZigbeeDevice) => {
-    setEditingDevice(device);
-    setEditData({
-      friendlyName: device.friendlyName,
-      deviceType: device.deviceType,
-      manufacturer: device.manufacturer || "",
-      modelId: device.modelId || "",
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editingDevice) return;
-
-    if (editData.friendlyName !== editingDevice.friendlyName) {
-      await renameDevice(editingDevice, editData.friendlyName);
-    }
-
-    setEditingDevice(null);
-  };
-
-  useEffect(() => {
-    fetchDevices();
-
-    // Calculate if there are online devices
-    const hasOnlineDevices = devices.some((d) => d.isOnline);
-
-    // Different refresh intervals based on device activity
-    const interval = setInterval(
-      () => {
-        const currentlyOnline = devices.some((d) => d.isOnline);
-        if (currentlyOnline) {
-          fetchDevices(false, false); // Normal refresh for active networks
-        } else {
-          fetchDevices(false, true); // Force refresh for inactive networks
-        }
-      },
-      hasOnlineDevices ? 30000 : 60000
-    ); // 30s vs 60s
-
-    return () => clearInterval(interval);
-  }, [fetchDevices, devices]);
-
-  // Utility functions (keep existing ones)
-  const getDeviceIcon = (deviceType: string) => {
-    const icons = {
-      light: <Lightbulb className="h-4 w-4 text-yellow-500" />,
-      color_light: <Lightbulb className="h-4 w-4 text-purple-500" />,
-      temperature_sensor: <Thermometer className="h-4 w-4 text-blue-500" />,
-      humidity_sensor: <Droplets className="h-4 w-4 text-blue-400" />,
-      door_sensor: <DoorOpen className="h-4 w-4 text-gray-500" />,
-      motion_sensor: <Eye className="h-4 w-4 text-green-500" />,
-      water_sensor: <Droplets className="h-4 w-4 text-blue-600" />,
-      switch: <Zap className="h-4 w-4 text-orange-500" />,
-    };
-    return (
-      icons[deviceType as keyof typeof icons] || (
-        <Settings className="h-4 w-4 text-gray-400" />
-      )
-    );
-  };
-
-  const getStatusBadge = (device: ZigbeeDevice) => {
-    if (!device.isOnline) {
-      return <Badge variant="destructive">Offline</Badge>;
-    }
-
-    const state = device.currentState;
-    if (state?.state === "ON" || state?.state === true) {
-      return <Badge variant="default">On</Badge>;
-    }
-    if (state?.state === "OFF" || state?.state === false) {
-      return <Badge variant="secondary">Off</Badge>;
-    }
-
-    return <Badge variant="outline">Online</Badge>;
-  };
-
-  const formatDeviceType = (deviceType: string) => {
-    return deviceType
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-  };
-
-  // Render device controls (keep existing function)
+  // Render device controls dialog content
   const renderDeviceControls = (device: ZigbeeDevice) => {
     const state = device.currentState || {};
     const isCommandLoading = (cmd: string) =>
       actionLoading === `${device.deviceId}-${cmd}`;
 
     return (
-      <div className="p-6 bg-gray-50 border-t">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Power Control */}
           {state.state !== undefined && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2 text-sm font-medium">
                   <Power className="h-4 w-4" />
-                  Power
+                  Power Control
                 </Label>
                 <Switch
                   checked={state.state === "ON" || state.state === true}
@@ -1257,9 +978,9 @@ export default function ZigbeePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Brightness</Label>
-                <span className="text-sm text-gray-600 px-2 py-1 bg-white rounded border">
+                <Badge variant="outline" className="text-xs">
                   {Math.round((state.brightness / 254) * 100)}%
-                </span>
+                </Badge>
               </div>
               <Slider
                 value={[state.brightness || 0]}
@@ -1279,9 +1000,9 @@ export default function ZigbeePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Color Temperature</Label>
-                <span className="text-sm text-gray-600 px-2 py-1 bg-white rounded border">
+                <Badge variant="outline" className="text-xs">
                   {state.color_temp} mired
-                </span>
+                </Badge>
               </div>
               <Slider
                 value={[state.color_temp || 150]}
@@ -1296,13 +1017,15 @@ export default function ZigbeePage() {
               />
             </div>
           )}
+        </div>
 
-          {/* Sensor Values */}
+        {/* Sensor Values Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {state.temperature !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <Thermometer className="h-5 w-5 text-blue-500" />
               <div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Temperature
                 </span>
                 <div className="text-lg font-bold">{state.temperature}°C</div>
@@ -1311,10 +1034,10 @@ export default function ZigbeePage() {
           )}
 
           {state.humidity !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <Droplets className="h-5 w-5 text-blue-400" />
               <div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Humidity
                 </span>
                 <div className="text-lg font-bold">{state.humidity}%</div>
@@ -1323,10 +1046,10 @@ export default function ZigbeePage() {
           )}
 
           {state.battery !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <Battery className="h-5 w-5 text-green-500" />
               <div className="flex-1">
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Battery
                 </span>
                 <div className="flex items-center gap-2">
@@ -1341,10 +1064,10 @@ export default function ZigbeePage() {
 
           {/* Contact/Motion Sensors */}
           {state.contact !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <DoorOpen className="h-5 w-5 text-gray-500" />
               <div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Door Status
                 </span>
                 <div className="mt-1">
@@ -1357,10 +1080,10 @@ export default function ZigbeePage() {
           )}
 
           {state.occupancy !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <Eye className="h-5 w-5 text-green-500" />
               <div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Motion
                 </span>
                 <div className="mt-1">
@@ -1375,10 +1098,10 @@ export default function ZigbeePage() {
           )}
 
           {state.water_leak !== undefined && (
-            <div className="flex items-center gap-3 p-3 bg-white rounded border">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
               <Droplets className="h-5 w-5 text-blue-600" />
               <div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Water Status
                 </span>
                 <div className="mt-1">
@@ -1396,258 +1119,408 @@ export default function ZigbeePage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <RefreshCcw className="h-8 w-8 animate-spin text-gray-500" />
-        <p className="text-gray-600">Loading devices...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="container mx-auto p-4 md:p-8">
+          <div className="flex flex-col items-center justify-center h-96 space-y-4">
+            <RefreshCcw className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading Zigbee devices...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Header dengan Enhanced Pairing Status */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Zigbee Devices</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your Zigbee smart home network
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 items-end">
-          {/* Enhanced Pairing Status Card with disable state */}
-          {renderPairingStatusCard()}
-
-          <Button
-            variant="outline"
-            onClick={() => fetchDevices(true)}
-            disabled={refreshing}
-          >
-            <RefreshCcw
-              className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-
-          {/* Enhanced Pairing Button dengan state management */}
-          {renderPairingButton()}
-        </div>
-      </div>
-      {/* Enhanced Stats Cards dengan Pairing Info */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Total Devices",
-            value: devices.length,
-            icon: Package,
-            color: "text-gray-600",
-          },
-          {
-            label: "Online",
-            value: devices.filter((d) => d.isOnline).length,
-            icon: Wifi,
-            color: "text-green-600",
-          },
-          {
-            label: "Offline",
-            value: devices.filter((d) => !d.isOnline).length,
-            icon: WifiOff,
-            color: "text-red-600",
-          },
-          {
-            label: pairingMode ? "Pairing Active" : "Device Types",
-            value: pairingMode
-              ? formatCountdown(pairingCountdown)
-              : new Set(devices.map((d) => d.deviceType)).size,
-            icon: pairingMode ? Activity : Settings,
-            color: pairingMode ? "text-blue-600" : "text-gray-600",
-          },
-        ].map((stat, i) => (
-          <Card
-            key={i}
-            className={
-              pairingMode && i === 3 ? "bg-blue-50 border-blue-200" : ""
-            }
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className={`text-sm font-medium ${stat.color}`}>
-                {stat.label}
-              </CardTitle>
-              <stat.icon
-                className={`h-4 w-4 ${stat.color} ${
-                  pairingMode && i === 3 ? "animate-pulse" : ""
-                }`}
-              />
-            </CardHeader>
-            <CardContent>
-              <div
-                className={`text-2xl font-bold ${
-                  pairingMode && i === 3 ? "font-mono text-blue-700" : ""
-                }`}
-              >
-                {stat.value}
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="p-4 md:p-6 space-y-8">
+          {/* Header Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Network className="h-6 w-6 text-primary" />
               </div>
-              {pairingMode && i === 3 && (
-                <div className="text-xs text-blue-500 mt-1">Remaining time</div>
-              )}
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Zigbee Network
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage and control your Zigbee smart home devices
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total Devices
+                    </p>
+                    <p className="text-3xl font-bold">{devices.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                    <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Online
+                    </p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {devices.filter((d) => d.isOnline).length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                    <Wifi className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Offline
+                    </p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {devices.filter((d) => !d.isOnline).length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+                    <WifiOff className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`border-0 shadow-md backdrop-blur-sm ${
+                pairingMode
+                  ? "bg-green-100/80 dark:bg-green-900/20"
+                  : "bg-white/80 dark:bg-slate-900/80"
+              }`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {pairingMode ? "Pairing Active" : "Device Types"}
+                    </p>
+                    <p
+                      className={`text-3xl font-bold ${
+                        pairingMode ? "font-mono text-green-700" : ""
+                      }`}
+                    >
+                      {pairingMode
+                        ? formatCountdown(pairingCountdown)
+                        : new Set(devices.map((d) => d.deviceType)).size}
+                    </p>
+                  </div>
+                  <div
+                    className={`p-3 rounded-full ${
+                      pairingMode
+                        ? "bg-green-200 dark:bg-green-800/30"
+                        : "bg-purple-100 dark:bg-purple-900/20"
+                    }`}
+                  >
+                    {pairingMode ? (
+                      <Activity className="h-6 w-6 text-green-600 dark:text-green-400 animate-pulse" />
+                    ) : (
+                      <Router className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Card */}
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl">Device Management</CardTitle>
+                  <CardDescription>
+                    Control and monitor your Zigbee smart home devices
+                  </CardDescription>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  {/* Pairing Status Card */}
+                  {renderPairingStatusCard()}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchDevices(true)}
+                    disabled={refreshing}
+                    className="whitespace-nowrap"
+                  >
+                    <RefreshCcw
+                      className={`mr-2 h-4 w-4 ${
+                        refreshing ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </Button>
+
+                  {/* Enhanced Pairing Button */}
+                  {renderPairingButton()}
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="pt-4">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search devices..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-background"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="overflow-hidden">
+                {filteredDevices.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <Package className="h-12 w-12 text-muted-foreground/50" />
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground font-medium">
+                          {searchTerm
+                            ? "No devices found"
+                            : "No Zigbee devices"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {searchTerm
+                            ? "Try adjusting your search terms"
+                            : "Start by pairing your first Zigbee device"}
+                        </p>
+                      </div>
+                      {!searchTerm && (
+                        <Button onClick={enablePairing} className="mt-2">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Pair Device
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Device
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Type & Model
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Status & Activity
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Last Seen
+                        </TableHead>
+                        <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDevices.map((device) => (
+                        <TableRow
+                          key={device.deviceId}
+                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              {getDeviceIcon(device.deviceType)}
+                              <div className="space-y-1">
+                                <p className="font-medium text-slate-900 dark:text-slate-100">
+                                  {device.friendlyName}
+                                </p>
+                                <code className="text-xs text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                  {device.deviceId}
+                                </code>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="py-4">
+                            <div className="space-y-2">
+                              <Badge variant="outline" className="text-xs">
+                                {formatDeviceType(device.deviceType)}
+                              </Badge>
+                              <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">
+                                  {device.manufacturer || "Unknown"}
+                                </p>
+                                {device.modelId && (
+                                  <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                    {device.modelId}
+                                  </code>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                {device.isOnline ? (
+                                  <Wifi className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <WifiOff className="h-4 w-4 text-red-600" />
+                                )}
+                                {getStatusBadge(device)}
+                              </div>
+
+                              {/* Battery indicator */}
+                              {device.currentState?.battery !== undefined && (
+                                <div className="flex items-center gap-1">
+                                  <Battery
+                                    className={`h-3 w-3 ${
+                                      device.currentState.battery < 20
+                                        ? "text-red-500"
+                                        : "text-green-500"
+                                    }`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {device.currentState.battery}%
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="py-4">
+                            {device.lastSeen ? (
+                              <div className="space-y-1">
+                                <p className="text-sm">
+                                  {new Date(
+                                    device.lastSeen
+                                  ).toLocaleDateString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(
+                                    device.lastSeen
+                                  ).toLocaleTimeString()}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-sm">
+                                Never
+                              </span>
+                            )}
+                          </TableCell>
+
+                          <TableCell className="text-right py-4">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Control Button */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                    onClick={() => openDeviceControls(device)}
+                                    disabled={!device.isOnline}
+                                  >
+                                    <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Device controls</TooltipContent>
+                              </Tooltip>
+
+                              {/* More Actions */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    disabled={actionLoading?.includes(
+                                      device.deviceId
+                                    )}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => confirmRename(device)}
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Rename Device
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() => confirmDelete(device)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remove Device
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
             </CardContent>
           </Card>
-        ))}
+        </div>
       </div>
 
-      {/* Devices Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Device List</CardTitle>
-          <CardDescription>
-            Click on a device to expand controls and settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {devices.length === 0 ? (
-            <div className="text-center py-16">
-              <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-semibold mb-2">No devices found</h3>
-              <p className="text-gray-600 mb-4">
-                Start by pairing your first Zigbee device
-              </p>
-              <Button onClick={enablePairing}>
-                <Plus className="h-4 w-4 mr-2" />
-                Pair Device
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead className="w-12">Type</TableHead>
-                  <TableHead>Device Name</TableHead>
-                  <TableHead>Manufacturer</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Status</TableHead>
+      {/* Device Controls Dialog */}
+      <Dialog open={isControlsOpen} onOpenChange={setIsControlsOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedDevice && getDeviceIcon(selectedDevice.deviceType)}
+              Device Controls
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDevice && (
+                <>
+                  Control and monitor{" "}
+                  <strong>{selectedDevice.friendlyName}</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-                  <TableHead>Last Seen</TableHead>
-                  <TableHead className="w-12">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {devices.map((device) => (
-                  <>
-                    <TableRow
-                      key={device.deviceId}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => toggleRow(device.deviceId)}
-                    >
-                      <TableCell>
-                        {expandedRows.has(device.deviceId) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </TableCell>
-                      <TableCell>{getDeviceIcon(device.deviceType)}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {device.friendlyName}
-                          </div>
-                          <div className="text-sm text-gray-500 font-mono">
-                            {device.deviceId}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={
-                            device.manufacturer ? "" : "text-gray-400 italic"
-                          }
-                        >
-                          {device.manufacturer || "Unknown"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {device.modelId ? (
-                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                            {device.modelId}
-                          </code>
-                        ) : (
-                          <span className="text-gray-400 italic">Unknown</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {device.isOnline ? (
-                            <Wifi className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <WifiOff className="h-4 w-4 text-red-600" />
-                          )}
-                          {getStatusBadge(device)}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        {device.lastSeen ? (
-                          <div className="text-sm">
-                            <div>
-                              {new Date(device.lastSeen).toLocaleDateString()}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {new Date(device.lastSeen).toLocaleTimeString()}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 italic">Never</span>
-                        )}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={actionLoading?.includes(
-                                device.deviceId
-                              )}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => confirmRename(device)}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              Rename Device
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => confirmDelete(device)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Remove Device
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Expanded Row Controls */}
-                    {expandedRows.has(device.deviceId) && (
-                      <TableRow>
-                        <TableCell colSpan={9} className="p-0">
-                          {renderDeviceControls(device)}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                ))}
-              </TableBody>
-            </Table>
+          {selectedDevice && (
+            <div className="pt-4">{renderDeviceControls(selectedDevice)}</div>
           )}
-        </CardContent>
-      </Card>
+
+          <DialogFooter>
+            <Button onClick={() => setIsControlsOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Dialog */}
       <Dialog
         open={!!editingDevice}
@@ -1691,6 +1564,6 @@ export default function ZigbeePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </TooltipProvider>
   );
 }

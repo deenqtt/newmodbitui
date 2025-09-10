@@ -36,30 +36,29 @@ model ZigbeeDevice {
   currentState      Json?    // current device state
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
-  // Relations
-  maintenances      Maintenance[]
+
 }
 model Maintenance {
-  id           Int               @id @default(autoincrement())
-  name         String
-  description  String?
-  startTask    DateTime
-  endTask      DateTime
-  assignTo     String
-  targetType   MaintenanceTarget
-  targetId     String
-  status       String            @default("Scheduled")
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  isActive     Boolean           @default(true)
-  assignedTo   User              @relation("AssignedToUser", fields: [assignTo], references: [id])
-  deviceTarget DeviceExternal    @relation(fields: [targetId], references: [id])
-    // NEW: Tambah relasi ke ZigbeeDevice
-  zigbeeDevice ZigbeeDevice?     @relation(fields: [zigbeeDeviceId], references: [id])
-  zigbeeDeviceId String?
+  id             Int               @id @default(autoincrement())
+  name           String
+  description    String?
+  startTask      DateTime
+  endTask        DateTime
+  assignTo       String
+  targetType     MaintenanceTarget
+  targetId       String            // Fleksibel untuk Device ID atau Rack ID
+  status         String            @default("Scheduled")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  isActive       Boolean           @default(true)
+  
+  // Relations
+  assignedTo     User              @relation("AssignedToUser", fields: [assignTo], references: [id])
+  
+  // Optional device relation - hanya untuk targetType = Device
+  deviceTargetId String?           // Foreign key terpisah
+  deviceTarget   DeviceExternal?   @relation(fields: [deviceTargetId], references: [id])
 }
-
 model DeviceExternal {
   id                          String                      @id @default(cuid())
   uniqId                      String                      @unique @default(cuid())
@@ -74,7 +73,7 @@ model DeviceExternal {
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
   sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
   loggingConfigs              LoggingConfiguration[]
-  maintenanceTasks            Maintenance[]
+  maintenanceTasks            Maintenance[]               // Ubah dari required ke optional
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
 }

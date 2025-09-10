@@ -73,19 +73,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prepare the data object
+    const maintenanceData: any = {
+      name,
+      description,
+      startTask: new Date(startTask),
+      endTask: new Date(endTask),
+      assignTo,
+      targetType,
+      targetId: String(targetId), // Selalu simpan targetId
+      status,
+      isActive: true,
+    };
+
+    // If targetType is Device, validate that the device exists and set the relation
+    if (targetType === "Device") {
+      // Check if the device exists in DeviceExternal
+      const deviceExists = await prisma.deviceExternal.findUnique({
+        where: { id: String(targetId) },
+      });
+
+      if (deviceExists) {
+        maintenanceData.deviceTargetId = String(targetId);
+      } else {
+        return NextResponse.json(
+          { message: "Device not found." },
+          { status: 400 }
+        );
+      }
+    }
+    // For Rack type, deviceTargetId remains null (default)
+
     const newMaintenance = await prisma.maintenance.create({
-      data: {
-        name,
-        description,
-        startTask: new Date(startTask),
-        endTask: new Date(endTask),
-        assignTo,
-        targetType,
-        // targetId adalah string (cuid dari DeviceExternal)
-        targetId: String(targetId),
-        status,
-        isActive: true, // Default
-      },
+      data: maintenanceData,
       include: {
         assignedTo: {
           select: {
@@ -106,24 +126,30 @@ export async function POST(request: NextRequest) {
     // Send WhatsApp notification if user has phone number
     try {
       if (newMaintenance.assignedTo.phoneNumber) {
+        const deviceName =
+          newMaintenance.deviceTarget?.name || `${targetType} (${targetId})`;
+
         const notificationData = {
-          userName: newMaintenance.assignedTo.email.split('@')[0],
+          userName: newMaintenance.assignedTo.email.split("@")[0],
           taskName: newMaintenance.name,
-          deviceName: newMaintenance.deviceTarget?.name,
+          deviceName,
           startTime: format(new Date(newMaintenance.startTask), "PPpp"),
           endTime: format(new Date(newMaintenance.endTask), "PPpp"),
           status: newMaintenance.status,
           description: newMaintenance.description || undefined,
         };
 
-        const whatsappResult = await whatsappService.sendMaintenanceNotification(
-          newMaintenance.assignedTo.phoneNumber,
-          notificationData
-        );
+        const whatsappResult =
+          await whatsappService.sendMaintenanceNotification(
+            newMaintenance.assignedTo.phoneNumber,
+            notificationData
+          );
 
         if (whatsappResult.success) {
-          console.log(`[Maintenance API] WhatsApp notification sent to ${newMaintenance.assignedTo.phoneNumber}`);
-          
+          console.log(
+            `[Maintenance API] WhatsApp notification sent to ${newMaintenance.assignedTo.phoneNumber}`
+          );
+
           // Log notification in database
           await prisma.notification.create({
             data: {
@@ -132,18 +158,26 @@ export async function POST(request: NextRequest) {
             },
           });
         } else {
-          console.warn(`[Maintenance API] WhatsApp notification failed: ${whatsappResult.message}`);
+          console.warn(
+            `[Maintenance API] WhatsApp notification failed: ${whatsappResult.message}`
+          );
         }
       } else {
-        console.log(`[Maintenance API] No phone number for user ${newMaintenance.assignedTo.email}, skipping WhatsApp notification`);
+        console.log(
+          `[Maintenance API] No phone number for user ${newMaintenance.assignedTo.email}, skipping WhatsApp notification`
+        );
       }
     } catch (whatsappError) {
-      console.error("[Maintenance API] WhatsApp notification error:", whatsappError);
+      console.error(
+        "[Maintenance API] WhatsApp notification error:",
+        whatsappError
+      );
       // Don't fail the maintenance creation if WhatsApp fails
     }
 
     return NextResponse.json(newMaintenance, { status: 201 });
   } catch (error: any) {
+    console.error("[Maintenance POST] Error:", error);
     return NextResponse.json(
       {
         message: "Failed to create maintenance schedule.",
@@ -164,7 +198,9 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const { id, ...data } = await request.json();
+    const body = await request.json();
+    const { id, ...data } = body;
+
     if (!id) {
       return NextResponse.json(
         { message: "Maintenance ID is required." },
@@ -172,17 +208,73 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Filter hanya field yang bisa diupdate
+    const allowedFields = [
+      "name",
+      "description",
+      "startTask",
+      "endTask",
+      "assignTo",
+      "targetType",
+      "targetId",
+      "status",
+      "isActive",
+      "deviceTargetId",
+    ];
+
+    const updateData: any = {};
+
+    // Hanya ambil field yang diizinkan
+    for (const field of allowedFields) {
+      if (data.hasOwnProperty(field)) {
+        if (field === "startTask" || field === "endTask") {
+          updateData[field] = data[field] ? new Date(data[field]) : undefined;
+        } else {
+          updateData[field] = data[field];
+        }
+      }
+    }
+
+    // Handle device relation logic
+    if (data.targetType === "Device" && data.targetId) {
+      // Check if device exists
+      const deviceExists = await prisma.deviceExternal.findUnique({
+        where: { id: String(data.targetId) },
+      });
+
+      if (deviceExists) {
+        updateData.deviceTargetId = String(data.targetId);
+      } else {
+        updateData.deviceTargetId = null;
+      }
+    } else {
+      // For Rack or when no device, clear the device relation
+      updateData.deviceTargetId = null;
+    }
+
     const updatedMaintenance = await prisma.maintenance.update({
       where: { id: parseInt(id) },
-      data: {
-        ...data,
-        startTask: data.startTask ? new Date(data.startTask) : undefined,
-        endTask: data.endTask ? new Date(data.endTask) : undefined,
+      data: updateData,
+      include: {
+        assignedTo: {
+          select: {
+            id: true,
+            email: true,
+            phoneNumber: true,
+          },
+        },
+        deviceTarget: {
+          select: {
+            name: true,
+            topic: true,
+          },
+        },
       },
     });
 
     return NextResponse.json(updatedMaintenance, { status: 200 });
   } catch (error: any) {
+    console.error("[Maintenance PUT] Error:", error);
     return NextResponse.json(
       {
         message: "Failed to update maintenance schedule.",

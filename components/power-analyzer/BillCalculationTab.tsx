@@ -51,8 +51,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Edit, Trash2, Loader2, Search } from "lucide-react"; // Import Loader2 icon
-
+import {
+  PlusCircle,
+  Edit,
+  Trash2,
+  Loader2,
+  Search,
+  Calculator,
+  RefreshCw,
+  DollarSign,
+  Zap,
+  Activity,
+  TrendingUp,
+  Clock,
+  Database,
+} from "lucide-react";
 // --- Type Definitions ---
 interface DeviceSelection {
   id: string; // Ini uniqId
@@ -118,7 +131,7 @@ export function BillCalculationTab() {
   const [isSubmitting, setIsSubmitting] = useState(false); // Untuk Add/Edit Save button
   const [isDeletingConfig, setIsDeletingConfig] = useState(false); // Untuk Delete Config button
   const [isDeletingAllLogs, setIsDeletingAllLogs] = useState(false); // Untuk Delete All Logs button
-
+  const [refreshing, setRefreshing] = useState(false);
   // --- Delete State ---
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<BillConfig | null>(null);
@@ -132,9 +145,13 @@ export function BillCalculationTab() {
   }, [allLogs, logsPage]);
 
   // --- Data Fetching ---
-  const fetchInitialData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchInitialData = useCallback(async (showToast = false) => {
     try {
+      if (showToast) {
+        setRefreshing(true);
+      }
+      setIsLoading(true);
+
       const [configsRes, devicesRes, logsRes] = await Promise.all([
         fetch("/api/bill-configs"),
         fetch("/api/devices/for-selection"),
@@ -187,6 +204,14 @@ export function BillCalculationTab() {
         console.error("Expected an array for logs, but received:", logsData);
         setAllLogs([]);
       }
+
+      if (showToast) {
+        Toast.fire({
+          icon: "success",
+          title: "Refreshed",
+          text: `${configsData.length} bill configurations loaded`,
+        });
+      }
     } catch (error: any) {
       console.error("Error fetching initial data:", error);
       Toast.fire({
@@ -195,6 +220,7 @@ export function BillCalculationTab() {
       });
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -421,44 +447,73 @@ export function BillCalculationTab() {
       ),
     [configs, searchQuery]
   );
+  const resetForm = () => {
+    setCurrentConfig({
+      rupiahRatePerKwh: 1467,
+      dollarRatePerKwh: 0.1,
+    });
+    setSelectedDeviceForModal(null);
+    setPayloadKeys([]);
+  };
 
+  const openAddModal = () => {
+    resetForm();
+    setIsEditMode(false);
+    setIsModalOpen(true);
+  };
   return (
     <div className="space-y-6">
-      <Card className="shadow-sm">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Bill Calculation Configurations</CardTitle>
+      <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Bill Calculation Configurations
+              </CardTitle>
               <CardDescription>
-                Configure items to calculate electricity costs.
+                Configure devices to automatically calculate electricity costs
+                in real-time
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                setIsEditMode(false);
-                setCurrentConfig({
-                  rupiahRatePerKwh: 1467,
-                  dollarRatePerKwh: 0.1,
-                });
-                setSelectedDeviceForModal(null);
-                setPayloadKeys([]);
-                setIsModalOpen(true);
-              }}
-              disabled={isSubmitting || isLoading} // NEW: Disable during submission or initial loading
-            >
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Data
-            </Button>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchInitialData(true)}
+                disabled={refreshing || isLoading}
+                className="whitespace-nowrap"
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={openAddModal}
+                disabled={isSubmitting || isLoading || isDeletingConfig}
+                className="bg-primary hover:bg-primary/90 whitespace-nowrap"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Configuration
+              </Button>
+            </div>
           </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by Custom Name..."
-              className="pl-8 w-full sm:w-1/3"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={isLoading} // NEW: Disable search during loading
-            />
+
+          {/* Search Bar */}
+          <div className="pt-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search configurations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={isLoading}
+                className="pl-10 bg-background"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -545,7 +600,7 @@ export function BillCalculationTab() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="destructive"
+                          variant="ghost"
                           size="icon"
                           onClick={() => {
                             setConfigToDelete(item);
@@ -614,12 +669,17 @@ export function BillCalculationTab() {
       </Card>
 
       {/* Tabel Log */}
-      <Card className="shadow-sm">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Calculation Log</CardTitle>
-              <CardDescription>History of calculations.</CardDescription>
+      <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Calculation History
+              </CardTitle>
+              <CardDescription>
+                Historical record of electricity cost calculations
+              </CardDescription>
             </div>
             <Button
               variant="destructive"
@@ -631,10 +691,11 @@ export function BillCalculationTab() {
                 isSubmitting ||
                 isDeletingConfig ||
                 isDeletingAllLogs
-              } // NEW: Disable
+              }
+              className="whitespace-nowrap"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete All Logs
+              Clear All History
             </Button>
           </div>
         </CardHeader>
