@@ -34,8 +34,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -53,7 +52,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Loader2,
-  List,
   Plus,
   Edit,
   Trash,
@@ -67,7 +65,13 @@ import {
   X,
   AlertCircle,
   Info,
+  ArrowLeft,
+  Crown,
+  Activity,
+  HardDrive,
+  UserCog,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // --- Interfaces & Types
 interface UserData {
@@ -105,14 +109,12 @@ interface MqttResponsePayload {
   status: "success" | "error" | "accepted" | "failed";
   message: string;
   data?: {
-    // Handle different response structures
     users?: UserData[];
     unique_users?: UserData[];
     user?: UserData;
     deleted_user?: UserData;
     total_users?: number;
     query_type?: string;
-    // Fingerprint response data
     consolidated_fingerprints?: FingerprintData[];
     devices?: any[];
     summary?: {
@@ -120,7 +122,6 @@ interface MqttResponsePayload {
       successful_queries: number;
       unique_users: number;
       total_user_records: number;
-      // Fingerprint summary properties
       unique_fingerprints?: number;
       total_fingerprint_records?: number;
     };
@@ -128,18 +129,43 @@ interface MqttResponsePayload {
 }
 
 const PRIVILEGES = [
-  { value: 0, label: "Normal User", icon: User },
-  { value: 1, label: "Enroll User", icon: UserCheck },
-  { value: 2, label: "Admin", icon: Shield },
-  { value: 3, label: "Super Admin", icon: Shield },
-  { value: 14, label: "Super User", icon: Shield },
+  {
+    value: 0,
+    label: "Normal User",
+    icon: User,
+    color: "bg-gray-100 text-gray-700",
+  },
+  {
+    value: 1,
+    label: "Enroll User",
+    icon: UserCheck,
+    color: "bg-blue-100 text-blue-700",
+  },
+  {
+    value: 2,
+    label: "Admin",
+    icon: Shield,
+    color: "bg-green-100 text-green-700",
+  },
+  {
+    value: 3,
+    label: "Super Admin",
+    icon: Crown,
+    color: "bg-purple-100 text-purple-700",
+  },
+  {
+    value: 14,
+    label: "Super User",
+    icon: UserCog,
+    color: "bg-orange-100 text-orange-700",
+  },
 ];
 
 // --- Main Component
 export default function UserManagement() {
+  const router = useRouter();
   const { isReady, connectionStatus, publish } = useMqtt();
 
-  // MQTT Topics - moved before useConnectivity hook
   const requestTopic = "accessControl/user/command";
   const responseTopic = "accessControl/user/response";
   const deviceResponseTopic = "accessControl/device/response";
@@ -219,15 +245,13 @@ export default function UserManagement() {
   const handleResponse = useCallback(
     (topic: string, message: string) => {
       try {
-        console.log("Received MQTT response:", message); // Debug log
+        console.log("Received MQTT response:", message);
         const payload: MqttResponsePayload = JSON.parse(message);
 
-        // Debug log untuk melihat semua response
         console.log("MQTT Response Status:", payload.status);
         console.log("MQTT Response Data:", payload.data);
 
         if (payload.status === "success" || payload.status === "accepted") {
-          // Handle fingerprint list responses
           if (payload.data?.consolidated_fingerprints !== undefined) {
             console.log(
               "Processing fingerprint list:",
@@ -236,7 +260,6 @@ export default function UserManagement() {
             console.log("Fingerprint list summary:", payload.data.summary);
             setFingerprintList(payload.data.consolidated_fingerprints);
             setIsLoadingFingerprints(false);
-            // Update summary data for fingerprints
             setSummaryData((prev) => ({
               ...prev,
               totalFingerprints:
@@ -249,9 +272,7 @@ export default function UserManagement() {
                 payload.data.summary?.successful_queries || 0
               } devices`
             );
-          }
-          // Handle fingerprint and card responses
-          else if (
+          } else if (
             payload.message?.includes("fingerprint") ||
             payload.message?.includes("Fingerprint")
           ) {
@@ -259,7 +280,6 @@ export default function UserManagement() {
               setIsFingerprintProcessing(false);
               setFingerprintAction(null);
               toast.success(payload.message);
-              // Refresh fingerprint list after fingerprint operations
               handleGetFingerprintList();
             } else {
               toast.info(payload.message);
@@ -277,11 +297,8 @@ export default function UserManagement() {
               toast.info(payload.message);
             }
           } else if (payload.data) {
-            // Handle regular user data responses
             if (payload.data?.unique_users) {
-              // Response from "getData" command - use unique_users array
               setUsers(payload.data.unique_users);
-              // Update summary data
               setSummaryData((prev) => ({
                 ...prev,
                 totalUsers: payload.data?.unique_users?.length || 0,
@@ -297,11 +314,9 @@ export default function UserManagement() {
                 } devices`
               );
             } else if (payload.data.users) {
-              // Fallback for direct users array
               setUsers(payload.data.users);
               toast.success(`Loaded ${payload.data.users.length} users`);
             } else if (payload.data.user || payload.data.deleted_user) {
-              // User created/updated/deleted - refresh list
               if (payload.data.user) {
                 toast.success(
                   `User ${payload.data.user.name} ${
@@ -316,9 +331,7 @@ export default function UserManagement() {
               handleGetUsers();
             }
           }
-        }
-        // Handle failed fingerprint operations
-        else if (payload.status === "failed" || payload.status === "error") {
+        } else if (payload.status === "failed" || payload.status === "error") {
           console.error("MQTT Error/Failed:", payload);
 
           if (
@@ -329,7 +342,6 @@ export default function UserManagement() {
             setIsFingerprintProcessing(false);
             setFingerprintAction(null);
 
-            // Enhanced error message for fingerprint enrollment
             if (
               payload.message?.includes("Cant Enroll") ||
               payload.message?.includes("Can't Enroll") ||
@@ -366,7 +378,6 @@ export default function UserManagement() {
             toast.error(payload.message);
           }
 
-          // Reset states on error
           setIsFingerprintProcessing(false);
           setIsCardProcessing(false);
           setFingerprintAction(null);
@@ -385,7 +396,6 @@ export default function UserManagement() {
         setIsRefreshing(false);
         setIsDialogOpen(false);
         setDeleteUserUID(null);
-        // Don't reset fingerprint and card states here as they handle their own completion
       }
     },
     [handleGetUsers, handleGetFingerprintList]
@@ -397,7 +407,6 @@ export default function UserManagement() {
       const payload = JSON.parse(message);
 
       if (payload.status === "success" && payload.data?.devices) {
-        // Handle device list response
         setDevices(payload.data.devices);
         setSummaryData((prev) => ({
           ...prev,
@@ -469,7 +478,7 @@ export default function UserManagement() {
       mode,
       selectedUser: user,
     });
-    setSelectedFingerIndex(1); // Reset to finger index 1
+    setSelectedFingerIndex(1);
   };
 
   const closeFingerprintDialog = () => {
@@ -596,727 +605,820 @@ export default function UserManagement() {
   return (
     <TooltipProvider>
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b px-4">
-          <div className="flex items-center gap-3">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-muted">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold">User Management</h1>
-                <p className="text-xs text-muted-foreground">
-                  Manage access control users and permissions
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    isConnected ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-                <span className="text-sm text-muted-foreground">
-                  MQTT: {connectionStatus}
-                </span>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleGetUsers}
-              disabled={!isConnected || isRefreshing}
-            >
-              {isRefreshing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <List className="mr-2 h-4 w-4" />
-              )}
-              Refresh
-            </Button>
-          </div>
-        </header>
-
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Users
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryData.totalUsers}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Registered users
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Devices
-                </CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryData.totalDevices}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Access control devices
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Connected Devices
-                </CardTitle>
-                <div
-                  className={`h-2 w-2 rounded-full ${
-                    summaryData.connectedDevices === summaryData.totalDevices
-                      ? "bg-green-500"
-                      : "bg-yellow-500"
-                  }`}
-                />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryData.connectedDevices}/{summaryData.totalDevices}
-                </div>
-                <p className="text-xs text-muted-foreground">Online devices</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Fingerprints
-                </CardTitle>
-                <Fingerprint className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {summaryData.totalFingerprints}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Registered fingerprints
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="border shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <Users className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">User Registry</h3>
-                    <div className="text-sm text-muted-foreground mt-0.5">
-                      Manage all users across ZKTeco access control devices
-                    </div>
-                  </div>
-                </div>
-              </CardTitle>
-              <div className="flex items-center gap-2">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+          <div className="p-4 md:p-6">
+            {/* Header Section */}
+            <div className="mb-6">
+              <div className="flex items-center gap-4 mb-4">
                 <Button
-                  onClick={handleSynchronizeCard}
-                  disabled={!isConnected || isCardProcessing}
                   variant="outline"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  {isCardProcessing && cardAction === "sync" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                  )}
-                  Sync Cards
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
                 </Button>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button onClick={openAddDialog} variant="default">
-                      <Plus className="mr-2 h-4 w-4" /> Add User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {dialogMode === "add" ? "Add New User" : "Update User"}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2 max-h-96 overflow-y-auto">
-                      {/* Display read-only values for existing users */}
-                      {dialogMode === "update" && (
-                        <div className="grid grid-cols-3 gap-4 p-3 bg-muted rounded-lg">
-                          <div>
-                            <Label className="text-sm text-muted-foreground">
-                              UID
-                            </Label>
-                            <div className="text-sm font-mono">
-                              {formData.uid || "Auto-generated"}
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-muted-foreground">
-                              User ID
-                            </Label>
-                            <div className="text-sm font-mono">
-                              {formData.user_id || "System-generated"}
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-muted-foreground">
-                              Card Number
-                            </Label>
-                            <div className="text-sm font-mono">
-                              {formData.card || "Not assigned"}
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
-                      {/* Information for new users */}
-                      {dialogMode === "add" && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Info className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-800">
-                              Automatic Generation
-                            </span>
-                          </div>
-                          <ul className="text-xs text-blue-700 space-y-1">
-                            <li>• UID will be auto-generated by the system</li>
-                            <li>• User ID will be system-generated</li>
-                            <li>
-                              • Card Number can be assigned later via card
-                              synchronization
-                            </li>
-                          </ul>
-                        </div>
-                      )}
+                {/* Connection Status & Refresh */}
+                <div className="ml-auto flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-white dark:bg-slate-800 shadow-sm">
+                    <div
+                      className={`w-2 h-2 rounded-full animate-pulse ${
+                        isConnected ? "bg-green-500" : "bg-red-500"
+                      }`}
+                    />
+                    <span>MQTT: {connectionStatus}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleGetUsers}
+                    disabled={!isConnected || isRefreshing}
+                    size="sm"
+                  >
+                    {isRefreshing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+              </div>
 
-                      {/* Editable fields */}
-                      <div>
-                        <Label htmlFor="name">
-                          Full Name <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id="name"
-                          placeholder="Enter full name"
-                          value={formData.name || ""}
-                          onChange={(e) =>
-                            setFormData({ ...formData, name: e.target.value })
-                          }
-                        />
+              {/* Page Title */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg">
+                  <Users className="h-6 w-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">
+                    User Management
+                  </h1>
+                  <p className="text-slate-600 dark:text-slate-400 mt-1">
+                    Manage access control users, permissions, and biometrics
+                  </p>
+                </div>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card className="border-0 shadow-sm bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                        <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="password">Password</Label>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Device access password"
-                            value={formData.password || ""}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                password: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="privilege">Privilege Level</Label>
-                          <Select
-                            value={String(formData.privilege ?? 0)}
-                            onValueChange={(value) =>
-                              setFormData({
-                                ...formData,
-                                privilege: Number(value),
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select privilege level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {PRIVILEGES.map((p) => {
-                                const Icon = p.icon;
-                                return (
-                                  <SelectItem
-                                    key={p.value}
-                                    value={String(p.value)}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Icon className="h-4 w-4" />
-                                      {p.label}
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Total Users
+                        </p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          {summaryData.totalUsers}
+                        </p>
                       </div>
                     </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={
-                          dialogMode === "add"
-                            ? handleAddUser
-                            : handleUpdateUser
-                        }
-                      >
-                        {dialogMode === "add" ? "Add" : "Update"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                  </CardContent>
+                </Card>
 
-                {/* Fingerprint Management Dialog */}
-                <Dialog
-                  open={fingerprintDialog.isOpen}
-                  onOpenChange={closeFingerprintDialog}
-                >
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {fingerprintDialog.mode === "register"
-                          ? "Register Fingerprint"
-                          : "Delete Fingerprint"}{" "}
-                        - {fingerprintDialog.selectedUser?.name}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>User Information</Label>
-                          <div className="p-3 bg-muted rounded-lg">
-                            <p className="font-medium">
-                              {fingerprintDialog.selectedUser?.name}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              UID: {fingerprintDialog.selectedUser?.uid}
-                            </p>
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="finger-index">Finger Index</Label>
-                          <Select
-                            value={selectedFingerIndex.toString()}
-                            onValueChange={(value) =>
-                              setSelectedFingerIndex(Number(value))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select finger index" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">
-                                Index 0 - Left Little
-                              </SelectItem>
-                              <SelectItem value="1">
-                                Index 1 - Left Ring
-                              </SelectItem>
-                              <SelectItem value="2">
-                                Index 2 - Left Middle
-                              </SelectItem>
-                              <SelectItem value="3">
-                                Index 3 - Left Index
-                              </SelectItem>
-                              <SelectItem value="4">
-                                Index 4 - Left Thumb
-                              </SelectItem>
-                              <SelectItem value="5">
-                                Index 5 - Right Thumb
-                              </SelectItem>
-                              <SelectItem value="6">
-                                Index 6 - Right Index
-                              </SelectItem>
-                              <SelectItem value="7">
-                                Index 7 - Right Middle
-                              </SelectItem>
-                              <SelectItem value="8">
-                                Index 8 - Right Ring
-                              </SelectItem>
-                              <SelectItem value="9">
-                                Index 9 - Right Little
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                <Card className="border-0 shadow-sm bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                        <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Total Devices
+                        </p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          {summaryData.totalDevices}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                      {fingerprintDialog.mode === "register" && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-blue-700">
-                            <Fingerprint className="h-4 w-4" />
-                            <span className="font-medium">
-                              Master Device Registration
-                            </span>
-                          </div>
-                          <p className="text-sm text-blue-600 mt-1">
-                            Fingerprint will be registered on the master device
-                            first, then automatically synchronized to all other
-                            devices.
-                          </p>
-                        </div>
+                <Card className="border-0 shadow-sm bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
+                        <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Connected Devices
+                        </p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          {summaryData.connectedDevices}/
+                          {summaryData.totalDevices}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/20">
+                        <Fingerprint className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                          Total Fingerprints
+                        </p>
+                        <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                          {summaryData.totalFingerprints}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Main User Registry Card */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                      <Users className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">User Registry</CardTitle>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Manage all users across ZKTeco access control devices
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Button
+                      onClick={handleSynchronizeCard}
+                      disabled={!isConnected || isCardProcessing}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {isCardProcessing && cardAction === "sync" ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CreditCard className="mr-2 h-4 w-4" />
                       )}
+                      Sync Cards
+                    </Button>
 
-                      {fingerprintDialog.mode === "delete" && (
-                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-orange-700">
-                            <AlertCircle className="h-4 w-4" />
-                            <span className="font-medium">
-                              Delete From All Devices
-                            </span>
-                          </div>
-                          <p className="text-sm text-orange-600 mt-1">
-                            This will permanently remove the fingerprint
-                            template from all connected devices.
-                          </p>
-                        </div>
-                      )}
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button onClick={openAddDialog}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add User
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {dialogMode === "add"
+                              ? "Add New User"
+                              : "Update User"}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
+                          {/* Display read-only values for existing users */}
+                          {dialogMode === "update" && (
+                            <div className="grid grid-cols-3 gap-4 p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                              <div>
+                                <Label className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                  UID
+                                </Label>
+                                <div className="text-sm font-mono bg-white dark:bg-slate-800 p-2 rounded mt-1">
+                                  {formData.uid || "Auto-generated"}
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                  User ID
+                                </Label>
+                                <div className="text-sm font-mono bg-white dark:bg-slate-800 p-2 rounded mt-1">
+                                  {formData.user_id || "System-generated"}
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                  Card Number
+                                </Label>
+                                <div className="text-sm font-mono bg-white dark:bg-slate-800 p-2 rounded mt-1">
+                                  {formData.card || "Not assigned"}
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                      {(() => {
-                        const fpStatus = getUserFingerprintStatus(
-                          fingerprintDialog.selectedUser?.uid || 0
-                        );
-                        return (
-                          fpStatus.hasFingerprints && (
-                            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center gap-2 text-green-700">
-                                <Fingerprint className="h-4 w-4" />
-                                <span className="font-medium">
-                                  Current Registration Status
+                          {/* Information for new users */}
+                          {dialogMode === "add" && (
+                            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Info className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                  Automatic Generation
                                 </span>
                               </div>
-                              <p className="text-sm text-green-600 mt-1">
-                                User has {fpStatus.fingerprintCount}{" "}
-                                fingerprint(s) registered on devices:{" "}
-                                {fpStatus.devices
-                                  .map((d) => d.device_name)
-                                  .join(", ")}
+                              <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                <li>
+                                  • UID will be auto-generated by the system
+                                </li>
+                                <li>• User ID will be system-generated</li>
+                                <li>
+                                  • Card Number can be assigned later via card
+                                  synchronization
+                                </li>
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Editable fields */}
+                          <div>
+                            <Label
+                              htmlFor="name"
+                              className="text-sm font-medium"
+                            >
+                              Full Name <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="name"
+                              placeholder="Enter full name"
+                              value={formData.name || ""}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  name: e.target.value,
+                                })
+                              }
+                              className="mt-1"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <Label
+                                htmlFor="password"
+                                className="text-sm font-medium"
+                              >
+                                Password
+                              </Label>
+                              <Input
+                                id="password"
+                                type="password"
+                                placeholder="Device access password"
+                                value={formData.password || ""}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    password: e.target.value,
+                                  })
+                                }
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="privilege"
+                                className="text-sm font-medium"
+                              >
+                                Privilege Level
+                              </Label>
+                              <Select
+                                value={String(formData.privilege ?? 0)}
+                                onValueChange={(value) =>
+                                  setFormData({
+                                    ...formData,
+                                    privilege: Number(value),
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Select privilege level" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PRIVILEGES.map((p) => {
+                                    const Icon = p.icon;
+                                    return (
+                                      <SelectItem
+                                        key={p.value}
+                                        value={String(p.value)}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Icon className="h-4 w-4" />
+                                          <span>{p.label}</span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={
+                              dialogMode === "add"
+                                ? handleAddUser
+                                : handleUpdateUser
+                            }
+                          >
+                            {dialogMode === "add" ? "Add User" : "Update User"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Fingerprint Management Dialog */}
+                    <Dialog
+                      open={fingerprintDialog.isOpen}
+                      onOpenChange={closeFingerprintDialog}
+                    >
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {fingerprintDialog.mode === "register"
+                              ? "Register Fingerprint"
+                              : "Delete Fingerprint"}
+                            {fingerprintDialog.selectedUser && (
+                              <Badge variant="outline" className="ml-2">
+                                {fingerprintDialog.selectedUser.name}
+                              </Badge>
+                            )}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium">
+                                User Information
+                              </Label>
+                              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg mt-1">
+                                <p className="font-medium">
+                                  {fingerprintDialog.selectedUser?.name}
+                                </p>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  UID: {fingerprintDialog.selectedUser?.uid}
+                                </p>
+                              </div>
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="finger-index"
+                                className="text-sm font-medium"
+                              >
+                                Finger Index
+                              </Label>
+                              <Select
+                                value={selectedFingerIndex.toString()}
+                                onValueChange={(value) =>
+                                  setSelectedFingerIndex(Number(value))
+                                }
+                              >
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Select finger index" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">
+                                    Index 0 - Left Little
+                                  </SelectItem>
+                                  <SelectItem value="1">
+                                    Index 1 - Left Ring
+                                  </SelectItem>
+                                  <SelectItem value="2">
+                                    Index 2 - Left Middle
+                                  </SelectItem>
+                                  <SelectItem value="3">
+                                    Index 3 - Left Index
+                                  </SelectItem>
+                                  <SelectItem value="4">
+                                    Index 4 - Left Thumb
+                                  </SelectItem>
+                                  <SelectItem value="5">
+                                    Index 5 - Right Thumb
+                                  </SelectItem>
+                                  <SelectItem value="6">
+                                    Index 6 - Right Index
+                                  </SelectItem>
+                                  <SelectItem value="7">
+                                    Index 7 - Right Middle
+                                  </SelectItem>
+                                  <SelectItem value="8">
+                                    Index 8 - Right Ring
+                                  </SelectItem>
+                                  <SelectItem value="9">
+                                    Index 9 - Right Little
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {fingerprintDialog.mode === "register" && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                <Fingerprint className="h-4 w-4" />
+                                <span className="font-medium">
+                                  Master Device Registration
+                                </span>
+                              </div>
+                              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                                Fingerprint will be registered on the master
+                                device first, then automatically synchronized to
+                                all other devices.
                               </p>
                             </div>
-                          )
-                        );
-                      })()}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={closeFingerprintDialog}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant={
-                          fingerprintDialog.mode === "register"
-                            ? "default"
-                            : "destructive"
-                        }
-                        onClick={
-                          fingerprintDialog.mode === "register"
-                            ? handleRegisterFingerprint
-                            : handleDeleteFingerprint
-                        }
-                        disabled={!isConnected}
-                      >
-                        {fingerprintDialog.mode === "register" ? (
-                          <>
-                            <Fingerprint className="mr-2 h-4 w-4" />
-                            Register Fingerprint
-                          </>
-                        ) : (
-                          <>
-                            <X className="mr-2 h-4 w-4" />
-                            Delete Fingerprint
-                          </>
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isRefreshing ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Loading users...
-                  </p>
-                </div>
-              ) : users.length > 0 ? (
-                <UITable>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>UID</TableHead>
-                      <TableHead>Full Name</TableHead>
-                      <TableHead>Privilege</TableHead>
-                      <TableHead>User ID</TableHead>
-                      <TableHead>Card</TableHead>
-                      {/* <TableHead>Fingerprints</TableHead> */}
-                      <TableHead>Devices</TableHead>
-                      <TableHead>Access Method</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.uid}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                              <span className="text-sm font-medium">
-                                {user.uid}
-                              </span>
+                          )}
+
+                          {fingerprintDialog.mode === "delete" && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                              <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                                <AlertCircle className="h-4 w-4" />
+                                <span className="font-medium">
+                                  Delete From All Devices
+                                </span>
+                              </div>
+                              <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                                This will permanently remove the fingerprint
+                                template from all connected devices.
+                              </p>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            <span className="font-medium">{user.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                          )}
+
                           {(() => {
-                            const privilege = PRIVILEGES.find(
-                              (p) => p.value === user.privilege
+                            const fpStatus = getUserFingerprintStatus(
+                              fingerprintDialog.selectedUser?.uid || 0
                             );
-                            const Icon = privilege?.icon || User;
                             return (
-                              <Badge variant="outline">
-                                <Icon className="h-3 w-3 mr-1" />
-                                {privilege?.label || `Level ${user.privilege}`}
-                              </Badge>
+                              fpStatus.hasFingerprints && (
+                                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                                    <Fingerprint className="h-4 w-4" />
+                                    <span className="font-medium">
+                                      Current Registration Status
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                                    User has {fpStatus.fingerprintCount}{" "}
+                                    fingerprint(s) registered on devices:{" "}
+                                    {fpStatus.devices
+                                      .map((d) => d.device_name)
+                                      .join(", ")}
+                                  </p>
+                                </div>
+                              )
                             );
                           })()}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-sm p-2 rounded-full bg-muted">
-                            {user.user_id || "N/A"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {user.card && user.card !== 0 ? (
-                            <div className="flex items-center gap-1">
-                              <CreditCard className="h-3 w-3" />
-                              <span className="text-xs font-mono bg-muted rounded-lg px-2 py-1">
-                                {user.card}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">
-                              No card
-                            </span>
-                          )}
-                        </TableCell>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={closeFingerprintDialog}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant={
+                              fingerprintDialog.mode === "register"
+                                ? "default"
+                                : "destructive"
+                            }
+                            onClick={
+                              fingerprintDialog.mode === "register"
+                                ? handleRegisterFingerprint
+                                : handleDeleteFingerprint
+                            }
+                            disabled={!isConnected}
+                          >
+                            {fingerprintDialog.mode === "register" ? (
+                              <>
+                                <Fingerprint className="mr-2 h-4 w-4" />
+                                Register Fingerprint
+                              </>
+                            ) : (
+                              <>
+                                <X className="mr-2 h-4 w-4" />
+                                Delete Fingerprint
+                              </>
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </CardHeader>
 
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {user.devices && user.devices.length > 0 ? (
-                              user.devices.map((deviceId) => {
-                                const device = devices.find(
-                                  (d) => d.id === deviceId
+              <CardContent className="p-0">
+                {isRefreshing ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
+                      Loading users...
+                    </p>
+                  </div>
+                ) : users.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <UITable>
+                      <TableHeader>
+                        <TableRow className="border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            UID
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Full Name
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Privilege
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            User ID
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Card
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Devices
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-center">
+                            Access Method
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300 text-center">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow
+                            key={user.uid}
+                            className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          >
+                            <TableCell>
+                              {(() => {
+                                const privilege = PRIVILEGES.find(
+                                  (p) => p.value === user.privilege
                                 );
-                                const deviceName = device?.name || deviceId;
+                                const Icon = privilege?.icon || User;
                                 return (
                                   <Badge
-                                    key={deviceId}
-                                    variant="secondary"
-                                    className="text-xs"
+                                    variant="outline"
+                                    className={`${
+                                      privilege?.color ||
+                                      "bg-gray-100 text-gray-700"
+                                    } border-0 shadow-sm`}
                                   >
-                                    {deviceName}
+                                    <Icon className="h-3 w-3 mr-1" />
+                                    {privilege?.label ||
+                                      `Level ${user.privilege}`}
                                   </Badge>
                                 );
-                              })
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                No devices
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openFingerprintDialog("register", user)
-                                  }
-                                  disabled={
-                                    !isConnected || isFingerprintProcessing
-                                  }
-                                  className="text-blue-600 hover:bg-blue-50"
-                                >
-                                  {isFingerprintProcessing &&
-                                  fingerprintAction?.uid === user.uid &&
-                                  fingerprintAction?.action === "register" ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Fingerprint className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Register fingerprint on master device</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openFingerprintDialog("delete", user)
-                                  }
-                                  disabled={
-                                    !isConnected || isFingerprintProcessing
-                                  }
-                                  className="text-orange-600 hover:bg-orange-50"
-                                >
-                                  {isFingerprintProcessing &&
-                                  fingerprintAction?.uid === user.uid &&
-                                  fingerprintAction?.action === "delete" ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <X className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete fingerprint from all devices</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            {user.card && user.card !== 0 ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteCard(user.uid)}
-                                    disabled={!isConnected || isCardProcessing}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    {isCardProcessing &&
-                                    selectedUserForCard === user.uid &&
-                                    cardAction === "delete" ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <CreditCard className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Remove card assignment from user</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openUpdateDialog(user)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Edit user information</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          <AlertDialog>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDeleteUserUID(user.uid)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <Trash className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete user from all devices</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Are you sure you want to delete this user?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will
-                                  permanently delete user{" "}
-                                  <span className="font-semibold">
-                                    {user.name}
-                                  </span>{" "}
-                                  with UID{" "}
-                                  <span className="font-semibold">
-                                    {user.uid}
+                              })()}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded w-fit">
+                                {user.user_id || "N/A"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {user.card && user.card !== 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="h-3 w-3 text-blue-600" />
+                                  <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded-lg px-2 py-1">
+                                    {user.card}
                                   </span>
-                                  .
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDeleteUser}>
-                                  Continue
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </UITable>
-              ) : (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground font-medium">
-                    No users registered
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Click "Add User" to get started
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                                </div>
+                              ) : (
+                                <span className="text-slate-500 text-sm">
+                                  No card
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {user.devices && user.devices.length > 0 ? (
+                                  user.devices.map((deviceId) => {
+                                    const device = devices.find(
+                                      (d) => d.id === deviceId
+                                    );
+                                    const deviceName = device?.name || deviceId;
+                                    return (
+                                      <Badge
+                                        key={deviceId}
+                                        variant="secondary"
+                                        className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                                      >
+                                        <HardDrive className="h-3 w-3 mr-1" />
+                                        {deviceName}
+                                      </Badge>
+                                    );
+                                  })
+                                ) : (
+                                  <span className="text-slate-500 text-sm">
+                                    No devices
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        openFingerprintDialog("register", user)
+                                      }
+                                      disabled={
+                                        !isConnected || isFingerprintProcessing
+                                      }
+                                      className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                    >
+                                      {isFingerprintProcessing &&
+                                      fingerprintAction?.uid === user.uid &&
+                                      fingerprintAction?.action ===
+                                        "register" ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Fingerprint className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Register fingerprint on master device</p>
+                                  </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        openFingerprintDialog("delete", user)
+                                      }
+                                      disabled={
+                                        !isConnected || isFingerprintProcessing
+                                      }
+                                      className="h-8 w-8 p-0 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                                    >
+                                      {isFingerprintProcessing &&
+                                      fingerprintAction?.uid === user.uid &&
+                                      fingerprintAction?.action === "delete" ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <X className="h-4 w-4 text-orange-600" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Delete fingerprint from all devices</p>
+                                  </TooltipContent>
+                                </Tooltip>
+
+                                {user.card && user.card !== 0 ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleDeleteCard(user.uid)
+                                        }
+                                        disabled={
+                                          !isConnected || isCardProcessing
+                                        }
+                                        className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      >
+                                        {isCardProcessing &&
+                                        selectedUserForCard === user.uid &&
+                                        cardAction === "delete" ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <CreditCard className="h-4 w-4 text-red-600" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Remove card assignment from user</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openUpdateDialog(user)}
+                                      className="h-8 w-8 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                    >
+                                      <Edit className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Edit user information</p>
+                                  </TooltipContent>
+                                </Tooltip>
+
+                                <AlertDialog>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            setDeleteUserUID(user.uid)
+                                          }
+                                          className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                        >
+                                          <Trash className="h-4 w-4 text-red-600" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Delete user from all devices</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Delete User
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete user{" "}
+                                        <span className="font-semibold">
+                                          {user.name}
+                                        </span>{" "}
+                                        with UID{" "}
+                                        <span className="font-semibold">
+                                          {user.uid}
+                                        </span>
+                                        ? This action cannot be undone and will
+                                        remove the user from all devices.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={handleDeleteUser}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete User
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </UITable>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 px-4">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800">
+                        <Users className="h-8 w-8 text-slate-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-1">
+                          No users registered
+                        </h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                          Get started by adding your first user to the access
+                          control system
+                        </p>
+                        <Button onClick={openAddDialog}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Your First User
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </SidebarInset>
     </TooltipProvider>

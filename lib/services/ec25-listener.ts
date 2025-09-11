@@ -131,7 +131,6 @@ class EC25ListenerService {
         process.env.NEXT_PUBLIC_MQTT_BROKER_URL ||
         process.env.MQTT_BROKER_URL ||
         "ws://192.168.0.139:9000";
-      console.log(`[EC25-LISTENER] Connecting to MQTT broker: ${brokerUrl}`);
 
       this.client = mqtt.connect(brokerUrl, {
         clientId: `ec25-web-client-${Date.now()}`,
@@ -141,7 +140,6 @@ class EC25ListenerService {
       });
 
       this.client.on("connect", () => {
-        console.log("[EC25-LISTENER] Connected to MQTT broker");
         this.isConnected = true;
         this.reconnectAttempts = 0;
         this.subscribeToTopics();
@@ -155,15 +153,11 @@ class EC25ListenerService {
       });
 
       this.client.on("close", () => {
-        console.log("[EC25-LISTENER] MQTT connection closed");
         this.isConnected = false;
       });
 
       this.client.on("reconnect", () => {
         this.reconnectAttempts++;
-        console.log(
-          `[EC25-LISTENER] Reconnecting... Attempt ${this.reconnectAttempts}`
-        );
       });
     } catch (error) {
       console.error("[EC25-LISTENER] Failed to connect to MQTT:", error);
@@ -200,8 +194,6 @@ class EC25ListenerService {
   private handleMessage(topic: string, message: Buffer) {
     try {
       const data = JSON.parse(message.toString());
-      console.log(`[EC25-LISTENER] Received from ${topic}:`, data);
-
       switch (topic) {
         case "ec25/gsm":
           this.currentGSMData = data as GSMData;
@@ -324,8 +316,6 @@ class EC25ListenerService {
           .toString(36)
           .substr(2, 9)}`,
       };
-
-      console.log("[EC25-LISTENER] Sending command:", commandPayload);
 
       this.client.publish(
         "ec25/commands",

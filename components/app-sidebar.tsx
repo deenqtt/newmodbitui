@@ -99,7 +99,7 @@ const defaultMenuConfig: MenuConfigData = {
   },
   SecurityAccess: {
     enabled: true,
-    submenus: { "Device Access": true, "Surveillance CCTV": true },
+    submenus: { "Access-Control": true, "Surveillance CCTV": true },
   },
   Network: {
     enabled: true,
@@ -171,7 +171,7 @@ const submenuOrder: { [key: string]: string[] } = {
     "Gateways",
     "EC25-Modem",
   ],
-  SecurityAccess: ["Device Access", "Surveillance CCTV"],
+  SecurityAccess: ["Access-Control", "Surveillance CCTV"],
   Network: ["Communication Setup", "Register SNMP", "MQTT Broker"],
   Automation: [
     "Automated Scheduling",
@@ -203,7 +203,7 @@ const iconMap: { [key: string]: React.ElementType } = {
   "Power Analyzer": Power,
   "Menu Display": Menu,
   "System Backup": DatabaseBackup,
-  "Device Access": ShieldCheck,
+  "Access-Control": ShieldCheck,
   "Surveillance CCTV": Cctv,
   "Communication Setup": Settings2,
   "Register SNMP": Network,

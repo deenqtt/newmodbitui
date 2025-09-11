@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,14 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,27 +27,26 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 import {
   Loader2,
   Settings,
   Clock,
   Globe,
-  Network,
   Power,
-  RotateCcw,
   Trash2,
   Calendar,
   Languages,
-  Wifi,
   Server,
-  Database,
-  AlertTriangle,
   CheckCircle,
   XCircle,
-  Info,
+  ArrowLeft,
+  Monitor,
+  Cpu,
+  HardDrive,
+  AlertTriangle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // --- Interfaces
 interface Device {
@@ -71,12 +61,6 @@ interface ConfigurationResponse {
   status: "success" | "error";
   message: string;
   data?: any;
-}
-
-// Interface untuk payload MQTT
-interface MqttPayload {
-  topic: string;
-  payload: string;
 }
 
 // Language options
@@ -97,22 +81,35 @@ const LANGUAGES = [
 ];
 
 const RESET_TYPES = [
-  { value: "users", label: "Users Only", description: "Clear all user data" },
+  {
+    value: "users",
+    label: "Users Only",
+    description: "Clear all user data",
+    icon: "👥",
+  },
   {
     value: "attendance",
     label: "Attendance Records",
     description: "Clear attendance logs",
+    icon: "📊",
   },
   {
     value: "templates",
     label: "Fingerprint Templates",
     description: "Clear biometric data",
+    icon: "👆",
   },
-  { value: "all", label: "All Data", description: "Complete device reset" },
+  {
+    value: "all",
+    label: "All Data",
+    description: "Complete device reset",
+    icon: "⚠️",
+  },
 ];
 
 // --- Main Component
 export default function DeviceConfiguration() {
+  const router = useRouter();
   const requestTopic = "accessControl/device/command";
   const responseTopic = "accessControl/device/response";
 
@@ -120,7 +117,7 @@ export default function DeviceConfiguration() {
   const { payloads } = useConnectivity([responseTopic]);
   const isConnected = connectionStatus === "Connected";
 
-  // Device selection and configuration state
+  // States
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -129,7 +126,7 @@ export default function DeviceConfiguration() {
 
   // Time configuration
   const [timeConfig, setTimeConfig] = useState({
-    datetime: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm format
+    datetime: new Date().toISOString().slice(0, 16),
     useSystemTime: true,
   });
 
@@ -149,16 +146,6 @@ export default function DeviceConfiguration() {
     try {
       const payload: ConfigurationResponse = JSON.parse(message);
       setLastResponse(payload);
-
-      if (payload.status === "success") {
-        // Handle specific successful operations
-        if (
-          payload.message.includes("restarted") ||
-          payload.message.includes("reset")
-        ) {
-          // Show success for destructive operations
-        }
-      }
     } catch (e) {
       console.error("Failed to parse MQTT response:", e);
       setLastResponse({
@@ -170,7 +157,6 @@ export default function DeviceConfiguration() {
     }
   }, []);
 
-  // Device List Handler
   const handleDeviceListResponse = useCallback(
     (topic: string, message: string) => {
       try {
@@ -205,10 +191,7 @@ export default function DeviceConfiguration() {
 
     const command = {
       command: "setDeviceTime",
-      data: {
-        device_id: selectedDevice,
-        timestamp: timestamp,
-      },
+      data: { device_id: selectedDevice, timestamp: timestamp },
     };
 
     await publish(requestTopic, JSON.stringify(command));
@@ -223,9 +206,7 @@ export default function DeviceConfiguration() {
     setIsLoading(true);
     const command = {
       command: "getDeviceTime",
-      data: {
-        device_id: selectedDevice,
-      },
+      data: { device_id: selectedDevice },
     };
 
     await publish(requestTopic, JSON.stringify(command));
@@ -240,10 +221,7 @@ export default function DeviceConfiguration() {
     setIsLoading(true);
     const command = {
       command: "setDeviceLanguage",
-      data: {
-        device_id: selectedDevice,
-        language: languageConfig.language,
-      },
+      data: { device_id: selectedDevice, language: languageConfig.language },
     };
 
     await publish(requestTopic, JSON.stringify(command));
@@ -287,11 +265,10 @@ export default function DeviceConfiguration() {
     await publish(requestTopic, JSON.stringify(command));
   };
 
-  // Handle MQTT payloads - FIXED VERSION
+  // Handle MQTT payloads
   useEffect(() => {
     if (payloads && Array.isArray(payloads) && payloads.length > 0) {
       const latestPayload = payloads[payloads.length - 1];
-      // Pastikan latestPayload adalah object dengan property topic dan payload
       if (
         latestPayload &&
         typeof latestPayload === "object" &&
@@ -316,308 +293,261 @@ export default function DeviceConfiguration() {
 
   return (
     <SidebarInset>
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b px-4">
-        <div className="flex items-center gap-3">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="h-6" />
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-500/10 dark:bg-emerald-400/10">
-              <Settings className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">Device Configuration</h1>
-              <p className="text-xs text-muted-foreground">
-                Configure ZKTeco device settings and parameters
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? "bg-green-500" : "bg-red-500"
-              }`}
-            ></div>
-            <span>{connectionStatus}</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex flex-1 flex-col gap-6 p-6">
-        {/* Device Selection */}
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              Device Selection
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label htmlFor="device-select">Select Device</Label>
-                <Select
-                  value={selectedDevice}
-                  onValueChange={setSelectedDevice}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a device to configure" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">🌐 All Devices</SelectItem>
-                    {devices.map((device) => (
-                      <SelectItem key={device.id} value={device.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              device.enabled ? "bg-green-500" : "bg-red-500"
-                            }`}
-                          />
-                          {device.name} ({device.ip})
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={fetchDeviceList} variant="outline" size="sm">
-                <Wifi className="h-4 w-4 mr-2" />
-                Refresh
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="p-4 md:p-6">
+          {/* Header Section */}
+          <div className="mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.back()}
+                className="flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
+
+              {/* Connection Status */}
+              <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-white dark:bg-slate-800 shadow-sm">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isConnected ? "bg-green-500" : "bg-red-500"
+                  }`}
+                />
+                <span>{connectionStatus}</span>
+              </div>
             </div>
 
-            {selectedDeviceInfo && (
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">
-                  Selected Device:
-                </div>
-                <div className="font-medium">{selectedDeviceInfo.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  {selectedDeviceInfo.ip}:{selectedDeviceInfo.port || 4370}
-                </div>
+            {/* Page Title */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
+                <Settings className="h-6 w-6" />
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Response Status */}
-        {lastResponse && (
-          <Card
-            className={`border shadow-sm ${
-              lastResponse.status === "success"
-                ? "border-green-200 bg-green-50"
-                : "border-red-200 bg-red-50"
-            }`}
-          >
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                {lastResponse.status === "success" ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-600" />
-                )}
-                <span
-                  className={`font-medium ${
-                    lastResponse.status === "success"
-                      ? "text-green-800"
-                      : "text-red-800"
-                  }`}
-                >
-                  {lastResponse.message}
-                </span>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100">
+                  Device Configuration
+                </h1>
+                <p className="text-slate-600 dark:text-slate-400 mt-1">
+                  Configure ZKTeco device settings and parameters
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Time Configuration */}
-          <Card className="border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Time Configuration
+          {/* Device Selection Card */}
+          <Card className="mb-6 border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+              <CardTitle className="flex items-center gap-3">
+                <Server className="h-5 w-5 text-blue-600" />
+                Device Selection
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="use-system-time"
-                    checked={timeConfig.useSystemTime}
-                    onCheckedChange={(checked) =>
-                      setTimeConfig({ ...timeConfig, useSystemTime: checked })
-                    }
-                  />
-                  <Label htmlFor="use-system-time">
-                    Use current system time
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
+                <div className="flex-1 w-full">
+                  <Label
+                    htmlFor="device-select"
+                    className="text-sm font-medium mb-2 block"
+                  >
+                    Select Target Device
                   </Label>
+                  <Select
+                    value={selectedDevice}
+                    onValueChange={setSelectedDevice}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose a device to configure" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          All Devices
+                        </div>
+                      </SelectItem>
+                      {devices.map((device) => (
+                        <SelectItem key={device.id} value={device.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                device.enabled ? "bg-green-500" : "bg-red-500"
+                              }`}
+                            />
+                            <span>{device.name}</span>
+                            <span className="text-slate-500">
+                              ({device.ip})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <Button
+                  onClick={fetchDeviceList}
+                  variant="outline"
+                  className="whitespace-nowrap"
+                  disabled={!isConnected}
+                >
+                  <Monitor className="h-4 w-4 mr-2" />
+                  Refresh Devices
+                </Button>
               </div>
 
-              {!timeConfig.useSystemTime && (
-                <div>
-                  <Label htmlFor="datetime">Set Custom Time</Label>
-                  <Input
-                    id="datetime"
-                    type="datetime-local"
-                    value={timeConfig.datetime}
-                    onChange={(e) =>
-                      setTimeConfig({ ...timeConfig, datetime: e.target.value })
-                    }
-                  />
+              {selectedDeviceInfo && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <HardDrive className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-900 dark:text-blue-100">
+                        {selectedDeviceInfo.name}
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {selectedDeviceInfo.ip}:
+                        {selectedDeviceInfo.port || 4370}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleSetTime}
-                  disabled={!isConnected || isLoading || !selectedDevice}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          {/* Response Status */}
+          {lastResponse && (
+            <Card
+              className={`mb-6 border-0 shadow-lg ${
+                lastResponse.status === "success"
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                  : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+              }`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  {lastResponse.status === "success" ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                   ) : (
-                    <Calendar className="h-4 w-4 mr-2" />
+                    <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                   )}
-                  Set Time
-                </Button>
-                <Button
-                  onClick={handleGetTime}
-                  variant="outline"
-                  disabled={!isConnected || isLoading || !selectedDevice}
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Get Time
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  <span
+                    className={`font-medium ${
+                      lastResponse.status === "success"
+                        ? "text-green-800 dark:text-green-200"
+                        : "text-red-800 dark:text-red-200"
+                    }`}
+                  >
+                    {lastResponse.message}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Language Configuration */}
-          <Card className="border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Languages className="h-5 w-5" />
-                Language Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="language">Device Language</Label>
-                <Select
-                  value={languageConfig.language}
-                  onValueChange={(value) =>
-                    setLanguageConfig({ language: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGES.map((lang) => (
-                      <SelectItem key={lang.value} value={lang.value}>
-                        <div className="flex items-center gap-2">
-                          <span>{lang.flag}</span>
-                          <span>{lang.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Configuration Sections */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Time Configuration */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                <CardTitle className="flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  Time Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Switch
+                      id="use-system-time"
+                      checked={timeConfig.useSystemTime}
+                      onCheckedChange={(checked) =>
+                        setTimeConfig({ ...timeConfig, useSystemTime: checked })
+                      }
+                    />
+                    <Label htmlFor="use-system-time" className="font-medium">
+                      Use current system time
+                    </Label>
+                  </div>
 
-              <Button
-                onClick={handleSetLanguage}
-                disabled={!isConnected || isLoading || !selectedDevice}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Globe className="h-4 w-4 mr-2" />
-                )}
-                Set Language
-              </Button>
-            </CardContent>
-          </Card>
+                  {!timeConfig.useSystemTime && (
+                    <div className="space-y-2">
+                      <Label htmlFor="datetime" className="text-sm font-medium">
+                        Set Custom Time
+                      </Label>
+                      <Input
+                        id="datetime"
+                        type="datetime-local"
+                        value={timeConfig.datetime}
+                        onChange={(e) =>
+                          setTimeConfig({
+                            ...timeConfig,
+                            datetime: e.target.value,
+                          })
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                  )}
 
-          {/* Device Control */}
-          <Card className="border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Power className="h-5 w-5" />
-                Device Control
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Restart Device */}
-              <div>
-                <h4 className="font-medium mb-2">Device Restart</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Restart the device. Device will be offline for 30-60 seconds.
-                </p>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <Button
+                      onClick={handleSetTime}
+                      disabled={!isConnected || isLoading || !selectedDevice}
+                      className="flex-1"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Calendar className="h-4 w-4 mr-2" />
+                      )}
+                      Set Time
+                    </Button>
+                    <Button
+                      onClick={handleGetTime}
                       variant="outline"
                       disabled={!isConnected || isLoading || !selectedDevice}
+                      className="flex-1"
                     >
-                      <Power className="h-4 w-4 mr-2" />
-                      Restart Device
+                      <Clock className="h-4 w-4 mr-2" />
+                      Get Time
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Confirm Device Restart
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will restart the selected device. The device will
-                        be offline for 30-60 seconds.
-                        {selectedDevice === "all" &&
-                          " This will restart ALL devices simultaneously."}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleRestartDevice}>
-                        Restart
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Separator />
-
-              {/* Reset Device Data */}
-              <div>
-                <h4 className="font-medium mb-2">Reset Device Data</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Clear device data. This action cannot be undone.
-                </p>
-
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="reset-type">Reset Type</Label>
+            {/* Language Configuration */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                <CardTitle className="flex items-center gap-3">
+                  <Languages className="h-5 w-5 text-purple-600" />
+                  Language Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="language" className="text-sm font-medium">
+                      Device Language
+                    </Label>
                     <Select
-                      value={resetConfig.resetType}
+                      value={languageConfig.language}
                       onValueChange={(value) =>
-                        setResetConfig({ ...resetConfig, resetType: value })
+                        setLanguageConfig({ language: value })
                       }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {RESET_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            <div>
-                              <div className="font-medium">{type.label}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {type.description}
-                              </div>
+                        {LANGUAGES.map((lang) => (
+                          <SelectItem key={lang.value} value={lang.value}>
+                            <div className="flex items-center gap-2">
+                              <span>{lang.flag}</span>
+                              <span>{lang.label}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -625,64 +555,219 @@ export default function DeviceConfiguration() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="confirm-text">
-                      Type "CONFIRM" to proceed
-                    </Label>
-                    <Input
-                      id="confirm-text"
-                      placeholder="CONFIRM"
-                      value={resetConfig.confirmText}
-                      onChange={(e) =>
-                        setResetConfig({
-                          ...resetConfig,
-                          confirmText: e.target.value,
-                        })
-                      }
-                    />
+                  <Button
+                    onClick={handleSetLanguage}
+                    disabled={!isConnected || isLoading || !selectedDevice}
+                    className="w-full"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Globe className="h-4 w-4 mr-2" />
+                    )}
+                    Set Language
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Device Control Section */}
+          <Card className="mt-6 border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+              <CardTitle className="flex items-center gap-3">
+                <Power className="h-5 w-5 text-red-600" />
+                Device Control & Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Restart Device */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                      <Power className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Device Restart</h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Restart the device safely
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Device will be offline for 30-60 seconds during restart.
+                      {selectedDevice === "all" &&
+                        " This will restart ALL devices simultaneously."}
+                    </p>
                   </div>
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        variant="destructive"
-                        disabled={
-                          !isConnected ||
-                          isLoading ||
-                          !selectedDevice ||
-                          resetConfig.confirmText !== "CONFIRM"
-                        }
+                        variant="outline"
+                        disabled={!isConnected || isLoading || !selectedDevice}
+                        className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Reset Device Data
+                        <Power className="h-4 w-4 mr-2" />
+                        Restart Device
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>
-                          ⚠️ DESTRUCTIVE ACTION
+                          Confirm Device Restart
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete{" "}
-                          {resetConfig.resetType === "all"
-                            ? "ALL DATA"
-                            : resetConfig.resetType}{" "}
-                          from the device. This action cannot be undone.
+                          This will restart the selected device. The device will
+                          be offline for 30-60 seconds.
                           {selectedDevice === "all" &&
-                            " This will affect ALL devices."}
+                            " This will restart ALL devices simultaneously."}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleResetDevice}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          Reset Data
+                        <AlertDialogAction onClick={handleRestartDevice}>
+                          Restart
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                </div>
+
+                {/* Reset Device Data */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                      <Trash2 className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        Reset Device Data
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Permanently clear device data
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label
+                        htmlFor="reset-type"
+                        className="text-sm font-medium mb-2 block"
+                      >
+                        Reset Type
+                      </Label>
+                      <Select
+                        value={resetConfig.resetType}
+                        onValueChange={(value) =>
+                          setResetConfig({ ...resetConfig, resetType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {RESET_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              <div className="flex items-center gap-2">
+                                <span>{type.icon}</span>
+                                <div>
+                                  <div className="font-medium">
+                                    {type.label}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {type.description}
+                                  </div>
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label
+                        htmlFor="confirm-text"
+                        className="text-sm font-medium mb-2 block"
+                      >
+                        Type "CONFIRM" to proceed
+                      </Label>
+                      <Input
+                        id="confirm-text"
+                        placeholder="CONFIRM"
+                        value={resetConfig.confirmText}
+                        onChange={(e) =>
+                          setResetConfig({
+                            ...resetConfig,
+                            confirmText: e.target.value,
+                          })
+                        }
+                        className="font-mono"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <span className="font-medium text-red-800 dark:text-red-200">
+                          Warning: Destructive Action
+                        </span>
+                      </div>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        This action cannot be undone. All selected data will be
+                        permanently deleted.
+                      </p>
+                    </div>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          disabled={
+                            !isConnected ||
+                            isLoading ||
+                            !selectedDevice ||
+                            resetConfig.confirmText !== "CONFIRM"
+                          }
+                          className="w-full"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Reset Device Data
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                            DESTRUCTIVE ACTION
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete{" "}
+                            {resetConfig.resetType === "all"
+                              ? "ALL DATA"
+                              : resetConfig.resetType}{" "}
+                            from the device. This action cannot be undone.
+                            {selectedDevice === "all" &&
+                              " This will affect ALL devices."}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleResetDevice}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Reset Data
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
             </CardContent>
