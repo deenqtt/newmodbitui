@@ -78,7 +78,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     let mqttHost;
     if (process.env.NODE_ENV === "production") {
       // Gunakan window.location.hostname untuk production
-      mqttHost = window.location.hostname;
+      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
     } else {
       // Gunakan environment variable untuk development
       mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
