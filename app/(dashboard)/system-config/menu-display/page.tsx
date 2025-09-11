@@ -82,7 +82,10 @@ const defaultMenuConfig: MenuConfig = {
   },
   SecurityAccess: {
     enabled: true,
-    submenus: { "Device Access": true, "Surveillance CCTV": true },
+    submenus: {
+      "Surveillance CCTV": true,
+      "Access-Control": true,
+    },
   },
   Network: {
     enabled: true,

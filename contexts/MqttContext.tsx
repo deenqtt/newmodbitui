@@ -40,7 +40,6 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const listenersRef = useRef<Map<string, MqttListener[]>>(new Map());
 
-  // ... (fungsi publish, subscribe, unsubscribe tidak berubah)
   const publish = useCallback((topic: string, payload: string) => {
     if (clientRef.current && clientRef.current.isConnected()) {
       const message = new Paho.Message(payload);
@@ -72,10 +71,19 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // useEffect untuk koneksi MQTT (tidak berubah)
   useEffect(() => {
     if (clientRef.current) return;
-    const mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+
+    // Tentukan host secara dinamis berdasarkan lingkungan
+    let mqttHost;
+    if (process.env.NODE_ENV === "production") {
+      // Gunakan window.location.hostname untuk production
+      mqttHost = window.location.hostname;
+    } else {
+      // Gunakan environment variable untuk development
+      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+    }
+
     const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
     const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
@@ -114,20 +122,16 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // --- LOGIKA CRON JOB GLOBAL DIPERBARUI ---
   useEffect(() => {
     console.log("[Global Cron] Memulai interval logging di background.");
 
     const intervalId = setInterval(() => {
-      // Panggil kedua API cron job secara bersamaan
       console.log("[Global Cron] Memicu semua cron job...");
 
-      // 1. Cron Job untuk Logging Umum
       fetch("/api/cron/log-data").catch((err) => {
         console.error("[Global Cron] Gagal memicu log-data API:", err);
       });
 
-      // 2. Cron Job untuk Bill Calculation
       fetch("/api/cron/bill-logger").catch((err) => {
         console.error("[Global Cron] Gagal memicu bill-logger API:", err);
       });
