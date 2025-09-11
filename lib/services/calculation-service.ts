@@ -90,17 +90,41 @@ class CalculationService {
     ) => {
       if (!config.apiTopic?.topic) return;
 
-      const pduList = (config.pduList as any[]) || [];
-      const mainPower = config.mainPower as any;
+      // ✅ FIX: Parse JSON strings dengan safety check
+      let pduList: any[] = [];
+      let mainPower: any = null;
+
+      try {
+        // Parse pduList dari JSON string
+        if (config.pduList) {
+          pduList = JSON.parse(config.pduList);
+          // Safety check: pastikan hasilnya array
+          if (!Array.isArray(pduList)) {
+            pduList = [];
+          }
+        }
+
+        // Parse mainPower dari JSON string
+        if (config.mainPower) {
+          mainPower = JSON.parse(config.mainPower);
+        }
+      } catch (error) {
+        console.error(
+          `[CALC SERVICE] Error parsing config for ${config.customName}:`,
+          error
+        );
+        return; // Skip config yang error
+      }
+
       const sources: { uniqId: string; key: string }[] = [];
 
-      // --- PERBAIKAN FINAL DI SINI ---
-      // Cek 'uniqId' (untuk Power Analyzer) ATAU 'topicUniqId' (untuk PUE)
+      // Process mainPower
       const mainUniqId = mainPower?.uniqId || mainPower?.topicUniqId;
       if (mainUniqId && mainPower?.key) {
         sources.push({ uniqId: mainUniqId, key: mainPower.key });
       }
 
+      // ✅ FIX: Sekarang pduList sudah pasti array
       pduList.forEach((pdu) => {
         const pduUniqId = pdu.uniqId || pdu.topicUniqId;
         if (pduUniqId && Array.isArray(pdu.keys)) {
@@ -242,19 +266,36 @@ class CalculationService {
   private calculateAndPublishPue(
     config: PueConfiguration & { apiTopic: DeviceExternal }
   ) {
-    const mainPowerConfig = config.mainPower as any;
-    const pduList = (config.pduList as any[]) || [];
-    // --- PERBAIKAN FINAL ---
-    const mainUniqId = mainPowerConfig.uniqId || mainPowerConfig.topicUniqId;
+    // ✅ FIX: Parse JSON strings dengan safety
+    let mainPowerConfig: any = null;
+    let pduList: any[] = [];
+
+    try {
+      if (config.mainPower) {
+        mainPowerConfig = JSON.parse(config.mainPower);
+      }
+      if (config.pduList) {
+        pduList = JSON.parse(config.pduList);
+        if (!Array.isArray(pduList)) pduList = [];
+      }
+    } catch (error) {
+      console.error(
+        `[CALC SERVICE] PUE Parse error for ${config.customName}:`,
+        error
+      );
+      return;
+    }
+
+    const mainUniqId = mainPowerConfig?.uniqId || mainPowerConfig?.topicUniqId;
     const mainPowerValue =
-      this.lastValues.get(`${mainUniqId}:${mainPowerConfig.key}`)?.value ?? 0;
+      this.lastValues.get(`${mainUniqId}:${mainPowerConfig?.key}`)?.value ?? 0;
 
     let itPower = 0;
     const itPowerDetails: { name: string; value: number }[] = [];
     pduList.forEach((pdu) => {
       const pduUniqId = pdu.uniqId || pdu.topicUniqId;
       const pduTotal = pdu.keys.reduce(
-        (sum, key) =>
+        (sum: number, key: string) =>
           sum + (this.lastValues.get(`${pduUniqId}:${key}`)?.value ?? 0),
         0
       );
@@ -274,19 +315,36 @@ class CalculationService {
   private calculateAndPublishPowerAnalyzer(
     config: PowerAnalyzerConfiguration & { apiTopic: DeviceExternal }
   ) {
-    const mainPowerConfig = config.mainPower as any;
-    const pduList = (config.pduList as any[]) || [];
-    // --- PERBAIKAN FINAL ---
-    const mainUniqId = mainPowerConfig.uniqId || mainPowerConfig.topicUniqId;
+    // ✅ FIX: Parse JSON strings dengan safety
+    let mainPowerConfig: any = null;
+    let pduList: any[] = [];
+
+    try {
+      if (config.mainPower) {
+        mainPowerConfig = JSON.parse(config.mainPower);
+      }
+      if (config.pduList) {
+        pduList = JSON.parse(config.pduList);
+        if (!Array.isArray(pduList)) pduList = [];
+      }
+    } catch (error) {
+      console.error(
+        `[CALC SERVICE] PowerAnalyzer Parse error for ${config.customName}:`,
+        error
+      );
+      return;
+    }
+
+    const mainUniqId = mainPowerConfig?.uniqId || mainPowerConfig?.topicUniqId;
     const mainPowerValue =
-      this.lastValues.get(`${mainUniqId}:${mainPowerConfig.key}`)?.value ?? 0;
+      this.lastValues.get(`${mainUniqId}:${mainPowerConfig?.key}`)?.value ?? 0;
 
     let itPower = 0;
     const itPowerDetails: { name: string; value: number }[] = [];
     pduList.forEach((pdu) => {
       const pduUniqId = pdu.uniqId || pdu.topicUniqId;
       const pduTotal = pdu.keys.reduce(
-        (sum, key) =>
+        (sum: number, key: string) =>
           sum + (this.lastValues.get(`${pduUniqId}:${key}`)?.value ?? 0),
         0
       );

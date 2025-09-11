@@ -15,12 +15,14 @@ import {
   RadioTower,
   WifiOff,
   Clock,
+  Activity,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { getIconComponent } from "@/lib/icon-library";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Tipe untuk setiap item dari config
 interface ItemConfig {
   customName: string;
   deviceUniqId: string;
@@ -32,13 +34,20 @@ interface ItemConfig {
   iconBgColor: string;
 }
 
-// Sub-komponen untuk setiap baris status
+// Enhanced StatusRow component with better styling
 const StatusRow = ({
   itemConfig,
-  isCompact,
+  layoutMode,
+  dynamicSizes,
 }: {
   itemConfig: ItemConfig;
-  isCompact: boolean;
+  layoutMode: "mini" | "compact" | "normal";
+  dynamicSizes: {
+    iconSize: number;
+    fontSize: number;
+    padding: number;
+    gap: number;
+  };
 }) => {
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
   const [displayValue, setDisplayValue] = useState<string | number | null>(
@@ -50,7 +59,6 @@ const StatusRow = ({
   );
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // 1. Ambil topic untuk item ini
   useEffect(() => {
     const fetchDeviceTopic = async () => {
       setStatus("loading");
@@ -72,7 +80,6 @@ const StatusRow = ({
     fetchDeviceTopic();
   }, [itemConfig.deviceUniqId]);
 
-  // 2. Handler MQTT
   const handleMqttMessage = useCallback(
     (receivedTopic: string, payloadString: string) => {
       try {
@@ -97,7 +104,6 @@ const StatusRow = ({
     [itemConfig.selectedKey, itemConfig.multiply]
   );
 
-  // 3. Subscribe/Unsubscribe
   useEffect(() => {
     if (topic && isReady && connectionStatus === "Connected") {
       setStatus("waiting");
@@ -117,41 +123,126 @@ const StatusRow = ({
 
   const IconComponent = getIconComponent(itemConfig.selectedIcon || "Zap");
 
-  // Status colors
-  const getStatusIndicator = () => {
+  const getStatusStyling = () => {
     switch (status) {
       case "ok":
-        return "bg-green-500 shadow-green-500/50";
+        return {
+          bg: "bg-gradient-to-r from-emerald-50 to-green-50",
+          border: "border-emerald-200/60",
+          indicator: "bg-emerald-500 shadow-emerald-400/50",
+          textColor: "text-emerald-700",
+          pulse: false,
+        };
       case "error":
-        return "bg-red-500 shadow-red-500/50";
+        return {
+          bg: "bg-gradient-to-r from-red-50 to-rose-50",
+          border: "border-red-200/60",
+          indicator: "bg-red-500 shadow-red-400/50",
+          textColor: "text-red-700",
+          pulse: false,
+        };
       case "waiting":
-        return "bg-yellow-500 shadow-yellow-500/50 animate-pulse";
+        return {
+          bg: "bg-gradient-to-r from-amber-50 to-yellow-50",
+          border: "border-amber-200/60",
+          indicator: "bg-amber-500 shadow-amber-400/50",
+          textColor: "text-amber-700",
+          pulse: true,
+        };
       default:
-        return "bg-gray-400 shadow-gray-400/50";
+        return {
+          bg: "bg-gradient-to-r from-slate-50 to-gray-50",
+          border: "border-slate-200/60",
+          indicator: "bg-slate-400 shadow-slate-400/50",
+          textColor: "text-slate-700",
+          pulse: false,
+        };
+    }
+  };
+
+  const formatValue = (value: string | number | null) => {
+    if (value === null) return "—";
+
+    if (typeof value === "number") {
+      return value.toLocaleString(undefined, {
+        maximumFractionDigits: layoutMode === "mini" ? 0 : 1,
+        minimumFractionDigits: 0,
+      });
+    }
+
+    return String(value);
+  };
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 60000) return "now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const renderStatusIcon = () => {
+    const iconSize = Math.max(dynamicSizes.iconSize * 0.6, 12);
+
+    switch (status) {
+      case "loading":
+        return (
+          <Loader2
+            className="animate-spin text-blue-500"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        );
+      case "error":
+        return connectionStatus !== "Connected" ? (
+          <WifiOff
+            className="text-red-500"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        ) : (
+          <XCircle
+            className="text-red-500"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        );
+      case "waiting":
+        return (
+          <Clock
+            className="text-amber-500"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        );
+      case "ok":
+        return (
+          <CheckCircle2
+            className="text-emerald-500"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        );
+      default:
+        return null;
     }
   };
 
   const renderValue = () => {
-    if (status === "loading") {
-      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-    }
-    if (status === "error") {
+    if (
+      status === "loading" ||
+      status === "error" ||
+      (status === "waiting" && displayValue === null)
+    ) {
       return (
-        <div className="flex items-center gap-1 text-red-600">
-          {connectionStatus !== "Connected" ? (
-            <WifiOff className="h-3 w-3" />
-          ) : (
-            <AlertTriangle className="h-3 w-3" />
-          )}
-          <span className="text-xs">Error</span>
-        </div>
-      );
-    }
-    if (status === "waiting" && displayValue === null) {
-      return (
-        <div className="flex items-center gap-1 text-yellow-600">
-          <Clock className="h-3 w-3" />
-          <span className="text-xs">Waiting</span>
+        <div className="flex items-center gap-1.5">
+          {renderStatusIcon()}
+          <span
+            className={`font-medium ${getStatusStyling().textColor}`}
+            style={{ fontSize: `${dynamicSizes.fontSize * 0.8}px` }}
+          >
+            {status === "loading"
+              ? "Loading..."
+              : status === "error"
+              ? "Error"
+              : "Waiting..."}
+          </span>
         </div>
       );
     }
@@ -160,86 +251,111 @@ const StatusRow = ({
       <div className="space-y-0.5">
         <div className="flex items-baseline gap-1">
           <span
-            className={`font-bold text-gray-900 dark:text-gray-100 ${
-              isCompact ? "text-sm" : "text-lg"
-            }`}
+            className="font-bold text-slate-900 tracking-tight"
+            style={{ fontSize: `${dynamicSizes.fontSize}px` }}
           >
-            {typeof displayValue === "number"
-              ? displayValue.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })
-              : displayValue}
+            {formatValue(displayValue)}
           </span>
           {itemConfig.units && (
             <span
-              className={`font-medium text-gray-500 dark:text-gray-400 ${
-                isCompact ? "text-xs" : "text-sm"
-              }`}
+              className="font-medium text-slate-500"
+              style={{ fontSize: `${dynamicSizes.fontSize * 0.7}px` }}
             >
               {itemConfig.units}
             </span>
           )}
         </div>
-        {lastUpdate && !isCompact && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            {lastUpdate.toLocaleTimeString()}
+        {lastUpdate && layoutMode === "normal" && (
+          <p
+            className="text-slate-400 flex items-center gap-1"
+            style={{ fontSize: `${dynamicSizes.fontSize * 0.6}px` }}
+          >
+            <Clock
+              style={{
+                width: dynamicSizes.fontSize * 0.6,
+                height: dynamicSizes.fontSize * 0.6,
+              }}
+            />
+            {formatTime(lastUpdate)}
           </p>
         )}
       </div>
     );
   };
 
+  const statusStyling = getStatusStyling();
+
   return (
     <div
-      className={`relative group transition-all duration-300 ease-out
-                  bg-white dark:bg-gray-900 
-                  border border-gray-200 dark:border-gray-700
-                 
-                  rounded-lg ${isCompact ? "p-3" : "p-3"}`}
+      className={`
+        relative group transition-all duration-300 ease-out
+        ${statusStyling.bg} ${statusStyling.border}
+        border rounded-lg shadow-sm hover:shadow-md
+        overflow-hidden
+      `}
+      style={{ padding: `${dynamicSizes.padding}px` }}
     >
       {/* Status indicator */}
-      <div className="absolute top-2 right-2 opacity-60 ">
+      <div className="absolute top-2 right-2 z-10">
         <div
-          className={`w-1.5 h-1.5 rounded-full shadow-lg ${getStatusIndicator()}`}
-        ></div>
+          className={`
+            w-2 h-2 rounded-full shadow-lg
+            ${statusStyling.indicator}
+            ${statusStyling.pulse ? "animate-pulse" : ""}
+            transition-all duration-300
+          `}
+        />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div
+        className="flex items-center"
+        style={{ gap: `${dynamicSizes.gap}px` }}
+      >
         {/* Icon */}
         {IconComponent && (
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <div
-              className={`rounded-lg flex items-center justify-center shadow-sm
-                         transition-all duration-300 ease-out
-                        
-                         ${isCompact ? "p-2" : "p-2.5"}`}
+              className="rounded-lg flex items-center justify-center shadow-sm
+                         transition-all duration-300 ease-out transform
+                         hover:scale-105 border border-white/30"
               style={{
                 backgroundColor: itemConfig.iconBgColor || "#3B82F6",
                 color: itemConfig.iconColor || "#FFFFFF",
+                padding: `${Math.max(dynamicSizes.padding * 0.3, 4)}px`,
               }}
             >
-              <IconComponent className={isCompact ? "h-4 w-4" : "h-5 w-5"} />
+              <IconComponent
+                style={{
+                  height: dynamicSizes.iconSize,
+                  width: dynamicSizes.iconSize,
+                }}
+              />
             </div>
             {/* Glow effect */}
             <div
-              className="absolute inset-0 rounded-lg opacity-20 blur-md transition-opacity duration-300"
+              className="absolute inset-0 rounded-lg opacity-20 blur-md transition-opacity duration-300 group-hover:opacity-30"
               style={{ backgroundColor: itemConfig.iconBgColor || "#3B82F6" }}
-            ></div>
+            />
           </div>
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden space-y-1">
+        <div className="flex-1 min-w-0 space-y-1">
           <p
-            className={`font-medium text-gray-700 dark:text-gray-300 truncate leading-tight
-                       ${isCompact ? "text-xs" : "text-sm"}`}
+            className="font-semibold text-slate-700 truncate leading-tight"
+            style={{ fontSize: `${dynamicSizes.fontSize * 0.85}px` }}
             title={itemConfig.customName}
           >
-            {itemConfig.customName}
+            {layoutMode === "mini" && itemConfig.customName.length > 15
+              ? `${itemConfig.customName.substring(0, 15)}...`
+              : itemConfig.customName}
           </p>
           {renderValue()}
         </div>
       </div>
+
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-transparent to-transparent pointer-events-none rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };
@@ -253,101 +369,238 @@ interface Props {
 
 export const GroupedIconStatusWidget = ({ config }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [columnCount, setColumnCount] = useState(1);
-  const [isCompact, setIsCompact] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [layoutConfig, setLayoutConfig] = useState({
+    columnCount: 1,
+    layoutMode: "normal" as "mini" | "compact" | "normal",
+    dynamicSizes: {
+      iconSize: 20,
+      fontSize: 14,
+      padding: 12,
+      gap: 12,
+      headerHeight: 48,
+    },
+  });
 
+  // Enhanced responsive system
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
+    const updateLayout = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
 
-        // Responsive column calculation
-        if (width > 450) {
-          setColumnCount(2);
-        } else {
-          setColumnCount(1);
-        }
+      setDimensions({ width, height });
 
-        // Compact mode for small heights
-        setIsCompact(height < 200);
+      // Smart layout calculation
+      const area = width * height;
+      const itemCount = config?.items?.length || 1;
+      const aspectRatio = width / height;
+
+      // Determine layout mode
+      let layoutMode: "mini" | "compact" | "normal";
+      if (area < 15000 || height < 120) {
+        layoutMode = "mini";
+      } else if (area < 30000 || height < 200) {
+        layoutMode = "compact";
+      } else {
+        layoutMode = "normal";
       }
-    });
+
+      // Determine column count
+      let columnCount = 1;
+      if (width > 400 && itemCount > 2) {
+        columnCount =
+          aspectRatio > 1.5 ? Math.min(3, Math.ceil(itemCount / 2)) : 2;
+      } else if (width > 300 && itemCount > 1 && aspectRatio > 1.2) {
+        columnCount = 2;
+      }
+
+      // Calculate dynamic sizes
+      const baseScale = Math.sqrt(area) / 150;
+      const itemHeight =
+        (height - (layoutMode === "mini" ? 40 : 60)) /
+        Math.ceil(itemCount / columnCount);
+
+      const sizes = {
+        mini: {
+          iconSize: Math.max(12, Math.min(itemHeight / 4, 16)),
+          fontSize: Math.max(10, Math.min(itemHeight / 6, 12)),
+          padding: Math.max(4, itemHeight / 12),
+          gap: Math.max(4, itemHeight / 15),
+          headerHeight: 40,
+        },
+        compact: {
+          iconSize: Math.max(16, Math.min(itemHeight / 3.5, 20)),
+          fontSize: Math.max(11, Math.min(itemHeight / 5, 14)),
+          padding: Math.max(6, itemHeight / 10),
+          gap: Math.max(6, itemHeight / 12),
+          headerHeight: 48,
+        },
+        normal: {
+          iconSize: Math.max(20, Math.min(itemHeight / 3, 24)),
+          fontSize: Math.max(12, Math.min(itemHeight / 4.5, 16)),
+          padding: Math.max(8, itemHeight / 8),
+          gap: Math.max(8, itemHeight / 10),
+          headerHeight: 56,
+        },
+      };
+
+      setLayoutConfig({
+        columnCount,
+        layoutMode,
+        dynamicSizes: sizes[layoutMode],
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(updateLayout);
     resizeObserver.observe(container);
+    updateLayout();
+
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [config?.items?.length]);
 
   if (!config || !config.items) {
     return (
       <div
         className="w-full h-full flex flex-col items-center justify-center p-4 
-                      bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900
-                      border border-red-200 dark:border-red-800 rounded-lg"
+                      bg-gradient-to-br from-red-50 to-red-100
+                      border-2 border-red-200 rounded-xl shadow-sm"
       >
-        <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 mb-2" />
-        <p className="text-sm font-medium text-red-700 dark:text-red-300 text-center">
+        <AlertTriangle className="h-8 w-8 text-red-600 mb-3" />
+        <p className="text-sm font-semibold text-red-700 text-center">
           Widget not configured correctly
         </p>
       </div>
     );
   }
 
-  // Count status for header indicator
-  const statusCount = {
+  // Calculate status summary
+  const statusSummary = {
     total: config.items.length,
-    // We could track individual statuses if needed
+    online: 0, // We could track this if StatusRow exposed status
+    offline: 0,
   };
 
   return (
     <div
+      ref={containerRef}
       className="w-full h-full flex flex-col
-                 bg-gradient-to-br from-gray-50 to-white 
-                 dark:from-gray-900 dark:to-gray-800
-                 border border-gray-200 dark:border-gray-700
-                 rounded-lg shadow-sm overflow-hidden"
+                 bg-gradient-to-br from-white to-slate-50
+                 
+                 rounded-xl shadow-sm hover:shadow-md
+                 transition-all duration-300 ease-out
+                 overflow-hidden"
     >
-      {/* Header */}
+      {/* Enhanced Header */}
       <div
         className="flex items-center justify-between px-4 py-3 
-                      bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm
-                      border-b border-gray-200 dark:border-gray-700"
+                  bg-gradient-to-r from-white/90 to-slate-50/90 backdrop-blur-sm
+                  border-b border-slate-200/60"
+        style={{ height: layoutConfig.dynamicSizes.headerHeight }}
       >
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-blue-100 dark:bg-blue-900 rounded-md">
-            <RadioTower className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg shadow-sm">
+            <Activity
+              className="text-blue-600"
+              style={{
+                width: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
+                height: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
+              }}
+            />
           </div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">
-            {config.title}
-          </h3>
+          <div className="flex-1 min-w-0">
+            <h3
+              className="font-bold text-slate-900 truncate leading-tight"
+              style={{
+                fontSize: `${layoutConfig.dynamicSizes.fontSize * 1.1}px`,
+              }}
+              title={config.title}
+            >
+              {config.title}
+            </h3>
+            {layoutConfig.layoutMode === "normal" && (
+              <p
+                className="text-slate-500 truncate"
+                style={{
+                  fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
+                }}
+              >
+                {statusSummary.total} key
+                {statusSummary.total !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {statusCount.total} items
+
+        {/* Status indicator */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-2 h-2 rounded-full bg-blue-500 shadow-blue-400/50 shadow-lg animate-pulse" />
+          <span
+            className="text-slate-600 font-medium"
+            style={{
+              fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.8}px`,
+            }}
+          >
+            {statusSummary.total}
           </span>
         </div>
       </div>
 
-      {/* Content */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-3">
+      {/* Content with enhanced scrolling */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div
-          className={`grid gap-2 ${
-            columnCount === 2 ? "grid-cols-2" : "grid-cols-1"
-          }`}
+          className="p-3"
+          style={{
+            gap: `${Math.max(layoutConfig.dynamicSizes.gap * 0.5, 4)}px`,
+          }}
         >
-          {config.items.map((item, index) => (
-            <StatusRow key={index} itemConfig={item} isCompact={isCompact} />
-          ))}
+          <div
+            className={`grid transition-all duration-300 ease-out`}
+            style={{
+              gridTemplateColumns: `repeat(${layoutConfig.columnCount}, minmax(0, 1fr))`,
+              gap: `${Math.max(layoutConfig.dynamicSizes.gap * 0.7, 6)}px`,
+            }}
+          >
+            {config.items.map((item, index) => (
+              <StatusRow
+                key={`${item.deviceUniqId}-${index}`}
+                itemConfig={item}
+                layoutMode={layoutConfig.layoutMode}
+                dynamicSizes={layoutConfig.dynamicSizes}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Footer - Optional summary */}
-      {config.items.length > 4 && (
-        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            Monitoring {config.items.length} devices
-          </p>
+      {/* Enhanced Footer for large widgets */}
+      {config.items.length > 6 && layoutConfig.layoutMode === "normal" && (
+        <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-200/60 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <p
+              className="text-slate-600"
+              style={{
+                fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
+              }}
+            >
+              Monitoring {config.items.length} devices
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span
+                  className="text-slate-500"
+                  style={{
+                    fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.7}px`,
+                  }}
+                >
+                  Active
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

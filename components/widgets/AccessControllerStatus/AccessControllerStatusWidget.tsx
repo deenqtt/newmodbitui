@@ -87,7 +87,7 @@ export function AccessControllerStatusWidget({
     const displayDoorStatus =
       Array.isArray(controller.doorStatus) && controller.doorStatus.length > 0
         ? controller.doorStatus
-        : [-1, -1, -1, -1];
+        : [-0, -0, -0, -0];
 
     return (
       <div className="p-4 h-full flex flex-col">

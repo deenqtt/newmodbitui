@@ -40,7 +40,7 @@ export async function PUT(
       where: { id: params.id },
       data: {
         ...(name && { name }),
-        ...(layout && { layout }),
+        ...(layout && { layout: JSON.stringify(layout) }), // ✅ Stringify here
         ...(inUse !== undefined && { inUse }),
       },
     });

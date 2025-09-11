@@ -1,9 +1,9 @@
 // File: app/api/pue-configs/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthFromCookie } from "@/lib/auth"; // Pastikan path ini benar
+import { getAuthFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- IMPORT
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * Helper untuk validasi struktur JSON PDU dan Main Power (sama seperti di route.ts)
@@ -85,7 +85,15 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(pueConfig);
+
+    // Parse JSON strings back to objects untuk frontend
+    const parsedConfig = {
+      ...pueConfig,
+      pduList: pueConfig.pduList ? JSON.parse(pueConfig.pduList) : [],
+      mainPower: pueConfig.mainPower ? JSON.parse(pueConfig.mainPower) : {},
+    };
+
+    return NextResponse.json(parsedConfig);
   } catch (error) {
     console.error(`Error fetching PUE configuration with ID ${id}:`, error);
     return NextResponse.json(
@@ -214,13 +222,21 @@ export async function PUT(
       where: { id },
       data: {
         customName,
-        pduList: validatedPduList,
-        mainPower: validatedMainPower,
+        pduList: JSON.stringify(validatedPduList), // Convert to String
+        mainPower: JSON.stringify(validatedMainPower), // Convert to String
       },
     });
-    triggerMqttServiceUpdate(); // <-- PANGGIL SETELAH UPDATE BERHASIL
 
-    return NextResponse.json(updatedPueConfig);
+    triggerMqttServiceUpdate();
+
+    // Parse response untuk frontend
+    const responseConfig = {
+      ...updatedPueConfig,
+      pduList: JSON.parse(updatedPueConfig.pduList || "[]"),
+      mainPower: JSON.parse(updatedPueConfig.mainPower || "{}"),
+    };
+
+    return NextResponse.json(responseConfig);
   } catch (error: any) {
     console.error(`Error updating PUE configuration with ID ${id}:`, error);
     return NextResponse.json(
@@ -269,7 +285,8 @@ export async function DELETE(
         where: { uniqId: pueConfig.apiTopicUniqId },
       });
     }
-    triggerMqttServiceUpdate(); // <-- PANGGIL SETELAH DELETE BERHASIL
+
+    triggerMqttServiceUpdate();
 
     return NextResponse.json({
       message: "PUE configuration and associated device deleted successfully",

@@ -1,5 +1,3 @@
-// File: app-sidebar.tsx
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -34,6 +32,11 @@ import {
   LogOut,
   User,
   Loader2,
+  NetworkIcon,
+  Router,
+  Smartphone,
+  ChevronRight,
+  Dot,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,6 +56,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 // --- Type Definitions ---
 interface Submenus {
@@ -71,6 +75,7 @@ const defaultMenuConfig: MenuConfigData = {
       "Devices External": true,
       "Devices for Logging": true,
       "Access Controllers": true,
+      Zigbee: true,
     },
   },
   SystemConfig: {
@@ -88,6 +93,8 @@ const defaultMenuConfig: MenuConfigData = {
       "Device List": true,
       "Device Profiles": true,
       Applications: true,
+      Gateways: true,
+      "EC25-Modem": true,
     },
   },
   SecurityAccess: {
@@ -127,18 +134,20 @@ const defaultMenuConfig: MenuConfigData = {
     submenus: { "Schedule Management": true, "Task Reports": true },
   },
 };
+
+// Reorder menu untuk flow yang lebih logis
 const menuOrder = [
   "Monitoring",
   "Devices",
-  "SystemConfig",
   "LoRaWAN",
-  "SecurityAccess",
   "Network",
+  "SecurityAccess",
   "Automation",
   "Alarms",
   "VoiceRecognition",
   "Analytics",
-  "Maintenance",
+  "Maintenance", // Dipindahkan ke bagian akhir sebelum system config
+  "SystemConfig",
 ];
 
 const submenuOrder: { [key: string]: string[] } = {
@@ -147,6 +156,7 @@ const submenuOrder: { [key: string]: string[] } = {
     "Devices External",
     "Devices for Logging",
     "Access Controllers",
+    "Zigbee",
   ],
   SystemConfig: [
     "User Management",
@@ -154,7 +164,13 @@ const submenuOrder: { [key: string]: string[] } = {
     "Menu Display",
     "System Backup",
   ],
-  LoRaWAN: ["Device List", "Device Profiles", "Applications"],
+  LoRaWAN: [
+    "Device List",
+    "Device Profiles",
+    "Applications",
+    "Gateways",
+    "EC25-Modem",
+  ],
   SecurityAccess: ["Device Access", "Surveillance CCTV"],
   Network: ["Communication Setup", "Register SNMP", "MQTT Broker"],
   Automation: [
@@ -170,26 +186,30 @@ const submenuOrder: { [key: string]: string[] } = {
   Maintenance: ["Schedule Management", "Task Reports"],
 };
 
+// Enhanced icon mapping with more appropriate icons
 const iconMap: { [key: string]: React.ElementType } = {
   "Main Dashboard": LayoutDashboard,
   "Devices Internal": HardDrive,
-  "Devices External": HardDrive,
-  "Devices for Logging": HardDrive,
+  "Devices External": Package,
+  "Devices for Logging": FileText,
   "Access Controllers": Lock,
+  Zigbee: NetworkIcon,
   "Device List": ListTree,
   "Device Profiles": Package,
   Applications: GitBranch,
+  Gateways: Router,
+  "EC25-Modem": Smartphone,
   "User Management": Users,
   "Power Analyzer": Power,
   "Menu Display": Menu,
   "System Backup": DatabaseBackup,
-  "Device Access": Lock,
+  "Device Access": ShieldCheck,
   "Surveillance CCTV": Cctv,
   "Communication Setup": Settings2,
-  "Register SNMP": ListTree,
+  "Register SNMP": Network,
   "MQTT Broker": GitBranch,
   "Automated Scheduling": CalendarClock,
-  "Smart Logic Automation": Lightbulb,
+  "Smart Logic Automation": Bot,
   "Voice Command": Voicemail,
   "Automation Values": DatabaseZap,
   "Dynamic Payload": Package,
@@ -198,9 +218,24 @@ const iconMap: { [key: string]: React.ElementType } = {
   "Alarm Log Reports": History,
   "Relay Control": Power,
   "Relay STT": Mic,
-  "Devices Log Report": FileText,
-  "Schedule Management": Wrench,
-  "Task Reports": History,
+  "Devices Log Report": BarChart3,
+  "Schedule Management": CalendarClock,
+  "Task Reports": FileText,
+};
+
+// Group icon mapping
+const groupIconMap: { [key: string]: React.ElementType } = {
+  Monitoring: LayoutDashboard,
+  Devices: HardDrive,
+  LoRaWAN: Router,
+  SystemConfig: Cog,
+  SecurityAccess: ShieldCheck,
+  Network: Network,
+  Automation: Bot,
+  Alarms: AlarmClock,
+  VoiceRecognition: Mic,
+  Analytics: BarChart3,
+  Maintenance: Wrench,
 };
 
 const toKebabCase = (str: string) =>
@@ -219,7 +254,7 @@ function SidebarUser() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-4">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -229,28 +264,33 @@ function SidebarUser() {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-9 w-9">
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/50">
+        <Avatar className="h-10 w-10 ring-2 ring-sidebar-border">
           <AvatarImage src="#" alt="User Avatar" />
-          <AvatarFallback>{getInitials(user.email)}</AvatarFallback>
+          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+            {getInitials(user.email)}
+          </AvatarFallback>
         </Avatar>
         <div className="flex-1 overflow-hidden">
-          <p className="text-sm font-medium leading-none truncate">
+          <p className="text-sm font-semibold leading-none truncate text-sidebar-foreground">
             {user.email}
           </p>
-          <p className="text-xs text-muted-foreground truncate">{user.role}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="secondary" className="text-xs px-2 py-0">
+              {user.role}
+            </Badge>
+          </div>
         </div>
       </div>
-      {/* Separator dipindahkan ke sini */}
-      <Separator className="my-3" />
+
       <Button
         variant="ghost"
-        className="w-full justify-start rounded-lg text-red-500 bg-red-100 hover:bg-red-300 hover:text-red-600"
+        className="w-full justify-start rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
         onClick={logout}
       >
         <LogOut className="mr-2 h-4 w-4" />
-        Log out
+        Sign Out
       </Button>
     </div>
   );
@@ -287,8 +327,13 @@ export function AppSidebar() {
         if (!menuData || !menuData.enabled) {
           return null;
         }
+
+        const GroupIcon = groupIconMap[menuKey] || Menu;
+
         return {
           title: formatGroupTitle(menuKey as string),
+          icon: GroupIcon,
+          key: menuKey,
           items: Object.entries(menuData.submenus)
             .filter(([, submenuEnabled]) => submenuEnabled)
             .sort(([submenuTitleA], [submenuTitleB]) => {
@@ -309,51 +354,85 @@ export function AppSidebar() {
                 title: submenuTitle,
                 url: url,
                 icon: iconMap[submenuTitle] || Menu,
+                isActive: pathname === url,
               };
             }),
         };
       })
       .filter(
-        (group): group is { title: string; items: any[] } =>
-          group !== null && group.items.length > 0
+        (
+          group
+        ): group is {
+          title: string;
+          icon: React.ElementType;
+          key: string;
+          items: any[];
+        } => group !== null && group.items.length > 0
       );
-  }, [menuConfig]);
+  }, [menuConfig, pathname]);
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <LayoutDashboard className="h-4 w-4" />
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border px-6 py-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg">
+            <LayoutDashboard className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Modbo</h1>
-            <p className="text-xs text-muted-foreground">Monitoring Platform</p>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              UniBoard
+            </h1>
+            <p className="text-xs text-muted-foreground font-medium">
+              Universal Monitoring Dashboard
+            </p>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        {navigation.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+
+      <SidebarContent className="px-2 py-4">
+        {navigation.map((group, groupIndex) => {
+          const GroupIcon = group.icon;
+          return (
+            <SidebarGroup key={group.key} className="mb-6">
+              <SidebarGroupLabel className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <GroupIcon className="h-4 w-4" />
+                {group.title}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={item.isActive}
+                          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md"
+                        >
+                          <Link
+                            href={item.url}
+                            className="flex items-center gap-3 w-full"
+                          >
+                            <ItemIcon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{item.title}</span>
+                            {item.isActive && (
+                              <div className="ml-auto">
+                                <Dot className="h-4 w-4" />
+                              </div>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
-      <SidebarFooter className="mt-auto">
+
+      <SidebarFooter className="mt-auto border-t border-sidebar-border">
         <SidebarUser />
       </SidebarFooter>
     </Sidebar>

@@ -53,6 +53,9 @@ import {
   Loader2,
   UploadCloud,
   Eye,
+  Search,
+  RefreshCw,
+  Activity,
 } from "lucide-react";
 import {
   Card,
@@ -60,7 +63,8 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card"; // Impor komponen Card lengkap
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface Device {
   id: string;
@@ -82,6 +86,7 @@ const Toast = Swal.mixin({
 function DevicesExternalContent() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const { isReady, connectionStatus, subscribe, unsubscribe } = useMqtt();
   const [dbStatus, setDbStatus] = useState<
     "connecting" | "connected" | "disconnected"
@@ -99,6 +104,17 @@ function DevicesExternalContent() {
     topic: string;
     payload: string;
   } | null>(null);
+
+  // Filter devices based on search term
+  const filteredDevices = useMemo(() => {
+    if (!searchTerm) return devices;
+    return devices.filter(
+      (device) =>
+        device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        device.address?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [devices, searchTerm]);
 
   const fetchDevices = async () => {
     setIsLoading(true);
@@ -260,246 +276,471 @@ function DevicesExternalContent() {
     reader.readAsText(fileToImport);
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "connected":
+      case "Connected":
+        return "text-emerald-600 dark:text-emerald-400";
+      case "connecting":
+      case "Connecting":
+        return "text-amber-600 dark:text-amber-400";
+      default:
+        return "text-red-600 dark:text-red-400";
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "connected":
+      case "Connected":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400";
+      case "connecting":
+      case "Connecting":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400";
+      default:
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
+    }
+  };
+
   return (
     <TooltipProvider>
-      <main className="p-4 md:p-6 space-y-6">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className=" p-4 md:p-6 space-y-8">
+          {/* Header Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <HardDrive className="h-6 w-6 text-primary" />
+              </div>
               <div>
-                <CardTitle>External Device List</CardTitle>
-              </div>
-              <div className="flex w-full sm:w-auto items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExport}
-                  disabled={devices.length === 0}
-                  className="flex-1 sm:flex-auto"
-                >
-                  <FileDown className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="flex-1 sm:flex-auto"
-                >
-                  <FileUp className="mr-2 h-4 w-4" />
-                  Import
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenForm("add")}
-                  className="flex-1 sm:flex-auto"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Device
-                </Button>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  External Devices
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage and monitor your external MQTT devices
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 pt-4">
-              <Tooltip>
-                <TooltipTrigger className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Database
-                    className={`h-4 w-4 ${
-                      dbStatus === "connected"
-                        ? "text-green-500"
-                        : dbStatus === "connecting"
-                        ? "text-yellow-400"
-                        : "text-red-500"
-                    }`}
-                  />
-                  <span>DB: {dbStatus}</span>
-                </TooltipTrigger>
-                <TooltipContent>Database Status</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {connectionStatus === "Connected" ? (
-                    <Wifi className="h-4 w-4 text-green-500" />
-                  ) : connectionStatus === "Connecting" ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
-                  ) : (
-                    <WifiOff className="h-4 w-4 text-red-500" />
-                  )}
-                  <span>MQTT: {connectionStatus}</span>
-                </TooltipTrigger>
-                <TooltipContent>MQTT Connection Status</TooltipContent>
-              </Tooltip>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Device Name</TableHead>
-                    <TableHead>Topic</TableHead>
-                    <TableHead>Latest Payload</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center h-48">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
-                      </TableCell>
-                    </TableRow>
-                  ) : devices.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="text-center h-48 text-muted-foreground"
-                      >
-                        No external devices found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    devices.map((device) => {
-                      const latestPayload = payloads[device.topic];
-                      return (
-                        <TableRow
-                          key={device.id}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-900"
-                        >
-                          <TableCell className="font-medium">
-                            {device.name}
-                          </TableCell>
-                          <TableCell>{device.topic}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {latestPayload ? (
-                                <>
-                                  <span className="font-mono text-xs truncate max-w-[200px]">
-                                    {latestPayload}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() =>
-                                      setViewingPayload({
-                                        topic: device.topic,
-                                        payload: latestPayload,
-                                      })
-                                    }
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  Waiting for data...
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenForm("edit", device)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setDeviceToDelete(device);
-                                setIsDeleteAlertOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+          </div>
 
-      {/* Dialogs tidak berubah */}
+          {/* Status Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total Devices
+                    </p>
+                    <p className="text-3xl font-bold">{devices.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                    <HardDrive className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Database
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={getStatusBadge(dbStatus)}
+                        variant="secondary"
+                      >
+                        {dbStatus}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                    <Database
+                      className={`h-6 w-6 ${getStatusColor(dbStatus)}`}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      MQTT Status
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={getStatusBadge(connectionStatus)}
+                        variant="secondary"
+                      >
+                        {connectionStatus}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full">
+                    {connectionStatus === "Connected" ? (
+                      <Wifi className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    ) : connectionStatus === "Connecting" ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-purple-600 dark:text-purple-400" />
+                    ) : (
+                      <WifiOff className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Card */}
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl">Device Management</CardTitle>
+                  <CardDescription>
+                    Monitor real-time data and manage your external devices
+                  </CardDescription>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchDevices}
+                      disabled={isLoading}
+                      className="whitespace-nowrap"
+                    >
+                      <RefreshCw
+                        className={`mr-2 h-4 w-4 ${
+                          isLoading ? "animate-spin" : ""
+                        }`}
+                      />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExport}
+                      disabled={devices.length === 0}
+                      className="whitespace-nowrap"
+                    >
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsImportModalOpen(true)}
+                      className="whitespace-nowrap"
+                    >
+                      <FileUp className="mr-2 h-4 w-4" />
+                      Import
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenForm("add")}
+                    className="bg-primary hover:bg-primary/90 whitespace-nowrap"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Device
+                  </Button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="pt-4">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search devices..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-background"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        Device Name
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        Topic
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        Status & Data
+                      </TableHead>
+                      <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center h-48">
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-muted-foreground">
+                              Loading devices...
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredDevices.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center h-48">
+                          <div className="flex flex-col items-center gap-3">
+                            <HardDrive className="h-12 w-12 text-muted-foreground/50" />
+                            <div className="space-y-1">
+                              <p className="text-muted-foreground font-medium">
+                                {searchTerm
+                                  ? "No devices found"
+                                  : "No devices available"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {searchTerm
+                                  ? "Try adjusting your search terms"
+                                  : "Add your first external device to get started"}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredDevices.map((device) => {
+                        const latestPayload = payloads[device.topic];
+                        const hasData = !!latestPayload;
+
+                        return (
+                          <TableRow
+                            key={device.id}
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
+                          >
+                            <TableCell className="py-4">
+                              <div className="space-y-1">
+                                <p className="font-medium text-slate-900 dark:text-slate-100">
+                                  {device.name}
+                                </p>
+                                {device.address && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {device.address}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-xs"
+                              >
+                                {device.topic}
+                              </Badge>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      hasData ? "bg-green-500" : "bg-gray-300"
+                                    }`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {hasData ? "Active" : "Waiting"}
+                                  </span>
+                                </div>
+
+                                {latestPayload && (
+                                  <div className="flex items-center gap-2">
+                                    <code className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded border max-w-[200px] truncate">
+                                      {latestPayload}
+                                    </code>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                          onClick={() =>
+                                            setViewingPayload({
+                                              topic: device.topic,
+                                              payload: latestPayload,
+                                            })
+                                          }
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        View full payload
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right py-4">
+                              <div className="flex items-center justify-end gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                      onClick={() =>
+                                        handleOpenForm("edit", device)
+                                      }
+                                    >
+                                      <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit device</TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                      onClick={() => {
+                                        setDeviceToDelete(device);
+                                        setIsDeleteAlertOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Delete device</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl">
               {dialogMode === "edit" ? "Edit Device" : "Add New Device"}
             </DialogTitle>
           </DialogHeader>
           <form
             onSubmit={handleSubmit}
             id="deviceForm"
-            className="space-y-4 pt-4"
+            className="space-y-6 pt-4"
           >
-            <div>
-              <Label htmlFor="name">Device Name</Label>
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm font-medium">
+                Device Name *
+              </Label>
               <Input
                 id="name"
                 name="name"
                 defaultValue={currentDevice?.name}
+                placeholder="Enter device name"
                 required
+                className="h-10"
               />
             </div>
-            <div>
-              <Label htmlFor="topic">Topic</Label>
+            <div className="space-y-2">
+              <Label htmlFor="topic" className="text-sm font-medium">
+                MQTT Topic *
+              </Label>
               <Input
                 id="topic"
                 name="topic"
                 defaultValue={currentDevice?.topic}
+                placeholder="e.g. sensors/temperature"
                 required
+                className="h-10 font-mono"
               />
             </div>
-            <div>
-              <Label htmlFor="address">Address (Optional)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="address" className="text-sm font-medium">
+                Address (Optional)
+              </Label>
               <Input
                 id="address"
                 name="address"
                 defaultValue={currentDevice?.address ?? ""}
+                placeholder="e.g. 192.168.1.100"
+                className="h-10"
               />
             </div>
             {dialogMode === "edit" && (
-              <div>
-                <Label>Unique ID (Cannot be changed)</Label>
-                <Input value={currentDevice?.uniqId} disabled />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Unique ID (Read-only)
+                </Label>
+                <Input
+                  value={currentDevice?.uniqId}
+                  disabled
+                  className="h-10 bg-muted font-mono"
+                />
               </div>
             )}
           </form>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsFormOpen(false)}>
+              Cancel
+            </Button>
             <Button type="submit" form="deviceForm">
-              Save
+              {dialogMode === "edit" ? "Update Device" : "Add Device"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Device</AlertDialogTitle>
           </AlertDialogHeader>
           <AlertDialogDescription>
-            This action will permanently delete the device "
-            {deviceToDelete?.name}".
+            Are you sure you want to delete "{deviceToDelete?.name}"? This
+            action cannot be undone.
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
-              Delete
+              Delete Device
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Dialog */}
       <Dialog
         open={isImportModalOpen}
         onOpenChange={() => {
@@ -507,28 +748,29 @@ function DevicesExternalContent() {
           setFileToImport(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Import Devices from JSON</DialogTitle>
+            <DialogTitle>Import Devices</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              Select a JSON file containing an array of device data.
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Upload a JSON file containing an array of device configurations.
             </p>
             <div className="flex items-center justify-center w-full">
               <label
                 htmlFor="dropzone-file"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                  <p className="mb-2 text-sm text-muted-foreground">
+                  <UploadCloud className="w-8 h-8 mb-2 text-slate-400" />
+                  <p className="mb-2 text-sm text-slate-600 dark:text-slate-400">
                     <span className="font-semibold">Click to upload</span> or
                     drag and drop
                   </p>
+                  <p className="text-xs text-slate-500">JSON files only</p>
                   {fileToImport && (
-                    <p className="text-xs text-foreground font-semibold">
-                      {fileToImport.name}
+                    <p className="text-xs text-primary font-semibold mt-2">
+                      Selected: {fileToImport.name}
                     </p>
                   )}
                 </div>
@@ -542,7 +784,7 @@ function DevicesExternalContent() {
               </label>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -554,35 +796,64 @@ function DevicesExternalContent() {
             </Button>
             <Button onClick={handleImport} disabled={!fileToImport}>
               <FileUp className="mr-2 h-4 w-4" />
-              Start Import
+              Import Devices
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payload Viewer Dialog */}
       <Dialog
         open={!!viewingPayload}
         onOpenChange={(isOpen) => !isOpen && setViewingPayload(null)}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>
-              Payload from Topic: {viewingPayload?.topic}
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Payload Data
             </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Topic:{" "}
+              <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs">
+                {viewingPayload?.topic}
+              </code>
+            </p>
           </DialogHeader>
-          <div className="mt-4 bg-muted rounded-md p-4 max-h-[60vh] overflow-auto">
-            <pre className="text-sm whitespace-pre-wrap break-all">
-              {(() => {
-                try {
-                  return JSON.stringify(
-                    JSON.parse(viewingPayload?.payload || "{}"),
-                    null,
-                    2
-                  );
-                } catch {
-                  return viewingPayload?.payload;
-                }
-              })()}
-            </pre>
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">
+                Raw Data
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(viewingPayload?.payload || "");
+                  Toast.fire({
+                    icon: "success",
+                    title: "Copied to clipboard!",
+                  });
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border p-4 max-h-[50vh] overflow-auto">
+              <pre className="text-sm whitespace-pre-wrap break-all font-mono text-slate-700 dark:text-slate-300">
+                {(() => {
+                  try {
+                    return JSON.stringify(
+                      JSON.parse(viewingPayload?.payload || "{}"),
+                      null,
+                      2
+                    );
+                  } catch {
+                    return viewingPayload?.payload;
+                  }
+                })()}
+              </pre>
+            </div>
           </div>
           <DialogFooter>
             <Button onClick={() => setViewingPayload(null)}>Close</Button>

@@ -9,7 +9,7 @@ export async function POST() {
   // Buat cookie yang sudah kadaluarsa untuk menghapusnya
   const serializedCookie = serialize("authToken", "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== "development",
+    secure: false,
     sameSite: "strict",
     maxAge: -1, // Langsung kadaluarsa
     path: "/",

@@ -1,9 +1,15 @@
 // File: components/widgets/TemperatureIndicatorBar/TemperatureIndicatorBarWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Thermometer } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -19,11 +25,42 @@ interface Props {
   };
 }
 
-// Fungsi untuk mendapatkan warna berdasarkan persentase
-const getColorForPercentage = (percentage: number) => {
-  if (percentage < 0.5) return "bg-green-500"; // Dingin
-  if (percentage < 0.8) return "bg-yellow-500"; // Hangat
-  return "bg-red-500"; // Panas
+// Enhanced color function for temperature ranges
+const getTemperatureStyle = (percentage: number, status: string) => {
+  if (status !== "ok") {
+    return {
+      border: status === "error" ? "border-red-200" : "border-amber-200",
+      bg: status === "error" ? "bg-red-50" : "bg-amber-50",
+      barColor: "bg-slate-400",
+    };
+  }
+
+  if (percentage < 0.3) {
+    return {
+      border: "border-blue-200",
+      bg: "bg-blue-50",
+      barColor: "bg-gradient-to-r from-blue-400 to-blue-500",
+    };
+  }
+  if (percentage < 0.6) {
+    return {
+      border: "border-emerald-200",
+      bg: "bg-emerald-50",
+      barColor: "bg-gradient-to-r from-emerald-400 to-emerald-500",
+    };
+  }
+  if (percentage < 0.8) {
+    return {
+      border: "border-orange-200",
+      bg: "bg-orange-50",
+      barColor: "bg-gradient-to-r from-orange-400 to-orange-500",
+    };
+  }
+  return {
+    border: "border-red-200",
+    bg: "bg-red-50",
+    barColor: "bg-gradient-to-r from-red-400 to-red-500",
+  };
 };
 
 export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
@@ -34,6 +71,53 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
   );
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [topic, setTopic] = useState<string | null>(null);
+
+  // Responsive sizing setup
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [titleFontSize, setTitleFontSize] = useState(14);
+  const [valueFontSize, setValueFontSize] = useState(24);
+  const [unitFontSize, setUnitFontSize] = useState(12);
+  const [labelFontSize, setLabelFontSize] = useState(10);
+
+  // Enhanced responsive calculation (sama seperti SingleValueCard)
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
+
+      setDimensions({ width, height });
+
+      // Advanced responsive scaling
+      const area = width * height;
+      const baseScale = Math.sqrt(area) / 100;
+      const minScale = Math.min(width / 150, height / 100);
+      const scale = Math.min(baseScale, minScale);
+
+      // Dynamic font sizes with better proportions
+      const newValueSize = Math.max(Math.min(width / 8, height / 4), 14);
+      const newTitleSize = Math.max(
+        Math.min(width / 15, height / 8, newValueSize * 0.6),
+        10
+      );
+      const newUnitSize = Math.max(newValueSize * 0.4, 8);
+      const newLabelSize = Math.max(newTitleSize * 0.7, 8);
+
+      setValueFontSize(newValueSize);
+      setTitleFontSize(newTitleSize);
+      setUnitFontSize(newUnitSize);
+      setLabelFontSize(newLabelSize);
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    resizeObserver.observe(container);
+    updateDimensions();
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!config.deviceUniqId) {
@@ -104,61 +188,181 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
   const { minValue = 0, maxValue = 100, units = "°C" } = config;
   const percentage =
     currentValue !== null
-      ? ((currentValue - minValue) / (maxValue - minValue)) * 100
+      ? Math.max(
+          0,
+          Math.min(1, (currentValue - minValue) / (maxValue - minValue))
+        )
       : 0;
-  const barColorClass = getColorForPercentage(percentage / 100);
+
+  const tempStyle = getTemperatureStyle(percentage, status);
+
+  const formatValue = (value: number | null) => {
+    if (value === null) return "—";
+    return value.toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    });
+  };
 
   const renderContent = () => {
-    if (status === "loading") {
-      return <Loader2 className="h-10 w-10 animate-spin text-primary" />;
+    const isLoading =
+      status === "loading" || (status === "waiting" && currentValue === null);
+
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-2">
+          <Loader2
+            className="animate-spin text-amber-500"
+            style={{
+              width: Math.max(dimensions.width / 10, 20),
+              height: Math.max(dimensions.width / 10, 20),
+            }}
+          />
+          <p
+            className="text-slate-500 font-medium"
+            style={{ fontSize: `${labelFontSize}px` }}
+          >
+            Loading...
+          </p>
+        </div>
+      );
     }
+
     if (status === "error") {
       return (
-        <div className="flex flex-col items-center justify-center text-center text-destructive p-2">
-          <AlertTriangle className="h-8 w-8 mb-2" />
-          <p className="text-sm font-semibold">{errorMessage}</p>
+        <div className="flex flex-col items-center justify-center gap-2 text-center">
+          <AlertTriangle
+            className="text-red-500"
+            style={{
+              width: Math.max(dimensions.width / 10, 20),
+              height: Math.max(dimensions.width / 10, 20),
+            }}
+          />
+          <p
+            className="text-red-600 font-semibold max-w-full break-words"
+            style={{ fontSize: `${labelFontSize}px` }}
+          >
+            {errorMessage}
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="w-full px-4">
-        <div className="flex justify-between items-end mb-1">
-          <span className="text-sm text-muted-foreground">{minValue}</span>
-          {currentValue !== null ? (
-            <div className="text-center">
-              <span className="text-2xl font-bold text-primary">
-                {currentValue.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })}
-              </span>
-              <span className="text-lg text-muted-foreground ml-1">
-                {units}
-              </span>
-            </div>
-          ) : (
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          )}
-          <span className="text-sm text-muted-foreground">{maxValue}</span>
+      <div className="w-full space-y-3">
+        {/* Value Display */}
+        <div className="flex items-baseline justify-center gap-1">
+          <span
+            className="font-bold text-slate-900 tracking-tight"
+            style={{ fontSize: `${valueFontSize}px`, lineHeight: 0.9 }}
+          >
+            {formatValue(currentValue)}
+          </span>
+          <span
+            className="font-medium text-slate-500"
+            style={{ fontSize: `${unitFontSize}px`, lineHeight: 1 }}
+          >
+            {units}
+          </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+
+        {/* Progress Bar Section */}
+        <div className="space-y-1">
+          <div className="flex justify-between items-center px-1">
+            <span
+              className="text-slate-500 font-medium"
+              style={{ fontSize: `${labelFontSize}px` }}
+            >
+              {minValue}°
+            </span>
+            <span
+              className="text-slate-500 font-medium"
+              style={{ fontSize: `${labelFontSize}px` }}
+            >
+              {maxValue}°
+            </span>
+          </div>
+
+          {/* Progress Bar */}
           <div
-            className={`h-4 rounded-full transition-all duration-500 ${barColorClass}`}
-            style={{ width: `${Math.max(0, Math.min(100, percentage))}%` }}
-          ></div>
+            className="w-full bg-slate-200 rounded-full overflow-hidden shadow-inner"
+            style={{ height: Math.max(6, dimensions.height * 0.08) }}
+          >
+            <div
+              className={`h-full ${tempStyle.barColor} rounded-full transition-all duration-500 ease-out relative overflow-hidden shadow-sm`}
+              style={{
+                width: `${Math.max(0, Math.min(100, percentage * 100))}%`,
+              }}
+            >
+              {/* Subtle shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            </div>
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move">
-      <h3 className="font-semibold text-md text-center truncate mb-4">
-        {config.customName}
-      </h3>
-      <div className="w-full flex-1 flex items-center justify-center">
+    <div
+      ref={containerRef}
+      className={`
+        w-full h-full relative overflow-hidden cursor-move
+        bg-gradient-to-br from-white to-slate-50
+       
+        rounded-xl shadow-sm hover:shadow-md
+        transition-all duration-300 ease-out
+        group
+      `}
+      style={{
+        minWidth: 200,
+        minHeight: 120,
+      }}
+    >
+      {/* Status indicator */}
+      <div className="absolute top-2 right-2 opacity-75 group-hover:opacity-100 transition-opacity">
+        <Thermometer
+          className={
+            status === "ok"
+              ? percentage < 0.3
+                ? "text-blue-500"
+                : percentage < 0.6
+                ? "text-emerald-500"
+                : percentage < 0.8
+                ? "text-orange-500"
+                : "text-red-500"
+              : status === "error"
+              ? "text-red-500"
+              : "text-amber-500"
+          }
+          style={{
+            width: Math.max(titleFontSize * 0.8, 12),
+            height: Math.max(titleFontSize * 0.8, 12),
+          }}
+        />
+      </div>
+
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-3">
+        <h3
+          className="font-semibold text-slate-700 truncate text-left"
+          style={{
+            fontSize: `${titleFontSize}px`,
+            lineHeight: 1.2,
+          }}
+          title={config.customName}
+        >
+          {config.customName}
+        </h3>
+      </div>
+
+      {/* Main content area */}
+      <div className="absolute inset-0 pt-10 pb-4 px-4 flex items-center justify-center">
         {renderContent()}
       </div>
+
+      {/* Subtle gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

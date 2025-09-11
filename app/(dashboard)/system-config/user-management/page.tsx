@@ -54,6 +54,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
   PaginationContent,
@@ -61,7 +62,6 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-  PaginationEllipsis,
 } from "@/components/ui/pagination";
 import {
   Users,
@@ -71,9 +71,13 @@ import {
   Loader2,
   Shield,
   Database,
-  ArrowUp,
-  ArrowDown,
   Search,
+  RefreshCw,
+  UserCheck,
+  UserX,
+  Crown,
+  Phone,
+  Mail,
 } from "lucide-react";
 
 // --- Hooks ---
@@ -111,41 +115,48 @@ function UserManagementContent() {
   const [password, setPassword] = useState("");
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
-
-  // ✨ STATE BARU UNTUK TOTAL PENGGUNA
-  const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 10;
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/users");
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          console.error(
-            "[UserManagement] Akses ditolak (401/403). Melakukan logout..."
-          );
-          logout();
+  const fetchUsers = useCallback(
+    async (showToast = false) => {
+      try {
+        if (showToast) {
+          setRefreshing(true);
         }
-        throw new Error("Failed to fetch users.");
+        setIsLoading(true);
+
+        const response = await fetch("/api/users");
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            console.error("Access denied. Logging out...");
+            logout();
+          }
+          throw new Error("Failed to fetch users.");
+        }
+        const data = await response.json();
+        setUsers(data);
+
+        if (showToast) {
+          Toast.fire({
+            icon: "success",
+            title: "Refreshed",
+            text: `${data.length} users loaded`,
+          });
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch users:", error.message);
+        Toast.fire({ icon: "error", title: error.message });
+      } finally {
+        setIsLoading(false);
+        setRefreshing(false);
       }
-      const data = await response.json();
-      setUsers(data);
-      // ✨ SIMPAN TOTAL PENGGUNA SETELAH MENGAMBIL DATA
-      setTotalUsersCount(data.length);
-    } catch (error: any) {
-      console.error(
-        "[UserManagement] Gagal mengambil data pengguna:",
-        error.message
-      );
-      Toast.fire({ icon: "error", title: error.message });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [logout]);
+    },
+    [logout]
+  );
 
   useEffect(() => {
     const checkDb = async () => {
@@ -274,279 +285,471 @@ function UserManagementContent() {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "connected":
+        return "text-emerald-600 dark:text-emerald-400";
+      case "connecting":
+        return "text-amber-600 dark:text-amber-400";
+      default:
+        return "text-red-600 dark:text-red-400";
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "connected":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400";
+      case "connecting":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400";
+      default:
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
+    }
+  };
+
+  const getRoleBadge = (role: Role) => {
+    return role === Role.ADMIN
+      ? "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
+      : "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
+  };
+
+  const getRoleIcon = (role: Role) => {
+    return role === Role.ADMIN ? (
+      <Crown className="h-3 w-3 mr-1" />
+    ) : (
+      <UserCheck className="h-3 w-3 mr-1" />
+    );
+  };
+
   if (isAuthLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-gray-500" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="container mx-auto p-4 md:p-8">
+          <div className="flex flex-col items-center justify-center h-96 space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading user management...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!user || user.role !== Role.ADMIN) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen text-center bg-gray-100">
-        <Shield className="h-16 w-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold">Access Denied</h1>
-        <p className="text-gray-600">
-          You do not have permission to view this page.
-        </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="container mx-auto p-4 md:p-8">
+          <div className="flex flex-col items-center justify-center h-96 space-y-4">
+            <div className="p-4 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <Shield className="h-12 w-12 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-bold">Access Denied</h1>
+              <p className="text-muted-foreground">
+                You do not have permission to view this page.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <TooltipProvider>
-      <main className="p-4 md:p-6">
-        {/* ✨ CARD UNTUK MENAMPILKAN TOTAL PENGGUNA */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {totalUsersCount !== null ? totalUsersCount : "N/A"}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className=" p-4 md:p-6 space-y-8">
+          {/* Header Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  User Management
+                </h1>
+                <p className="text-muted-foreground">
+                  Manage user accounts, roles, and permissions
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total Users
+                    </p>
+                    <p className="text-3xl font-bold">{users.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                    <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
                 </div>
-              )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Administrators
+                    </p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {users.filter((u) => u.role === Role.ADMIN).length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full">
+                    <Crown className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Regular Users
+                    </p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {users.filter((u) => u.role === Role.USER).length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                    <UserCheck className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Database
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={getStatusBadge(dbStatus)}
+                        variant="secondary"
+                      >
+                        {dbStatus}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-full">
+                    <Database
+                      className={`h-6 w-6 ${getStatusColor(dbStatus)}`}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Card */}
+          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl">User Accounts</CardTitle>
+                  <CardDescription>
+                    Manage user accounts, permissions, and system access
+                  </CardDescription>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchUsers(true)}
+                    disabled={refreshing}
+                    className="whitespace-nowrap"
+                  >
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${
+                        refreshing ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenModal()}
+                    className="bg-primary hover:bg-primary/90 whitespace-nowrap"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add User
+                  </Button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="pt-4">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-10 bg-background"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <div className="overflow-hidden">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground mt-2">
+                      Loading users...
+                    </p>
+                  </div>
+                ) : paginatedUsers.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <Users className="h-12 w-12 text-muted-foreground/50" />
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground font-medium">
+                          {searchQuery
+                            ? "No users found"
+                            : "No users available"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {searchQuery
+                            ? "Try adjusting your search terms"
+                            : "Add your first user to get started"}
+                        </p>
+                      </div>
+                      {!searchQuery && (
+                        <Button
+                          onClick={() => handleOpenModal()}
+                          className="mt-2"
+                        >
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Add User
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            User Information
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Contact
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Role & Permissions
+                          </TableHead>
+                          <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                            Created
+                          </TableHead>
+                          <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedUsers.map((userData) => (
+                          <TableRow
+                            key={userData.id}
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
+                          >
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full">
+                                  <Mail className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-medium text-slate-900 dark:text-slate-100">
+                                    {userData.email}
+                                  </p>
+                                  <code className="text-xs text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                    ID: {userData.id.slice(0, 8)}...
+                                  </code>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <div className="space-y-2">
+                                {userData.phoneNumber ? (
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-sm">
+                                      {userData.phoneNumber}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground italic">
+                                    No phone number
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <Badge
+                                className={getRoleBadge(userData.role)}
+                                variant="secondary"
+                              >
+                                {getRoleIcon(userData.role)}
+                                {userData.role}
+                              </Badge>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <div className="space-y-1">
+                                <p className="text-sm">
+                                  {new Date(
+                                    userData.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(
+                                    userData.createdAt
+                                  ).toLocaleTimeString()}
+                                </p>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right py-4">
+                              <div className="flex items-center justify-end gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                      onClick={() => handleOpenModal(userData)}
+                                    >
+                                      <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit user</TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                      onClick={() => {
+                                        setUserToDelete(userData);
+                                        setIsDeleteAlertOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Delete user</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() =>
+                                  handlePageChange(currentPage - 1)
+                                }
+                                href="#"
+                                aria-disabled={currentPage <= 1}
+                                tabIndex={currentPage <= 1 ? -1 : undefined}
+                                className={
+                                  currentPage <= 1
+                                    ? "pointer-events-none opacity-50"
+                                    : undefined
+                                }
+                              />
+                            </PaginationItem>
+                            {Array.from(
+                              { length: Math.min(totalPages, 5) },
+                              (_, i) => {
+                                const pageNum = i + 1;
+                                return (
+                                  <PaginationItem key={i}>
+                                    <PaginationLink
+                                      href="#"
+                                      isActive={currentPage === pageNum}
+                                      onClick={() => handlePageChange(pageNum)}
+                                    >
+                                      {pageNum}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                );
+                              }
+                            )}
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() =>
+                                  handlePageChange(currentPage + 1)
+                                }
+                                href="#"
+                                aria-disabled={currentPage >= totalPages}
+                                tabIndex={
+                                  currentPage >= totalPages ? -1 : undefined
+                                }
+                                className={
+                                  currentPage >= totalPages
+                                    ? "pointer-events-none opacity-50"
+                                    : undefined
+                                }
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
-        {/* AKHIR CARD */}
+      </div>
 
-        <Card className="shadow-sm">
-          <CardHeader>
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  Manage all users, roles, and credentials.
-                </CardDescription>
-              </div>
-              <Button onClick={() => handleOpenModal()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add User
-              </Button>
-            </div>
-            <div className="relative mb-4">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search users by email, phone, or role..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-8"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {/* ✨ ICON SORTING SELALU TERLIHAT */}
-                    <TableHead
-                      className="font-semibold cursor-pointer"
-                      onClick={() => handleSort("email")}
-                    >
-                      <div className="flex items-center">
-                        Email
-                        <span className="flex items-center ml-2">
-                          <ArrowUp
-                            className={`h-4 w-4 ${
-                              sortKey === "email" && sortDirection === "asc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <ArrowDown
-                            className={`h-4 w-4 ${
-                              sortKey === "email" && sortDirection === "desc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        </span>
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="font-semibold cursor-pointer"
-                      onClick={() => handleSort("phoneNumber")}
-                    >
-                      <div className="flex items-center">
-                        Phone Number
-                        <span className="flex items-center ml-2">
-                          <ArrowUp
-                            className={`h-4 w-4 ${
-                              sortKey === "phoneNumber" &&
-                              sortDirection === "asc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <ArrowDown
-                            className={`h-4 w-4 ${
-                              sortKey === "phoneNumber" &&
-                              sortDirection === "desc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        </span>
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="font-semibold cursor-pointer"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center">
-                        Role
-                        <span className="flex items-center ml-2">
-                          <ArrowUp
-                            className={`h-4 w-4 ${
-                              sortKey === "role" && sortDirection === "asc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <ArrowDown
-                            className={`h-4 w-4 ${
-                              sortKey === "role" && sortDirection === "desc"
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        </span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right font-semibold">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center h-48">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
-                      </TableCell>
-                    </TableRow>
-                  ) : paginatedUsers.length > 0 ? (
-                    paginatedUsers.map((u) => (
-                      <TableRow
-                        key={u.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-900"
-                      >
-                        <TableCell className="font-medium text-gray-800 dark:text-gray-200">
-                          {u.email}
-                        </TableCell>
-                        <TableCell>{u.phoneNumber}</TableCell>
-                        <TableCell>
-                          <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              u.role === Role.ADMIN
-                                ? "bg-purple-100 text-purple-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {u.role}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenModal(u)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setUserToDelete(u);
-                              setIsDeleteAlertOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500 hover:text-red-600" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="text-center h-48 text-gray-500"
-                      >
-                        No users found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-        {totalPages > 1 && (
-          <Pagination className="mt-6">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  href="#"
-                  aria-disabled={currentPage <= 1}
-                  tabIndex={currentPage <= 1 ? -1 : undefined}
-                  className={
-                    currentPage <= 1
-                      ? "pointer-events-none opacity-50"
-                      : undefined
-                  }
-                />
-              </PaginationItem>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <PaginationItem key={i}>
-                  <PaginationLink
-                    href="#"
-                    isActive={currentPage === i + 1}
-                    onClick={() => handlePageChange(i + 1)}
-                  >
-                    {i + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  href="#"
-                  aria-disabled={currentPage >= totalPages}
-                  tabIndex={currentPage >= totalPages ? -1 : undefined}
-                  className={
-                    currentPage >= totalPages
-                      ? "pointer-events-none opacity-50"
-                      : undefined
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
-      </main>
+      {/* Add/Edit User Dialog */}
       <Dialog open={isModalOpen} onOpenChange={handleCloseModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? "Edit User" : "Add New User"}
+            <DialogTitle className="text-xl">
+              {isEditMode ? "Edit User Account" : "Add New User"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email Address *
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -554,11 +757,16 @@ function UserManagementContent() {
                 onChange={(e) =>
                   setCurrentUser({ ...currentUser, email: e.target.value })
                 }
+                placeholder="user@example.com"
+                className="h-10"
                 required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                Phone Number (Optional)
+              </Label>
               <Input
                 id="phoneNumber"
                 type="tel"
@@ -569,64 +777,116 @@ function UserManagementContent() {
                     phoneNumber: e.target.value,
                   })
                 }
+                placeholder="+1 (555) 123-4567"
+                className="h-10"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password {!isEditMode && "*"}
+              </Label>
               <Input
                 id="password"
                 type="password"
                 placeholder={
-                  isEditMode ? "Leave blank to keep current password" : ""
+                  isEditMode
+                    ? "Leave blank to keep current password"
+                    : "Enter password"
                 }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-10"
+                required={!isEditMode}
               />
+              {isEditMode && (
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to keep the current password
+                </p>
+              )}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role" className="text-sm font-medium">
+                User Role *
+              </Label>
               <Select
                 value={currentUser.role}
                 onValueChange={(value: Role) =>
                   setCurrentUser({ ...currentUser, role: value })
                 }
               >
-                <SelectTrigger id="role">
-                  <SelectValue />
+                <SelectTrigger id="role" className="h-10">
+                  <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Role.ADMIN}>Admin</SelectItem>
-                  <SelectItem value={Role.USER}>User</SelectItem>
+                  <SelectItem value={Role.ADMIN}>
+                    <div className="flex items-center">
+                      <Crown className="h-4 w-4 mr-2 text-purple-600" />
+                      Administrator
+                    </div>
+                  </SelectItem>
+                  <SelectItem value={Role.USER}>
+                    <div className="flex items-center">
+                      <UserCheck className="h-4 w-4 mr-2 text-green-600" />
+                      Regular User
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
+
+            {/* Role Description */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                {currentUser.role === Role.ADMIN ? (
+                  <>
+                    <strong>Administrator:</strong> Full access to all system
+                    features including user management, system configuration,
+                    and administrative functions.
+                  </>
+                ) : (
+                  <>
+                    <strong>Regular User:</strong> Standard access to monitoring
+                    features and device controls. Cannot access administrative
+                    functions.
+                  </>
+                )}
+              </p>
+            </div>
           </form>
+
+          <DialogFooter className="gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button type="submit" form="userForm" onClick={handleSubmit}>
+              {isEditMode ? "Update User" : "Create User"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action will permanently delete the user{" "}
-              <b>{userToDelete?.email}</b>.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Delete User Account</AlertDialogTitle>
           </AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to permanently delete the user account for{" "}
+            <strong>{userToDelete?.email}</strong>? This action cannot be undone
+            and will revoke all access immediately.
+          </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setUserToDelete(null)}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
-              Delete
+              Delete User
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

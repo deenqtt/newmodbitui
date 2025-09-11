@@ -1,0 +1,540 @@
+// prisma/schema.prisma - SQLite version
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"] // untuk RPi
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./iot_dashboard.db"
+}
+
+model User {
+  id                   String            @id @default(cuid())
+  email                String            @unique
+  password             String
+  role                 Role              @default(USER)
+  fingerprintId        String?           @unique
+  cardUid              String?           @unique
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  phoneNumber          String?
+  dashboards           DashboardLayout[]
+  assignedMaintenances Maintenance[]     @relation("AssignedToUser")
+  notifications        Notification[]
+}
+
+model Maintenance {
+  id           Int               @id @default(autoincrement())
+  name         String            @db.VarChar(200)
+  description  String?           @db.VarChar(1000)
+  startTask    DateTime
+  endTask      DateTime
+  assignTo     String
+  targetType   MaintenanceTarget
+  targetId     String
+  status       String            @default("Scheduled") @db.VarChar(50)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  isActive     Boolean           @default(true)
+  assignedTo   User              @relation("AssignedToUser", fields: [assignTo], references: [id])
+  deviceTarget DeviceExternal    @relation(fields: [targetId], references: [id])
+}
+
+model DeviceExternal {
+  id                          String                      @id @default(cuid())
+  uniqId                      String                      @unique @default(cuid())
+  name                        String
+  topic                       String                      @unique
+  address                     String?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+  lastPayload                 Json?
+  lastUpdatedByMqtt           DateTime?
+  alarmConfigs                AlarmConfiguration[]
+  publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
+  sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
+  loggingConfigs              LoggingConfiguration[]
+  maintenanceTasks            Maintenance[]
+  powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
+  pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
+}
+
+model LoggingConfiguration {
+  id           String         @id @default(cuid())
+  customName   String
+  key          String
+  units        String?
+  multiply     Float?         @default(1)
+  deviceUniqId String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  logs         LoggedData[]
+  device       DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+
+  @@unique([deviceUniqId, key])
+}
+
+model LoggedData {
+  id        String               @id @default(cuid())
+  configId  String
+  value     Float
+  timestamp DateTime             @default(now())
+  config    LoggingConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+}
+
+model BillConfiguration {
+  id                        String         @id @default(cuid())
+  customName                String         @unique
+  sourceDeviceKey           String
+  rupiahRatePerKwh          Float          @default(1467)
+  dollarRatePerKwh          Float          @default(0.1)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+  publishTargetDeviceUniqId String         @unique
+  sourceDeviceUniqId        String
+  publishTargetDevice       DeviceExternal @relation("PublishTargetForBill", fields: [publishTargetDeviceUniqId], references: [uniqId])
+  sourceDevice              DeviceExternal @relation("SourceDeviceForBill", fields: [sourceDeviceUniqId], references: [uniqId])
+  logs                      BillLog[]
+}
+
+model BillLog {
+  id         String            @id @default(cuid())
+  configId   String
+  rawValue   Float
+  rupiahCost Float
+  dollarCost Float
+  timestamp  DateTime          @default(now())
+  config     BillConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+}
+
+model PueConfiguration {
+  id             String          @id @default(cuid())
+  customName     String          @unique
+  type           String          @default("pue")
+  apiTopicUniqId String?         @unique
+  pduList        Json?
+  mainPower      Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  apiTopic       DeviceExternal? @relation("PueApiTopic", fields: [apiTopicUniqId], references: [uniqId])
+}
+
+model PowerAnalyzerConfiguration {
+  id             String          @id @default(cuid())
+  customName     String          @unique
+  apiTopicUniqId String?         @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  mainPower      Json?
+  pduList        Json?
+  apiTopic       DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
+}
+
+model MenuConfiguration {
+  id        String   @id @default(cuid())
+  structure Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AlarmConfiguration {
+  id           String                  @id @default(cuid())
+  customName   String
+  alarmType    AlarmType
+  keyType      AlarmKeyType
+  key          String
+  deviceUniqId String
+  minValue     Float?
+  maxValue     Float?
+  maxOnly      Boolean?                @default(false)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  bits         AlarmBitConfiguration[]
+  device       DeviceExternal          @relation(fields: [deviceUniqId], references: [uniqId], onDelete: Cascade)
+  logs         AlarmLog[]
+}
+
+model AlarmBitConfiguration {
+  id              String             @id @default(cuid())
+  alarmConfigId   String
+  bitPosition     Int
+  customName      String
+  alertToWhatsApp Boolean            @default(false)
+  alarmConfig     AlarmConfiguration @relation(fields: [alarmConfigId], references: [id], onDelete: Cascade)
+}
+
+model AlarmLog {
+  id              String             @id @default(cuid())
+  status          AlarmLogStatus
+  triggeringValue String?
+  timestamp       DateTime           @default(now())
+  clearedAt       DateTime?
+  alarmConfigId   String
+  alarmConfig     AlarmConfiguration @relation(fields: [alarmConfigId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ZkTecoDevice {
+  id              String             @id @default(cuid())
+  name            String             @unique
+  ipAddress       String
+  port            Int
+  status          ZkTecoDeviceStatus @default(DISCONNECTED)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  topicIdentifier String?            @unique
+  users           ZkTecoUser[]
+}
+
+model ZkTecoUser {
+  id             String       @id @default(cuid())
+  uid            Int
+  name           String
+  password       String?
+  card           String?
+  fingerprints   Json?
+  zkTecoDeviceId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  zkTecoDevice   ZkTecoDevice @relation(fields: [zkTecoDeviceId], references: [id], onDelete: Cascade)
+
+  @@unique([zkTecoDeviceId, uid])
+}
+
+model Cctv {
+  id         String   @id @default(cuid())
+  name       String
+  ipAddress  String
+  port       Int
+  channel    String?
+  username   String?
+  password   String?
+  resolution String?  @default("640x480")
+  framerate  Int?     @default(15)
+  bitrate    Int?     @default(1024)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  group      String?
+  apiKey     String?
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  name      String
+  layout    Json
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  inUse     Boolean  @default(false)
+  isActive  Boolean? @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+model EnergyTarget {
+  id              String   @id @default(cuid())
+  loggingConfigId String   @unique
+  year            Int
+  monthlyTargets  Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([loggingConfigId, year])
+}
+
+model AccessController {
+  id            String        @id @default(cuid())
+  name          String
+  ipAddress     String        @unique
+  status        String        @default("offline")
+  lockCount     Int           @default(0)
+  firmware      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  doorStatus    Int[]
+  lockAddresses Int[]
+  lastSeen      DateTime?
+  macAddress    String?       @unique
+  freeHeap      Int?
+  logFileSize   Int?
+  spiffsTotal   Int?
+  spiffsUsed    Int?
+  totalHeap     Int?
+  uptime        String?
+  activityLogs  ActivityLog[]
+}
+
+model ActivityLog {
+  id           String           @id @default(cuid())
+  controllerId String
+  timestamp    DateTime
+  message      String
+  details      Json?
+  createdAt    DateTime         @default(now())
+  controller   AccessController @relation(fields: [controllerId], references: [id], onDelete: Cascade)
+}
+
+model LoraDevice {
+  id       String       @id @default(cuid())
+  devEui   String       @unique
+  name     String
+  lastSeen DateTime?
+  data     DeviceData[]
+}
+
+model DeviceData {
+  id        String     @id @default(cuid())
+  timestamp DateTime   @default(now())
+  deviceId  String
+  data      Json
+  device    LoraDevice @relation(fields: [deviceId], references: [id])
+}
+
+model LoraGateway {
+  id          String         @id @default(cuid())
+  gatewayId   String         @unique // Gateway ID dari topic MQTT
+  name        String
+  description String?
+  lastSeen    DateTime?
+  isOnline    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  stats       GatewayStats[]
+}
+
+model GatewayStats {
+  id        String   @id @default(cuid())
+  gatewayId String
+  timestamp DateTime
+
+  // Upstream Statistics
+  rfPacketsReceived     Int   @default(0)
+  rfPacketsOk           Int   @default(0)
+  rfPacketsBad          Int   @default(0)
+  rfPacketsNocrc        Int   @default(0)
+  rfPacketsForwarded    Int   @default(0)
+  upstreamPayloadBytes  Int   @default(0)
+  upstreamDatagramsSent Int   @default(0)
+  upstreamNetworkBytes  Int   @default(0)
+  upstreamAckRatio      Float @default(0)
+  crcOkRatio            Float @default(0)
+  crcFailRatio          Float @default(0)
+  noCrcRatio            Float @default(0)
+
+  // Downstream Statistics
+  pullDataSent                Int   @default(0)
+  pullAckReceived             Int   @default(0)
+  downstreamDatagramsReceived Int   @default(0)
+  downstreamNetworkBytes      Int   @default(0)
+  downstreamPayloadBytes      Int   @default(0)
+  txOk                        Int   @default(0)
+  txErrors                    Int   @default(0)
+  downstreamAckRatio          Float @default(0)
+
+  // SX1302 Status
+  counterInst String @default("0")
+  counterPps  String @default("0")
+
+  // Beacon Status
+  beaconQueued   Int @default(0)
+  beaconSent     Int @default(0)
+  beaconRejected Int @default(0)
+
+  createdAt DateTime    @default(now())
+  gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
+}
+
+model EC25Modem {
+  id           String  @id @default(cuid())
+  imei         String  @unique
+  manufacturer String?
+  model        String?
+  revision     String?
+
+  // Connection status
+  connected Boolean  @default(false)
+  lastSeen  DateTime @default(now())
+
+  // Current network status (latest data, bukan log)
+  currentOperator           String?
+  currentRegistrationStatus String?
+  currentNetworkType        String?
+  currentSignalStrength     Int?
+  currentSignalQuality      Int?
+
+  // Detailed signal info
+  currentRsrp   Float?
+  currentRsrq   Float?
+  currentSinr   Float?
+  currentCellId String?
+
+  // Current GPS position (latest data, bukan log)
+  currentLatitude     Float?
+  currentLongitude    Float?
+  currentAltitude     Float?
+  currentSpeed        Float?
+  currentSatellites   Int?
+  currentGpsFixStatus String?
+
+  // Configuration
+  configApn      String?
+  configUsername String?
+  configPin      String?
+
+  // Relations to historical data
+  networkHistory EC25NetworkData[]
+  gpsHistory     EC25GpsData[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ec25_modems")
+}
+
+// Historical network data - hanya disimpan saat ada perubahan signifikan
+model EC25NetworkData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
+
+  operator           String?
+  registrationStatus String?
+  networkType        String?
+  signalStrength     Int?
+  signalQuality      Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@map("ec25_network_data")
+}
+
+// Historical GPS data - hanya disimpan saat ada perubahan lokasi signifikan
+model EC25GpsData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
+
+  fixStatus  String?
+  latitude   Float?
+  longitude  Float?
+  altitude   Float?
+  speed      Float?
+  satellites Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@index([latitude, longitude])
+  @@map("ec25_gps_data")
+}
+
+// Service health monitoring
+model EC25ServiceHealth {
+  id            String    @id @default(cuid())
+  serviceId     String    @unique
+  status        String
+  lastSeen      DateTime
+  lastHeartbeat DateTime?
+  uptime        Float?
+  memoryUsage   String? // JSON string
+  data          String? // JSON string for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ec25_service_health")
+}
+
+// Service status logs - untuk audit trail
+model EC25ServiceLog {
+  id        String  @id @default(cuid())
+  serviceId String
+  status    String
+  uptime    Float?
+  data      String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceId, createdAt])
+  @@map("ec25_service_logs")
+}
+
+// Alerts dari modem service
+model EC25Alert {
+  id             String    @id @default(cuid())
+  type           String
+  message        String
+  severity       String // info, warning, error, critical
+  requiresAction Boolean   @default(false)
+  details        String? // JSON string
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resolved, createdAt])
+  @@index([severity, createdAt])
+  @@map("ec25_alerts")
+}
+
+// Command logs - untuk audit trail commands
+model EC25CommandLog {
+  id      String  @id @default(cuid())
+  command String
+  status  String
+  message String?
+  data    String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([command, createdAt])
+  @@map("ec25_command_logs")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum AlarmType {
+  CRITICAL
+  MAJOR
+  MINOR
+}
+
+enum AlarmKeyType {
+  DIRECT
+  THRESHOLD
+  BIT_VALUE
+}
+
+enum ZkTecoDeviceStatus {
+  CONNECTED
+  DISCONNECTED
+  CONNECTING
+  ERROR
+}
+
+enum MaintenanceTarget {
+  Device
+  Rack
+}
+
+enum AlarmLogStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  CLEARED
+}

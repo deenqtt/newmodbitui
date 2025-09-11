@@ -22,24 +22,43 @@ model User {
   assignedMaintenances Maintenance[]     @relation("AssignedToUser")
   notifications        Notification[]
 }
+// Tambah ke schema.prisma
+model ZigbeeDevice {
+  id                String   @id @default(cuid())
+  deviceId          String   @unique  // 0x00158d0004851829
+  friendlyName      String   
+  deviceType        String   // sensor, switch, bulb, etc
+  manufacturer      String?  
+  modelId           String?
+  capabilities      Json     // attributes yang supported
+  lastSeen          DateTime?
+  isOnline          Boolean  @default(false)
+  currentState      Json?    // current device state
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-model Maintenance {
-  id           Int               @id @default(autoincrement())
-  name         String            @db.VarChar(200)
-  description  String?           @db.VarChar(1000)
-  startTask    DateTime
-  endTask      DateTime
-  assignTo     String
-  targetType   MaintenanceTarget
-  targetId     String
-  status       String            @default("Scheduled") @db.VarChar(50)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  isActive     Boolean           @default(true)
-  assignedTo   User              @relation("AssignedToUser", fields: [assignTo], references: [id])
-  deviceTarget DeviceExternal    @relation(fields: [targetId], references: [id])
 }
-
+model Maintenance {
+  id             Int               @id @default(autoincrement())
+  name           String
+  description    String?
+  startTask      DateTime
+  endTask        DateTime
+  assignTo       String
+  targetType     MaintenanceTarget
+  targetId       String            // Fleksibel untuk Device ID atau Rack ID
+  status         String            @default("Scheduled")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  isActive       Boolean           @default(true)
+  
+  // Relations
+  assignedTo     User              @relation("AssignedToUser", fields: [assignTo], references: [id])
+  
+  // Optional device relation - hanya untuk targetType = Device
+  deviceTargetId String?           // Foreign key terpisah
+  deviceTarget   DeviceExternal?   @relation(fields: [deviceTargetId], references: [id])
+}
 model DeviceExternal {
   id                          String                      @id @default(cuid())
   uniqId                      String                      @unique @default(cuid())
@@ -48,13 +67,13 @@ model DeviceExternal {
   address                     String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime                    @updatedAt
-  lastPayload                 Json?
+  lastPayload                 String?
   lastUpdatedByMqtt           DateTime?
   alarmConfigs                AlarmConfiguration[]
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
   sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
   loggingConfigs              LoggingConfiguration[]
-  maintenanceTasks            Maintenance[]
+  maintenanceTasks            Maintenance[]               // Ubah dari required ke optional
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
 }
@@ -112,8 +131,8 @@ model PueConfiguration {
   customName     String          @unique
   type           String          @default("pue")
   apiTopicUniqId String?         @unique
-  pduList        Json?
-  mainPower      Json?
+  pduList        String?
+  mainPower      String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   apiTopic       DeviceExternal? @relation("PueApiTopic", fields: [apiTopicUniqId], references: [uniqId])
@@ -125,14 +144,14 @@ model PowerAnalyzerConfiguration {
   apiTopicUniqId String?         @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  mainPower      Json?
-  pduList        Json?
+  mainPower      String?
+  pduList        String?
   apiTopic       DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
 }
 
 model MenuConfiguration {
   id        String   @id @default(cuid())
-  structure Json
+  structure String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -200,7 +219,7 @@ model ZkTecoUser {
   name           String
   password       String?
   card           String?
-  fingerprints   Json?
+  fingerprints   String?
   zkTecoDeviceId String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -229,7 +248,7 @@ model Cctv {
 model DashboardLayout {
   id        String   @id @default(cuid())
   name      String
-  layout    Json
+  layout    String
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,7 +263,7 @@ model EnergyTarget {
   id              String   @id @default(cuid())
   loggingConfigId String   @unique
   year            Int
-  monthlyTargets  Json
+  monthlyTargets  String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -260,8 +279,8 @@ model AccessController {
   firmware      String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  doorStatus    Int[]
-  lockAddresses Int[]
+  doorStatus    String?
+  lockAddresses String?
   lastSeen      DateTime?
   macAddress    String?       @unique
   freeHeap      Int?
@@ -278,7 +297,7 @@ model ActivityLog {
   controllerId String
   timestamp    DateTime
   message      String
-  details      Json?
+  details      String?
   createdAt    DateTime         @default(now())
   controller   AccessController @relation(fields: [controllerId], references: [id], onDelete: Cascade)
 }
@@ -295,9 +314,60 @@ model DeviceData {
   id        String     @id @default(cuid())
   timestamp DateTime   @default(now())
   deviceId  String
-  data      Json
+  data      String
   device    LoraDevice @relation(fields: [deviceId], references: [id])
 }
+
+model LoraGateway {
+  id          String         @id @default(cuid())
+  gatewayId   String         @unique
+  name        String
+  description String?
+  lastSeen    DateTime?
+  isOnline    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  stats       GatewayStats[]
+}
+
+model GatewayStats {
+  id        String   @id @default(cuid())
+  gatewayId String
+  timestamp DateTime
+
+  rfPacketsReceived     Int   @default(0)
+  rfPacketsOk           Int   @default(0)
+  rfPacketsBad          Int   @default(0)
+  rfPacketsNocrc        Int   @default(0)
+  rfPacketsForwarded    Int   @default(0)
+  upstreamPayloadBytes  Int   @default(0)
+  upstreamDatagramsSent Int   @default(0)
+  upstreamNetworkBytes  Int   @default(0)
+  upstreamAckRatio      Float @default(0)
+  crcOkRatio            Float @default(0)
+  crcFailRatio          Float @default(0)
+  noCrcRatio            Float @default(0)
+
+  pullDataSent                Int   @default(0)
+  pullAckReceived             Int   @default(0)
+  downstreamDatagramsReceived Int   @default(0)
+  downstreamNetworkBytes      Int   @default(0)
+  downstreamPayloadBytes      Int   @default(0)
+  txOk                        Int   @default(0)
+  txErrors                    Int   @default(0)
+  downstreamAckRatio          Float @default(0)
+
+  counterInst String @default("0")
+  counterPps  String @default("0")
+
+  beaconQueued   Int @default(0)
+  beaconSent     Int @default(0)
+  beaconRejected Int @default(0)
+
+  createdAt DateTime    @default(now())
+  gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
+}
+
 
 enum Role {
   ADMIN

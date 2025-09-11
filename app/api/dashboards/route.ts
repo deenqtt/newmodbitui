@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const newDashboard = await prisma.dashboardLayout.create({
       data: {
         name,
-        layout: [],
+        layout: JSON.stringify([]),
         userId: auth.userId, // PERBAIKAN: Gunakan auth.userId
         inUse: isFirstDashboard,
       },
