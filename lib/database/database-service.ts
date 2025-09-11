@@ -19,14 +19,8 @@ class DatabaseService {
   constructor(config: DatabaseConfig) {
     this.config = config;
 
-    // Initialize local SQLite
-    this.localDb = new PrismaClient({
-      datasources: {
-        db: {
-          url: "file:./iot_dashboard.db",
-        },
-      },
-    });
+    // Initialize local PostgreSQL
+    this.localDb = new PrismaClient();
 
     // Initialize Supabase if sync enabled
     if (config.enableSync && config.supabaseUrl && config.supabaseKey) {
@@ -338,9 +332,9 @@ class DatabaseService {
 // Singleton instance
 const dbConfig: DatabaseConfig = {
   useLocal: true,
-  enableSync: process.env.ENABLE_CLOUD_SYNC === "true",
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  enableSync: false, // Disable Supabase sync
+  supabaseUrl: undefined,
+  supabaseKey: undefined,
 };
 
 export const db = new DatabaseService(dbConfig);
