@@ -74,21 +74,32 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (clientRef.current) return;
 
-    // Tentukan host secara dinamis berdasarkan lingkungan
-    let mqttHost;
-    if (process.env.NODE_ENV === "production") {
-      // Gunakan window.location.hostname untuk production
-      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
-    } else {
-      // Gunakan environment variable untuk development
-      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
-    }
+    // Fungsi untuk mendapatkan MQTT host berdasarkan environment
+    const getMqttHost = () => {
+      if (process.env.NODE_ENV === "production") {
+        // Di production, gunakan window.location.hostname jika tersedia
+        if (typeof window !== "undefined") {
+          return window.location.hostname;
+        }
+        // Fallback jika window belum tersedia
+        return "localhost";
+      } else {
+        // Di development, gunakan environment variable
+        return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+      }
+    };
 
+    const mqttHost = getMqttHost();
     const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
     const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
+
+    console.log(
+      `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
+    );
+
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
-    mqttClient.onConnectionLost = (responseObject) => {
+    mqttClient.onConnectionLost = (responseObject: Paho.MQTTError) => {
       if (responseObject.errorCode !== 0) {
         setConnectionStatus("Disconnected");
       }
@@ -107,7 +118,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
           mqttClient.subscribe(topic);
         });
       },
-      onFailure: (responseObject) => {
+      onFailure: (responseObject: Paho.MQTTError) => {
         setConnectionStatus("Failed to Connect");
         setIsReady(true);
       },
