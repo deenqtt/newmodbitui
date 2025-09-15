@@ -12,12 +12,12 @@ import { useMqtt } from "@/contexts/MqttContext";
 import {
   Loader2,
   AlertTriangle,
-  RadioTower,
   WifiOff,
   Clock,
   Activity,
   CheckCircle2,
   XCircle,
+  List,
 } from "lucide-react";
 import { getIconComponent } from "@/lib/icon-library";
 
@@ -34,7 +34,7 @@ interface ItemConfig {
   iconBgColor: string;
 }
 
-// Enhanced StatusRow component with better styling
+// Clean minimal StatusRow component
 const StatusRow = ({
   itemConfig,
   layoutMode,
@@ -123,38 +123,44 @@ const StatusRow = ({
 
   const IconComponent = getIconComponent(itemConfig.selectedIcon || "Zap");
 
-  const getStatusStyling = () => {
+  // Clean minimal status styling
+  const getStatusStyles = () => {
+    const baseStyles = {
+      title: "text-slate-700",
+      value: "text-slate-900",
+      unit: "text-slate-500",
+      iconBg: itemConfig.iconBgColor || "#64748B", // Default neutral
+      iconColor: itemConfig.iconColor || "#FFFFFF",
+    };
+
     switch (status) {
       case "ok":
         return {
-          bg: "bg-gradient-to-r from-emerald-50 to-green-50",
-          border: "border-emerald-200/60",
-          indicator: "bg-emerald-500 shadow-emerald-400/50",
-          textColor: "text-emerald-700",
+          ...baseStyles,
+          indicator: "bg-emerald-500",
           pulse: false,
         };
       case "error":
         return {
-          bg: "bg-gradient-to-r from-red-50 to-rose-50",
-          border: "border-red-200/60",
-          indicator: "bg-red-500 shadow-red-400/50",
-          textColor: "text-red-700",
+          ...baseStyles,
+          indicator: "bg-red-500",
           pulse: false,
+          title: "text-red-600",
+          value: "text-red-700",
         };
+      case "loading":
       case "waiting":
         return {
-          bg: "bg-gradient-to-r from-amber-50 to-yellow-50",
-          border: "border-amber-200/60",
-          indicator: "bg-amber-500 shadow-amber-400/50",
-          textColor: "text-amber-700",
+          ...baseStyles,
+          indicator: "bg-amber-500",
           pulse: true,
+          title: "text-slate-600",
+          value: "text-slate-700",
         };
       default:
         return {
-          bg: "bg-gradient-to-r from-slate-50 to-gray-50",
-          border: "border-slate-200/60",
-          indicator: "bg-slate-400 shadow-slate-400/50",
-          textColor: "text-slate-700",
+          ...baseStyles,
+          indicator: "bg-slate-400",
           pulse: false,
         };
     }
@@ -164,6 +170,23 @@ const StatusRow = ({
     if (value === null) return "—";
 
     if (typeof value === "number") {
+      // Smart number formatting
+      if (Math.abs(value) >= 1000000) {
+        return (
+          (value / 1000000).toLocaleString(undefined, {
+            maximumFractionDigits: 1,
+            minimumFractionDigits: 0,
+          }) + "M"
+        );
+      }
+      if (Math.abs(value) >= 1000) {
+        return (
+          (value / 1000).toLocaleString(undefined, {
+            maximumFractionDigits: 1,
+            minimumFractionDigits: 0,
+          }) + "K"
+        );
+      }
       return value.toLocaleString(undefined, {
         maximumFractionDigits: layoutMode === "mini" ? 0 : 1,
         minimumFractionDigits: 0,
@@ -177,7 +200,8 @@ const StatusRow = ({
     const now = new Date();
     const diff = now.getTime() - date.getTime();
 
-    if (diff < 60000) return "now";
+    if (diff < 30000) return "now";
+    if (diff < 60000) return `${Math.floor(diff / 1000)}s`;
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
@@ -189,14 +213,14 @@ const StatusRow = ({
       case "loading":
         return (
           <Loader2
-            className="animate-spin text-blue-500"
+            className="animate-spin text-slate-400"
             style={{ width: iconSize, height: iconSize }}
           />
         );
       case "error":
         return connectionStatus !== "Connected" ? (
           <WifiOff
-            className="text-red-500"
+            className="text-slate-500"
             style={{ width: iconSize, height: iconSize }}
           />
         ) : (
@@ -208,7 +232,7 @@ const StatusRow = ({
       case "waiting":
         return (
           <Clock
-            className="text-amber-500"
+            className="text-slate-400"
             style={{ width: iconSize, height: iconSize }}
           />
         );
@@ -225,6 +249,8 @@ const StatusRow = ({
   };
 
   const renderValue = () => {
+    const styles = getStatusStyles();
+
     if (
       status === "loading" ||
       status === "error" ||
@@ -234,7 +260,7 @@ const StatusRow = ({
         <div className="flex items-center gap-1.5">
           {renderStatusIcon()}
           <span
-            className={`font-medium ${getStatusStyling().textColor}`}
+            className={`font-medium ${styles.title}`}
             style={{ fontSize: `${dynamicSizes.fontSize * 0.8}px` }}
           >
             {status === "loading"
@@ -251,14 +277,14 @@ const StatusRow = ({
       <div className="space-y-0.5">
         <div className="flex items-baseline gap-1">
           <span
-            className="font-bold text-slate-900 tracking-tight"
+            className={`font-bold tracking-tight transition-colors duration-200 ${styles.value}`}
             style={{ fontSize: `${dynamicSizes.fontSize}px` }}
           >
             {formatValue(displayValue)}
           </span>
           {itemConfig.units && (
             <span
-              className="font-medium text-slate-500"
+              className={`font-medium ${styles.unit}`}
               style={{ fontSize: `${dynamicSizes.fontSize * 0.7}px` }}
             >
               {itemConfig.units}
@@ -267,7 +293,7 @@ const StatusRow = ({
         </div>
         {lastUpdate && layoutMode === "normal" && (
           <p
-            className="text-slate-400 flex items-center gap-1"
+            className={`flex items-center gap-1 ${styles.unit} opacity-60`}
             style={{ fontSize: `${dynamicSizes.fontSize * 0.6}px` }}
           >
             <Clock
@@ -283,27 +309,30 @@ const StatusRow = ({
     );
   };
 
-  const statusStyling = getStatusStyling();
+  const styles = getStatusStyles();
 
   return (
     <div
       className={`
         relative group transition-all duration-300 ease-out
-        ${statusStyling.bg} ${statusStyling.border}
-        border rounded-lg shadow-sm hover:shadow-md
+        bg-white border border-slate-200/60 rounded-lg 
+        shadow-sm hover:shadow-md hover:scale-[1.01] transform-gpu
         overflow-hidden
       `}
       style={{ padding: `${dynamicSizes.padding}px` }}
     >
-      {/* Status indicator */}
+      {/* Clean status indicator */}
       <div className="absolute top-2 right-2 z-10">
         <div
           className={`
-            w-2 h-2 rounded-full shadow-lg
-            ${statusStyling.indicator}
-            ${statusStyling.pulse ? "animate-pulse" : ""}
-            transition-all duration-300
+            rounded-full transition-all duration-300
+            ${styles.indicator}
+            ${styles.pulse ? "animate-pulse" : ""}
           `}
+          style={{
+            width: Math.max(dynamicSizes.fontSize * 0.4, 6),
+            height: Math.max(dynamicSizes.fontSize * 0.4, 6),
+          }}
         />
       </div>
 
@@ -311,16 +340,16 @@ const StatusRow = ({
         className="flex items-center"
         style={{ gap: `${dynamicSizes.gap}px` }}
       >
-        {/* Icon */}
+        {/* Icon with clean styling */}
         {IconComponent && (
           <div className="relative flex-shrink-0">
             <div
               className="rounded-lg flex items-center justify-center shadow-sm
                          transition-all duration-300 ease-out transform
-                         hover:scale-105 border border-white/30"
+                         hover:scale-105 border border-slate-200/50"
               style={{
-                backgroundColor: itemConfig.iconBgColor || "#3B82F6",
-                color: itemConfig.iconColor || "#FFFFFF",
+                backgroundColor: styles.iconBg,
+                color: styles.iconColor,
                 padding: `${Math.max(dynamicSizes.padding * 0.3, 4)}px`,
               }}
             >
@@ -331,18 +360,13 @@ const StatusRow = ({
                 }}
               />
             </div>
-            {/* Glow effect */}
-            <div
-              className="absolute inset-0 rounded-lg opacity-20 blur-md transition-opacity duration-300 group-hover:opacity-30"
-              style={{ backgroundColor: itemConfig.iconBgColor || "#3B82F6" }}
-            />
           </div>
         )}
 
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-1">
           <p
-            className="font-semibold text-slate-700 truncate leading-tight"
+            className={`font-medium truncate leading-tight transition-colors duration-200 ${styles.title}`}
             style={{ fontSize: `${dynamicSizes.fontSize * 0.85}px` }}
             title={itemConfig.customName}
           >
@@ -354,8 +378,8 @@ const StatusRow = ({
         </div>
       </div>
 
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/5 via-transparent to-transparent pointer-events-none rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Minimal hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };
@@ -418,7 +442,6 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
       }
 
       // Calculate dynamic sizes
-      const baseScale = Math.sqrt(area) / 150;
       const itemHeight =
         (height - (layoutMode === "mini" ? 40 : 60)) /
         Math.ceil(itemCount / columnCount);
@@ -463,47 +486,39 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
   if (!config || !config.items) {
     return (
-      <div
-        className="w-full h-full flex flex-col items-center justify-center p-4 
-                      bg-gradient-to-br from-red-50 to-red-100
-                      border-2 border-red-200 rounded-xl shadow-sm"
-      >
-        <AlertTriangle className="h-8 w-8 text-red-600 mb-3" />
-        <p className="text-sm font-semibold text-red-700 text-center">
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-white border border-slate-200/60 rounded-xl shadow-sm">
+        <AlertTriangle className="h-8 w-8 text-red-500 mb-3" />
+        <p className="text-sm font-medium text-red-600 text-center">
           Widget not configured correctly
         </p>
       </div>
     );
   }
 
-  // Calculate status summary
   const statusSummary = {
     total: config.items.length,
-    online: 0, // We could track this if StatusRow exposed status
-    offline: 0,
   };
 
   return (
     <div
       ref={containerRef}
       className="w-full h-full flex flex-col
-                 bg-gradient-to-br from-white to-slate-50
-                 
-                 rounded-xl shadow-sm hover:shadow-md
+                 bg-white
+                 border border-slate-200/60 rounded-xl
+                 shadow-sm hover:shadow-md
                  transition-all duration-300 ease-out
                  overflow-hidden"
     >
-      {/* Enhanced Header */}
+      {/* Clean minimal header */}
       <div
         className="flex items-center justify-between px-4 py-3 
-                  bg-gradient-to-r from-white/90 to-slate-50/90 backdrop-blur-sm
-                  border-b border-slate-200/60"
+                  bg-white border-b border-slate-200/40"
         style={{ height: layoutConfig.dynamicSizes.headerHeight }}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg shadow-sm">
-            <Activity
-              className="text-blue-600"
+          <div className="flex-shrink-0 p-2 bg-slate-100 rounded-lg shadow-sm">
+            <List
+              className="text-slate-600"
               style={{
                 width: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
                 height: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
@@ -527,16 +542,16 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
                   fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
                 }}
               >
-                {statusSummary.total} key
+                {statusSummary.total} device
                 {statusSummary.total !== 1 ? "s" : ""}
               </p>
             )}
           </div>
         </div>
 
-        {/* Status indicator */}
+        {/* Status count indicator */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-2 h-2 rounded-full bg-blue-500 shadow-blue-400/50 shadow-lg animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-slate-400" />
           <span
             className="text-slate-600 font-medium"
             style={{
@@ -548,7 +563,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
         </div>
       </div>
 
-      {/* Content with enhanced scrolling */}
+      {/* Content with clean scrolling */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div
           className="p-3"
@@ -575,9 +590,9 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
         </div>
       </div>
 
-      {/* Enhanced Footer for large widgets */}
+      {/* Clean minimal footer for large widgets */}
       {config.items.length > 6 && layoutConfig.layoutMode === "normal" && (
-        <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-200/60 backdrop-blur-sm">
+        <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-200/40">
           <div className="flex items-center justify-between">
             <p
               className="text-slate-600"
@@ -589,7 +604,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
             </p>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                 <span
                   className="text-slate-500"
                   style={{

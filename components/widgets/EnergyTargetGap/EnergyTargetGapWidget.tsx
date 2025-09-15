@@ -1,10 +1,15 @@
 // File: components/widgets/EnergyTargetGap/EnergyTargetGapWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Loader2, AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import {
+  Loader2,
+  AlertTriangle,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle,
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -19,66 +24,66 @@ interface Props {
   };
 }
 
-interface DynamicSizes {
-  valueFontSize: number;
-  iconSize: number;
-  titleFontSize: number;
-  progressHeight: number;
-}
-
 export const EnergyTargetGapWidget = ({ config }: Props) => {
   const [usage, setUsage] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ok">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [layoutMode, setLayoutMode] = useState<"horizontal" | "vertical">(
-    "horizontal"
-  );
-  const [dynamicSizes, setDynamicSizes] = useState<DynamicSizes>({
-    valueFontSize: 24,
-    iconSize: 40,
-    titleFontSize: 14,
-    progressHeight: 12,
-  });
 
-  const widgetRef = useRef<HTMLDivElement>(null);
+  // Responsive sizing setup
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [titleFontSize, setTitleFontSize] = useState(14);
+  const [valueFontSize, setValueFontSize] = useState(24);
+  const [unitFontSize, setUnitFontSize] = useState(12);
+  const [layoutMode, setLayoutMode] = useState<"compact" | "normal">("normal");
 
-  // Responsive sizing dengan ResizeObserver
-  useEffect(() => {
-    if (!widgetRef.current) return;
+  // Enhanced responsive calculation
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        const aspectRatio = width / height;
+    const updateDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
 
-        // Tentukan mode layout berdasarkan aspek rasio
-        const currentLayoutMode = aspectRatio > 1.3 ? "horizontal" : "vertical";
-        setLayoutMode(currentLayoutMode);
+      setDimensions({ width, height });
 
-        // Rumus dinamis yang lebih conservative untuk card kecil
-        let baseSize;
-        if (currentLayoutMode === "horizontal") {
-          baseSize = Math.min(width / 15, height / 5);
-        } else {
-          baseSize = Math.min(width / 6, height / 8);
-        }
+      // Determine layout mode based on size
+      const area = width * height;
+      const currentLayoutMode = area < 25000 ? "compact" : "normal";
+      setLayoutMode(currentLayoutMode);
 
-        setDynamicSizes({
-          valueFontSize: Math.max(16, baseSize * 1.5),
-          iconSize: Math.max(20, baseSize * 1.6),
-          titleFontSize: Math.max(10, baseSize * 0.6),
-          progressHeight: Math.max(8, baseSize * 0.4),
-        });
-      }
-    });
+      // Improved scaling algorithm
+      const minDimension = Math.min(width, height);
+      const scaleFactor = Math.sqrt(area) / 120;
+      const minScaleFactor = Math.min(width / 180, height / 120);
+      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
 
-    resizeObserver.observe(widgetRef.current);
+      const baseValueSize = Math.max(minDimension * 0.12, 16);
+      const maxValueSize = Math.min(width * 0.25, height * 0.3);
+      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
+
+      const newTitleSize = Math.max(
+        Math.min(newValueSize * 0.5, width * 0.08),
+        11
+      );
+      const newUnitSize = Math.max(newValueSize * 0.4, 10);
+
+      setValueFontSize(Math.round(newValueSize));
+      setTitleFontSize(Math.round(newTitleSize));
+      setUnitFontSize(Math.round(newUnitSize));
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    resizeObserver.observe(container);
+    updateDimensions();
+
     return () => resizeObserver.disconnect();
   }, []);
 
   // Fetch usage data
   useEffect(() => {
-    if (!config.loggingConfigId || !config.period) {
+    if (!config.loggingConfigId || !config.period || !config.targetValue) {
       setStatus("error");
       setErrorMessage("Widget not configured correctly.");
       return;
@@ -105,213 +110,336 @@ export const EnergyTargetGapWidget = ({ config }: Props) => {
     };
 
     fetchUsageData();
-  }, [config.loggingConfigId, config.period, config.multiply]);
+  }, [
+    config.loggingConfigId,
+    config.period,
+    config.multiply,
+    config.targetValue,
+  ]);
 
-  // Loading skeleton component
-  const LoadingSkeleton = () => (
-    <div className="w-full px-4">
-      <div className="flex justify-between items-baseline mb-2">
-        <div
-          className="bg-gradient-to-r from-muted/50 via-muted to-muted/50 animate-pulse rounded"
-          style={{
-            width: `${dynamicSizes.valueFontSize * 2}px`,
-            height: `${dynamicSizes.titleFontSize * 1.2}px`,
-          }}
-        />
-        <div
-          className="bg-gradient-to-r from-muted/50 via-muted to-muted/50 animate-pulse rounded"
-          style={{
-            width: `${dynamicSizes.valueFontSize * 3}px`,
-            height: `${dynamicSizes.titleFontSize * 1.2}px`,
-          }}
-        />
-      </div>
-      <div
-        className="bg-gradient-to-r from-muted/30 via-muted/50 to-muted/30 animate-pulse rounded-full mb-3"
-        style={{
-          height: `${dynamicSizes.progressHeight}px`,
-        }}
-      />
-      <div className="flex justify-center">
-        <div
-          className="bg-gradient-to-r from-muted/50 via-muted to-muted/50 animate-pulse rounded-lg"
-          style={{
-            width: `${dynamicSizes.valueFontSize * 4}px`,
-            height: `${dynamicSizes.valueFontSize * 1.2}px`,
-          }}
-        />
-      </div>
-    </div>
-  );
+  // Clean minimal status styling
+  const getStatusStyles = () => {
+    const baseStyles = {
+      title: "text-slate-700",
+      value: "text-slate-900",
+      unit: "text-slate-500",
+    };
 
-  // Render content with animations
+    switch (status) {
+      case "ok":
+        return {
+          ...baseStyles,
+          indicator: "bg-emerald-500",
+          pulse: false,
+        };
+      case "error":
+        return {
+          ...baseStyles,
+          indicator: "bg-red-500",
+          pulse: false,
+          title: "text-red-600",
+          value: "text-red-700",
+        };
+      case "loading":
+        return {
+          ...baseStyles,
+          indicator: "bg-amber-500",
+          pulse: true,
+          title: "text-slate-600",
+          value: "text-slate-700",
+        };
+      default:
+        return {
+          ...baseStyles,
+          indicator: "bg-slate-400",
+          pulse: false,
+        };
+    }
+  };
+
+  const formatValue = (value: number) => {
+    if (Math.abs(value) >= 1000000) {
+      return (
+        (value / 1000000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "M"
+      );
+    }
+    if (Math.abs(value) >= 1000) {
+      return (
+        (value / 1000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "K"
+      );
+    }
+    return value.toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    });
+  };
+
+  const renderProgressBar = (current: number, target: number) => {
+    const progress = Math.min(100, (current / target) * 100);
+    const isOverTarget = current > target;
+
+    return (
+      <div className="w-full space-y-1">
+        <div className="relative h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 rounded-full ${
+              isOverTarget
+                ? "bg-amber-500"
+                : progress >= 80
+                ? "bg-emerald-500"
+                : "bg-blue-500"
+            }`}
+            style={{ width: `${Math.min(progress, 100)}%` }}
+          />
+          {/* Target line marker */}
+          <div className="absolute top-0 right-0 w-0.5 h-full bg-slate-400" />
+        </div>
+        <div className="flex justify-between text-xs text-slate-500">
+          <span>0</span>
+          <span>{formatValue(target)}</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
+    const styles = getStatusStyles();
+
     if (status === "loading") {
       return (
-        <div className="flex items-center justify-center w-full">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
+        <div className="flex flex-col items-center justify-center gap-3">
+          <Loader2
+            className="animate-spin text-slate-400"
+            style={{
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
+            }}
+          />
+          <p
+            className={`font-medium ${styles.title}`}
+            style={{ fontSize: `${titleFontSize}px` }}
           >
-            <Loader2
-              className="animate-spin text-primary"
-              style={{
-                width: `${dynamicSizes.iconSize}px`,
-                height: `${dynamicSizes.iconSize}px`,
-              }}
-            />
-          </motion.div>
+            Loading data...
+          </p>
         </div>
       );
     }
 
     if (status === "error") {
       return (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col items-center justify-center text-center p-2"
-        >
+        <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
-            className="text-destructive mb-2"
+            className="text-red-500"
             style={{
-              width: `${dynamicSizes.iconSize * 0.8}px`,
-              height: `${dynamicSizes.iconSize * 0.8}px`,
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
             }}
           />
           <p
-            className="font-semibold text-destructive text-center"
-            style={{
-              fontSize: `${Math.max(12, dynamicSizes.titleFontSize)}px`,
-            }}
+            className={`font-semibold break-words ${styles.value}`}
+            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
           >
             {errorMessage}
           </p>
-        </motion.div>
+        </div>
       );
     }
 
-    const target = config.targetValue || 0;
+    const target = config.targetValue;
     const current = usage || 0;
-    const progress = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+    const gap = target - current;
+    const progress = (current / target) * 100;
     const isAchieved = current >= target;
-    const gap = Math.max(0, target - current);
-    const gapPercentage = target > 0 ? (gap / target) * 100 : 0;
+    const isOverTarget = current > target;
 
     return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${current}-${target}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="w-full px-4"
-        >
-          <div className="flex justify-between items-baseline mb-2">
-            <span
-              className="font-medium text-muted-foreground"
-              style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
-            >
-              Usage
-            </span>
-            {isAchieved ? (
-              <motion.span
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="font-bold text-green-600 flex items-center"
-                style={{ fontSize: `${dynamicSizes.titleFontSize * 0.9}px` }}
-              >
-                <CheckCircle2
-                  className="mr-1"
-                  style={{
-                    width: `${dynamicSizes.iconSize * 0.5}px`,
-                    height: `${dynamicSizes.iconSize * 0.5}px`,
-                  }}
-                />
-                Achieved
-              </motion.span>
-            ) : (
+      <div className="w-full space-y-4">
+        {layoutMode === "normal" && (
+          <>
+            {/* Progress visualization */}
+            <div className="space-y-2">
+              {renderProgressBar(current, target)}
+            </div>
+
+            {/* Current vs Target comparison */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Current</p>
+                <p
+                  className={`font-bold ${styles.value}`}
+                  style={{ fontSize: `${valueFontSize * 0.8}px` }}
+                >
+                  {formatValue(current)}
+                </p>
+                <p
+                  className={`${styles.unit}`}
+                  style={{ fontSize: `${unitFontSize * 0.9}px` }}
+                >
+                  {config.units}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Target</p>
+                <p
+                  className="font-bold text-slate-600"
+                  style={{ fontSize: `${valueFontSize * 0.8}px` }}
+                >
+                  {formatValue(target)}
+                </p>
+                <p
+                  className="text-slate-500"
+                  style={{ fontSize: `${unitFontSize * 0.9}px` }}
+                >
+                  {config.units}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Status indicator */}
+        <div className="flex items-center justify-center gap-2 p-2 bg-slate-50 rounded-lg">
+          {isAchieved ? (
+            <>
+              <CheckCircle
+                className="text-emerald-600"
+                style={{
+                  width: titleFontSize * 1.2,
+                  height: titleFontSize * 1.2,
+                }}
+              />
               <span
-                className="font-medium text-muted-foreground"
-                style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
+                className="font-medium text-emerald-700"
+                style={{ fontSize: `${titleFontSize}px` }}
               >
-                Target: {target.toLocaleString()} {config.units}
+                {isOverTarget
+                  ? `${formatValue(Math.abs(gap))} over target`
+                  : "Target achieved"}
               </span>
-            )}
-          </div>
-
-          <div className="mb-3">
-            <Progress
-              value={progress}
-              className="w-full transition-all duration-500 ease-out"
-              style={{ height: `${dynamicSizes.progressHeight}px` }}
-            />
-          </div>
-
-          <div className="text-center">
-            <p
-              className="font-bold text-primary"
-              style={{ fontSize: `${dynamicSizes.valueFontSize}px` }}
-            >
-              {current.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+            </>
+          ) : (
+            <>
+              <Target
+                className="text-slate-500"
+                style={{
+                  width: titleFontSize * 1.2,
+                  height: titleFontSize * 1.2,
+                }}
+              />
               <span
-                className="text-muted-foreground ml-1"
-                style={{ fontSize: `${dynamicSizes.valueFontSize * 0.6}px` }}
+                className="font-medium text-slate-600"
+                style={{ fontSize: `${titleFontSize}px` }}
+              >
+                {formatValue(gap)} to target
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Compact mode - show only essential info */}
+        {layoutMode === "compact" && (
+          <div className="text-center">
+            <div className="flex items-baseline justify-center gap-2">
+              <span
+                className={`font-bold ${styles.value}`}
+                style={{ fontSize: `${valueFontSize}px` }}
+              >
+                {formatValue(current)}
+              </span>
+              <span className="text-slate-400">/</span>
+              <span
+                className="font-medium text-slate-600"
+                style={{ fontSize: `${valueFontSize * 0.7}px` }}
+              >
+                {formatValue(target)}
+              </span>
+              <span
+                className={`${styles.unit}`}
+                style={{ fontSize: `${unitFontSize}px` }}
               >
                 {config.units}
               </span>
-            </p>
-
-            {!isAchieved && (
-              <motion.p
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-muted-foreground mt-1"
-                style={{ fontSize: `${dynamicSizes.titleFontSize * 0.85}px` }}
-              >
-                {gap.toLocaleString(undefined, { maximumFractionDigits: 1 })}{" "}
-                {config.units} to target
-              </motion.p>
-            )}
+            </div>
           </div>
-        </motion.div>
-      </AnimatePresence>
+        )}
+      </div>
     );
   };
 
+  const styles = getStatusStyles();
+
   return (
     <div
-      ref={widgetRef}
-      className="w-full h-full flex flex-col items-center justify-center p-4 cursor-move bg-card/30 backdrop-blur-sm rounded-xl border border-border/50 shadow-sm"
+      ref={containerRef}
+      className={`
+        w-full h-full relative overflow-hidden cursor-move
+        bg-white
+        border border-slate-200/60 rounded-xl
+        shadow-sm hover:shadow-md
+        transition-all duration-300 ease-out
+        group hover:scale-[1.01] transform-gpu
+      `}
+      style={{
+        minWidth: 200,
+        minHeight: 120,
+      }}
     >
-      <motion.div
-        className="flex items-center w-full mb-3"
-        style={{
-          justifyContent: layoutMode === "horizontal" ? "flex-start" : "center",
-        }}
-      >
-        <TrendingUp
-          className="text-muted-foreground mr-2 flex-shrink-0"
+      {/* Status indicators */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+        <Target
+          className="text-slate-400"
           style={{
-            width: `${dynamicSizes.iconSize * 0.5}px`,
-            height: `${dynamicSizes.iconSize * 0.5}px`,
+            width: Math.max(titleFontSize * 0.8, 12),
+            height: Math.max(titleFontSize * 0.8, 12),
           }}
         />
-        <p
-          className="font-medium text-muted-foreground truncate"
-          style={{ fontSize: `${dynamicSizes.titleFontSize * 0.9}px` }}
+
+        <div
+          className={`rounded-full transition-all duration-300 ${
+            styles.indicator
+          } ${styles.pulse ? "animate-pulse" : ""}`}
+          style={{
+            width: Math.max(titleFontSize * 0.6, 8),
+            height: Math.max(titleFontSize * 0.6, 8),
+          }}
+        />
+      </div>
+
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-4 pr-16">
+        <h3
+          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
+          style={{
+            fontSize: `${titleFontSize}px`,
+            lineHeight: 1.3,
+          }}
+          title={config.widgetTitle}
         >
           {config.widgetTitle}
-        </p>
-      </motion.div>
+        </h3>
+      </div>
 
-      <div className="w-full flex-1 flex items-center justify-center">
+      {/* Main content area */}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingTop: titleFontSize * 2.5,
+          paddingBottom: 16,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
         {renderContent()}
       </div>
+
+      {/* Minimal hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

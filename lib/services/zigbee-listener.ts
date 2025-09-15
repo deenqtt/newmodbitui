@@ -12,7 +12,19 @@ class ZigbeeListenerService {
     string,
     { resolve: Function; reject: Function }
   >();
-
+  // MQTT Configuration from environment variables
+  private mqttConfig = {
+    brokerUrl: process.env.MQTT_BROKER_URL || "mqtt://localhost:1883",
+    username: process.env.MQTT_USERNAME || undefined,
+    password: process.env.MQTT_PASSWORD || undefined,
+    clientId:
+      process.env.MQTT_CLIENT_ID ||
+      `newmodbitui_${Math.random().toString(16).substr(2, 8)}`,
+    keepalive: parseInt(process.env.MQTT_KEEPALIVE || "30"),
+    connectTimeout: parseInt(process.env.MQTT_CONNECT_TIMEOUT || "10000"),
+    reconnectPeriod: parseInt(process.env.MQTT_RECONNECT_PERIOD || "2000"),
+  };
+  // Log MQTT configuration (without sensitive info)
   // COMPREHENSIVE device mapping covering 4500+ devices from 510+ vendors
   private deviceMapping = {
     // 510+ Manufacturer mappings (enhanced with complete database)
@@ -342,20 +354,30 @@ class ZigbeeListenerService {
     if (this.isRunning) return;
 
     try {
-      console.log("🔗 Connecting to Zigbee2MQTT broker...");
-
-      this.client = mqtt.connect("mqtt://52.74.91.79:1883", {
-        clientId: `newmodbitui_${Math.random().toString(16).substr(2, 8)}`,
-        keepalive: 30,
-        reconnectPeriod: 2000,
-        connectTimeout: 10000,
+      // Build connection options
+      const connectOptions: mqtt.IClientOptions = {
+        clientId: this.mqttConfig.clientId,
+        keepalive: this.mqttConfig.keepalive,
+        reconnectPeriod: this.mqttConfig.reconnectPeriod,
+        connectTimeout: this.mqttConfig.connectTimeout,
         queueQoSZero: false,
         clean: true,
         properties: {
           requestResponseInformation: true,
           requestProblemInformation: true,
         },
-      });
+      };
+
+      // Add authentication if provided
+      if (this.mqttConfig.username) {
+        connectOptions.username = this.mqttConfig.username;
+      }
+      if (this.mqttConfig.password) {
+        connectOptions.password = this.mqttConfig.password;
+      }
+
+      console.log(`🔗 Connecting to MQTT broker: ${this.mqttConfig.brokerUrl}`);
+      this.client = mqtt.connect(this.mqttConfig.brokerUrl, connectOptions);
 
       this.setupEventHandlers();
       this.isRunning = true;
@@ -1463,6 +1485,7 @@ class ZigbeeListenerService {
     // TAMBAHAN: Espressif (ESP32/ESP8266) device detection
     if (
       manufacturer.includes("espressif") ||
+      manufacturer.includes("GSPE") ||
       manufacturer.includes("Espressif")
     ) {
       console.log(

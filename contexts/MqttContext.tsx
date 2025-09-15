@@ -74,31 +74,47 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (clientRef.current) return;
 
-    // Tentukan host secara dinamis berdasarkan lingkungan
-    let mqttHost;
-    if (process.env.NODE_ENV === "production") {
-      // Gunakan window.location.hostname untuk production
-      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
-    } else {
-      // Gunakan environment variable untuk development
-      mqttHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
-    }
+    // Fungsi untuk mendapatkan MQTT host berdasarkan environment
+    const getMqttHost = () => {
+      if (process.env.NODE_ENV === "production") {
+        // Di production, gunakan window.location.hostname jika tersedia
+        if (typeof window !== "undefined") {
+          return window.location.hostname;
+        }
+        // Fallback jika window belum tersedia
+        return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+      } else {
+        // Di development, gunakan environment variable
+        return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+      }
+    };
 
-    const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
-    const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
+    const mqttHost = getMqttHost();
+    const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000", 10);
+    // Menggunakan slice() yang lebih modern daripada substr()
+    const clientId = `web-client-${Math.random().toString(16).slice(2, 10)}`;
+
+    // [FIXED] Menambahkan backtick ` di awal string
+    console.log(
+      `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
+    );
+
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
-    mqttClient.onConnectionLost = (responseObject) => {
+
+    mqttClient.onConnectionLost = (responseObject: Paho.MQTTError) => {
       if (responseObject.errorCode !== 0) {
         setConnectionStatus("Disconnected");
       }
     };
+
     mqttClient.onMessageArrived = (message: Paho.Message) => {
       const topic = message.destinationName;
       const payload = message.payloadString;
       const topicListeners = listenersRef.current.get(topic) || [];
       topicListeners.forEach((listener) => listener(topic, payload));
     };
+
     mqttClient.connect({
       onSuccess: () => {
         setConnectionStatus("Connected");
@@ -107,14 +123,16 @@ export function MqttProvider({ children }: { children: ReactNode }) {
           mqttClient.subscribe(topic);
         });
       },
-      onFailure: (responseObject) => {
+      onFailure: (responseObject: Paho.MQTTError) => {
+        console.error("MQTT Connection Failure:", responseObject.errorMessage);
         setConnectionStatus("Failed to Connect");
-        setIsReady(true);
+        setIsReady(false); // Set isReady ke false jika koneksi gagal
       },
       useSSL: false,
       reconnect: true,
       cleanSession: true,
     });
+
     return () => {
       if (clientRef.current && clientRef.current.isConnected()) {
         clientRef.current.disconnect();

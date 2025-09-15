@@ -9,7 +9,14 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle, Activity } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -28,20 +35,24 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   const [displayValue, setDisplayValue] = useState<string | number | null>(
     null
   );
+  const [previousValue, setPreviousValue] = useState<string | number | null>(
+    null
+  );
   const [status, setStatus] = useState<"loading" | "error" | "ok" | "waiting">(
     "loading"
   );
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [topic, setTopic] = useState<string | null>(null);
+  const [trend, setTrend] = useState<"up" | "down" | "stable" | null>(null);
 
-  // Responsive font sizing with improved scaling
+  // Responsive sizing
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [titleFontSize, setTitleFontSize] = useState(14);
   const [valueFontSize, setValueFontSize] = useState(24);
   const [unitFontSize, setUnitFontSize] = useState(12);
 
-  // Enhanced responsive calculation
+  // Enhanced responsive calculation with better proportions
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -49,37 +60,36 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     const updateDimensions = () => {
       const rect = container.getBoundingClientRect();
       const { width, height } = rect;
-
       setDimensions({ width, height });
 
-      // Advanced responsive scaling
+      // Improved scaling algorithm
+      const minDimension = Math.min(width, height);
+      const maxDimension = Math.max(width, height);
       const area = width * height;
-      const aspectRatio = width / height;
 
-      // Base scaling factors
-      const baseScale = Math.sqrt(area) / 100;
-      const minScale = Math.min(width / 150, height / 100);
-      const scale = Math.min(baseScale, minScale);
+      // Dynamic font scaling based on container size
+      const scaleFactor = Math.sqrt(area) / 120;
+      const minScaleFactor = Math.min(width / 180, height / 120);
+      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
 
-      // Dynamic font sizes with better proportions
-      const newValueSize = Math.max(Math.min(width / 6, height / 2.5), 16);
+      // Better proportioned font sizes
+      const baseValueSize = Math.max(minDimension * 0.15, 18);
+      const maxValueSize = Math.min(width * 0.3, height * 0.4);
+      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
 
       const newTitleSize = Math.max(
-        Math.min(width / 15, height / 8, newValueSize * 0.5),
-        10
+        Math.min(newValueSize * 0.45, width * 0.08),
+        12
       );
+      const newUnitSize = Math.max(newValueSize * 0.4, 10);
 
-      const newUnitSize = Math.max(newValueSize * 0.35, 10);
-
-      setValueFontSize(newValueSize);
-      setTitleFontSize(newTitleSize);
-      setUnitFontSize(newUnitSize);
+      setValueFontSize(Math.round(newValueSize));
+      setTitleFontSize(Math.round(newTitleSize));
+      setUnitFontSize(Math.round(newUnitSize));
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
     resizeObserver.observe(container);
-
-    // Initial calculation
     updateDimensions();
 
     return () => resizeObserver.disconnect();
@@ -121,12 +131,33 @@ export const SingleValueCardWidget = ({ config }: Props) => {
           typeof payload.value === "string"
             ? JSON.parse(payload.value)
             : payload.value || {};
+
         if (innerPayload.hasOwnProperty(config.selectedKey)) {
           const rawValue = innerPayload[config.selectedKey];
           const finalValue =
             typeof rawValue === "number"
               ? rawValue * (config.multiply || 1)
               : rawValue;
+
+          // Calculate trend
+          if (
+            previousValue !== null &&
+            typeof finalValue === "number" &&
+            typeof previousValue === "number"
+          ) {
+            const diff = finalValue - previousValue;
+            const threshold = Math.abs(previousValue * 0.01); // 1% threshold
+
+            if (Math.abs(diff) <= threshold) {
+              setTrend("stable");
+            } else if (diff > 0) {
+              setTrend("up");
+            } else {
+              setTrend("down");
+            }
+          }
+
+          setPreviousValue(displayValue);
           setDisplayValue(finalValue);
           setStatus("ok");
         }
@@ -134,7 +165,7 @@ export const SingleValueCardWidget = ({ config }: Props) => {
         console.error("Failed to parse MQTT payload:", e);
       }
     },
-    [config.selectedKey, config.multiply]
+    [config.selectedKey, config.multiply, displayValue, previousValue]
   );
 
   useEffect(() => {
@@ -154,28 +185,45 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     handleMqttMessage,
   ]);
 
-  const getStatusColor = () => {
+  const getStatusStyles = () => {
+    // Clean minimal approach - always white background, hanya status di indicator dan text
+    const baseStyles = {
+      title: "text-slate-700",
+      value: "text-slate-900",
+      unit: "text-slate-500",
+    };
+
     switch (status) {
       case "ok":
-        return "text-emerald-600 bg-emerald-50 border-emerald-200";
+        return {
+          ...baseStyles,
+          indicator: "bg-emerald-500",
+          pulse: false,
+        };
       case "error":
-        return "text-red-600 bg-red-50 border-red-200";
+        return {
+          ...baseStyles,
+          indicator: "bg-red-500",
+          pulse: false,
+          // Sedikit hint warna di text untuk error
+          title: "text-red-600",
+          value: "text-red-700",
+        };
       case "loading":
       case "waiting":
-        return "text-amber-600 bg-amber-50 border-amber-200";
+        return {
+          ...baseStyles,
+          indicator: "bg-amber-500",
+          pulse: true,
+          title: "text-slate-600",
+          value: "text-slate-700",
+        };
       default:
-        return "text-slate-600 bg-slate-50 border-slate-200";
-    }
-  };
-
-  const getValueColor = () => {
-    switch (status) {
-      case "ok":
-        return "text-slate-900";
-      case "error":
-        return "text-red-600";
-      default:
-        return "text-slate-600";
+        return {
+          ...baseStyles,
+          indicator: "bg-slate-400",
+          pulse: false,
+        };
     }
   };
 
@@ -183,6 +231,22 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     if (value === null) return "—";
 
     if (typeof value === "number") {
+      if (Math.abs(value) >= 1000000) {
+        return (
+          (value / 1000000).toLocaleString(undefined, {
+            maximumFractionDigits: 1,
+            minimumFractionDigits: 0,
+          }) + "M"
+        );
+      }
+      if (Math.abs(value) >= 1000) {
+        return (
+          (value / 1000).toLocaleString(undefined, {
+            maximumFractionDigits: 1,
+            minimumFractionDigits: 0,
+          }) + "K"
+        );
+      }
       return value.toLocaleString(undefined, {
         maximumFractionDigits: 2,
         minimumFractionDigits: value % 1 === 0 ? 0 : 1,
@@ -192,7 +256,38 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     return String(value);
   };
 
+  const renderTrendIndicator = () => {
+    if (!trend || status !== "ok") return null;
+
+    const trendConfig = {
+      up: { icon: TrendingUp, color: "text-emerald-500" },
+      down: { icon: TrendingDown, color: "text-red-500" },
+      stable: { icon: Minus, color: "text-slate-400" },
+    };
+
+    const { icon: Icon, color } = trendConfig[trend];
+
+    return (
+      <div
+        className="flex items-center justify-center p-1.5 rounded-full bg-white shadow-sm border border-slate-200/50"
+        style={{
+          width: Math.max(titleFontSize * 1.8, 20),
+          height: Math.max(titleFontSize * 1.8, 20),
+        }}
+      >
+        <Icon
+          className={color}
+          style={{
+            width: Math.max(titleFontSize * 0.9, 12),
+            height: Math.max(titleFontSize * 0.9, 12),
+          }}
+        />
+      </div>
+    );
+  };
+
   const renderContent = () => {
+    const styles = getStatusStyles();
     const isLoading =
       status === "loading" || (status === "waiting" && displayValue === null);
 
@@ -201,18 +296,18 @@ export const SingleValueCardWidget = ({ config }: Props) => {
         <div className="flex flex-col items-center justify-center gap-3">
           <div className="relative">
             <Loader2
-              className="animate-spin text-amber-500"
+              className="animate-spin text-slate-400"
               style={{
-                width: Math.max(dimensions.width / 8, 24),
-                height: Math.max(dimensions.width / 8, 24),
+                width: Math.max(dimensions.width / 8, 28),
+                height: Math.max(dimensions.width / 8, 28),
               }}
             />
           </div>
           <p
-            className="text-slate-500 font-medium"
+            className={`font-medium ${styles.title}`}
             style={{ fontSize: `${titleFontSize}px` }}
           >
-            Loading...
+            Loading data...
           </p>
         </div>
       );
@@ -220,17 +315,17 @@ export const SingleValueCardWidget = ({ config }: Props) => {
 
     if (status === "error") {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
             className="text-red-500"
             style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
             }}
           />
           <p
-            className="text-red-600 font-semibold max-w-full break-words"
-            style={{ fontSize: `${titleFontSize}px` }}
+            className={`font-semibold break-words ${styles.value}`}
+            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
           >
             {errorMessage}
           </p>
@@ -239,10 +334,10 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     }
 
     return (
-      <div className="flex flex-col items-center justify-center text-center w-full">
-        <div className="flex items-baseline justify-center gap-1 w-full">
+      <div className="flex flex-col items-center justify-center text-center w-full gap-1">
+        <div className="flex items-baseline justify-center gap-2 w-full">
           <span
-            className={`font-bold tracking-tight transition-colors duration-200 ${getValueColor()}`}
+            className={`font-bold tracking-tight transition-all duration-300 ${styles.value}`}
             style={{
               fontSize: `${valueFontSize}px`,
               lineHeight: 0.9,
@@ -252,7 +347,7 @@ export const SingleValueCardWidget = ({ config }: Props) => {
           </span>
           {config.units && (
             <span
-              className="font-medium text-slate-500 transition-colors duration-200"
+              className={`font-medium transition-colors duration-200 ${styles.unit}`}
               style={{
                 fontSize: `${unitFontSize}px`,
                 lineHeight: 1,
@@ -266,46 +361,47 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     );
   };
 
+  const styles = getStatusStyles();
+
   return (
     <div
       ref={containerRef}
       className={`
         w-full h-full relative overflow-hidden cursor-move
-        bg-gradient-to-br from-white to-slate-50
-      
-        rounded-xl shadow-sm hover:shadow-md
+        bg-white
+        border border-slate-200/60 rounded-xl
+        shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
-        group
+        group hover:scale-[1.01] transform-gpu
       `}
       style={{
         minWidth: 120,
         minHeight: 80,
       }}
     >
-      {/* Status indicator */}
-      <div className="absolute top-2 right-2 opacity-75 group-hover:opacity-100 transition-opacity">
-        <Activity
-          className={
-            status === "ok"
-              ? "text-emerald-500"
-              : status === "error"
-              ? "text-red-500"
-              : "text-amber-500"
-          }
-          style={{
-            width: Math.max(titleFontSize * 0.8, 8),
-            height: Math.max(titleFontSize * 0.8, 8),
-          }}
-        />
+      {/* Status indicators - clean minimal approach */}
+      <div className="absolute top-3 right-3 z-10">
+        <div className="flex items-center gap-2">
+          {renderTrendIndicator()}
+          <div
+            className={`rounded-full transition-all duration-300 ${
+              styles.indicator
+            } ${styles.pulse ? "animate-pulse" : ""}`}
+            style={{
+              width: Math.max(titleFontSize * 0.6, 8),
+              height: Math.max(titleFontSize * 0.6, 8),
+            }}
+          />
+        </div>
       </div>
 
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-3">
+      {/* Header with clean typography */}
+      <div className="absolute top-0 left-0 right-0 p-4 pr-16">
         <h3
-          className="font-semibold text-slate-700 truncate text-left"
+          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
           style={{
             fontSize: `${titleFontSize}px`,
-            lineHeight: 1.2,
+            lineHeight: 1.3,
           }}
           title={config.customName}
         >
@@ -314,12 +410,20 @@ export const SingleValueCardWidget = ({ config }: Props) => {
       </div>
 
       {/* Main content area */}
-      <div className="absolute inset-0 pt-12 pb-4 px-4 flex items-center justify-center">
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingTop: titleFontSize * 2.5,
+          paddingBottom: 16,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
         {renderContent()}
       </div>
 
-      {/* Subtle gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Subtle hover effect - minimal */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

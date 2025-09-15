@@ -8,6 +8,7 @@ import {
   Zap,
   TrendingUp,
   TrendingDown,
+  Calendar,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -22,56 +23,12 @@ interface Props {
   };
 }
 
-// Get energy-specific styling based on usage level and period
-const getEnergyStyle = (
-  status: string,
-  usage: number | null,
-  period: string
-) => {
-  if (status !== "ok") {
-    return {
-      border: status === "error" ? "border-red-200" : "border-amber-200",
-      bg: status === "error" ? "bg-red-50" : "bg-amber-50",
-    };
-  }
-
-  // Color based on energy usage level (if it's a number)
-  if (typeof usage === "number") {
-    if (usage < 100) {
-      return {
-        border: "border-emerald-200",
-        bg: "bg-emerald-50", // Low usage - efficient
-      };
-    } else if (usage < 500) {
-      return {
-        border: "border-blue-200",
-        bg: "bg-blue-50", // Normal usage
-      };
-    } else if (usage < 1000) {
-      return {
-        border: "border-orange-200",
-        bg: "bg-orange-50", // High usage - monitor
-      };
-    } else {
-      return {
-        border: "border-red-200",
-        bg: "bg-red-50", // Very high usage - attention needed
-      };
-    }
-  }
-
-  // Default period-based styling
-  return period === "current_month"
-    ? { border: "border-blue-200", bg: "bg-blue-50" }
-    : { border: "border-slate-200", bg: "bg-slate-50" };
-};
-
 export const EnergyUsageWidget = ({ config }: Props) => {
   const [usage, setUsage] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ok">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Responsive sizing setup (sama seperti widgets lainnya)
+  // Responsive sizing setup
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [titleFontSize, setTitleFontSize] = useState(14);
@@ -89,23 +46,27 @@ export const EnergyUsageWidget = ({ config }: Props) => {
 
       setDimensions({ width, height });
 
-      // Advanced responsive scaling
+      // Improved scaling algorithm
+      const minDimension = Math.min(width, height);
       const area = width * height;
-      const baseScale = Math.sqrt(area) / 100;
-      const minScale = Math.min(width / 150, height / 100);
-      const scale = Math.min(baseScale, minScale);
 
-      // Dynamic font sizes with better proportions
-      const newValueSize = Math.max(Math.min(width / 6, height / 2.5), 16);
+      const scaleFactor = Math.sqrt(area) / 120;
+      const minScaleFactor = Math.min(width / 180, height / 120);
+      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
+
+      const baseValueSize = Math.max(minDimension * 0.15, 18);
+      const maxValueSize = Math.min(width * 0.3, height * 0.4);
+      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
+
       const newTitleSize = Math.max(
-        Math.min(width / 15, height / 8, newValueSize * 0.5),
-        10
+        Math.min(newValueSize * 0.45, width * 0.08),
+        12
       );
-      const newUnitSize = Math.max(newValueSize * 0.35, 10);
+      const newUnitSize = Math.max(newValueSize * 0.4, 10);
 
-      setValueFontSize(newValueSize);
-      setTitleFontSize(newTitleSize);
-      setUnitFontSize(newUnitSize);
+      setValueFontSize(Math.round(newValueSize));
+      setTitleFontSize(Math.round(newTitleSize));
+      setUnitFontSize(Math.round(newUnitSize));
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
@@ -146,32 +107,99 @@ export const EnergyUsageWidget = ({ config }: Props) => {
     fetchUsageData();
   }, [config.loggingConfigId, config.period, config.multiply]);
 
-  const energyStyle = getEnergyStyle(status, usage, config.period);
+  // Clean minimal status styling
+  const getStatusStyles = () => {
+    const baseStyles = {
+      title: "text-slate-700",
+      value: "text-slate-900",
+      unit: "text-slate-500",
+    };
+
+    switch (status) {
+      case "ok":
+        return {
+          ...baseStyles,
+          indicator: "bg-emerald-500",
+          pulse: false,
+        };
+      case "error":
+        return {
+          ...baseStyles,
+          indicator: "bg-red-500",
+          pulse: false,
+          title: "text-red-600",
+          value: "text-red-700",
+        };
+      case "loading":
+        return {
+          ...baseStyles,
+          indicator: "bg-amber-500",
+          pulse: true,
+          title: "text-slate-600",
+          value: "text-slate-700",
+        };
+      default:
+        return {
+          ...baseStyles,
+          indicator: "bg-slate-400",
+          pulse: false,
+        };
+    }
+  };
+
+  // Get usage level condition - minimal colors
+  const getUsageCondition = (value: number) => {
+    if (value < 100) {
+      return {
+        label: "Efficient",
+        color: "text-emerald-600",
+        dotColor: "bg-emerald-500",
+      };
+    } else if (value < 500) {
+      return {
+        label: "Normal",
+        color: "text-blue-600",
+        dotColor: "bg-blue-500",
+      };
+    } else if (value < 1000) {
+      return {
+        label: "High",
+        color: "text-orange-600",
+        dotColor: "bg-orange-500",
+      };
+    } else {
+      return {
+        label: "Critical",
+        color: "text-red-600",
+        dotColor: "bg-red-500",
+      };
+    }
+  };
 
   const formatValue = (value: number | null) => {
     if (value === null) return "—";
+
+    // Smart number formatting
+    if (Math.abs(value) >= 1000000) {
+      return (
+        (value / 1000000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "M"
+      );
+    }
+    if (Math.abs(value) >= 1000) {
+      return (
+        (value / 1000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "K"
+      );
+    }
     return value.toLocaleString(undefined, {
       maximumFractionDigits: 1,
       minimumFractionDigits: value % 1 === 0 ? 0 : 1,
     });
-  };
-
-  const getStatusIcon = () => {
-    if (typeof usage === "number") {
-      if (usage < 100) return "text-emerald-500";
-      if (usage < 500) return "text-blue-500";
-      if (usage < 1000) return "text-orange-500";
-      return "text-red-500";
-    }
-
-    switch (status) {
-      case "ok":
-        return "text-slate-500";
-      case "error":
-        return "text-red-500";
-      default:
-        return "text-amber-500";
-    }
   };
 
   const getPeriodIcon = () => {
@@ -179,23 +207,25 @@ export const EnergyUsageWidget = ({ config }: Props) => {
   };
 
   const renderContent = () => {
+    const styles = getStatusStyles();
+
     if (status === "loading") {
       return (
         <div className="flex flex-col items-center justify-center gap-3">
           <div className="relative">
             <Loader2
-              className="animate-spin text-amber-500"
+              className="animate-spin text-slate-400"
               style={{
-                width: Math.max(dimensions.width / 8, 24),
-                height: Math.max(dimensions.width / 8, 24),
+                width: Math.max(dimensions.width / 8, 28),
+                height: Math.max(dimensions.width / 8, 28),
               }}
             />
           </div>
           <p
-            className="text-slate-500 font-medium"
+            className={`font-medium ${styles.title}`}
             style={{ fontSize: `${titleFontSize}px` }}
           >
-            Loading...
+            Loading data...
           </p>
         </div>
       );
@@ -203,17 +233,17 @@ export const EnergyUsageWidget = ({ config }: Props) => {
 
     if (status === "error") {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
             className="text-red-500"
             style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
             }}
           />
           <p
-            className="text-red-600 font-semibold max-w-full break-words"
-            style={{ fontSize: `${titleFontSize}px` }}
+            className={`font-semibold break-words ${styles.value}`}
+            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
           >
             {errorMessage}
           </p>
@@ -222,10 +252,11 @@ export const EnergyUsageWidget = ({ config }: Props) => {
     }
 
     return (
-      <div className="flex flex-col items-center justify-center text-center w-full">
-        <div className="flex items-baseline justify-center gap-1 w-full">
+      <div className="flex flex-col items-center justify-center text-center w-full gap-2">
+        {/* Main value display */}
+        <div className="flex items-baseline justify-center gap-2 w-full">
           <span
-            className="font-bold tracking-tight text-slate-900 transition-colors duration-200"
+            className={`font-bold tracking-tight transition-all duration-300 ${styles.value}`}
             style={{
               fontSize: `${valueFontSize}px`,
               lineHeight: 0.9,
@@ -235,7 +266,7 @@ export const EnergyUsageWidget = ({ config }: Props) => {
           </span>
           {config.units && (
             <span
-              className="font-medium text-slate-500 transition-colors duration-200"
+              className={`font-medium transition-colors duration-200 ${styles.unit}`}
               style={{
                 fontSize: `${unitFontSize}px`,
                 lineHeight: 1,
@@ -246,31 +277,23 @@ export const EnergyUsageWidget = ({ config }: Props) => {
           )}
         </div>
 
-        {/* Usage level indicator */}
+        {/* Usage level indicator - minimal design */}
         {typeof usage === "number" && (
-          <div className="mt-2 flex items-center space-x-1">
+          <div className="flex items-center gap-1.5">
             <div
-              className={`w-2 h-2 rounded-full ${
-                usage < 100
-                  ? "bg-emerald-400"
-                  : usage < 500
-                  ? "bg-blue-400"
-                  : usage < 1000
-                  ? "bg-orange-400"
-                  : "bg-red-400"
-              } animate-pulse`}
+              className={`rounded-full transition-all duration-300 ${
+                getUsageCondition(usage).dotColor
+              }`}
+              style={{
+                width: Math.max(titleFontSize * 0.4, 6),
+                height: Math.max(titleFontSize * 0.4, 6),
+              }}
             />
             <span
-              className="text-slate-400 font-medium"
-              style={{ fontSize: `${Math.max(unitFontSize * 0.8, 8)}px` }}
+              className={`font-medium ${getUsageCondition(usage).color}`}
+              style={{ fontSize: `${Math.max(unitFontSize * 0.9, 10)}px` }}
             >
-              {usage < 100
-                ? "Efficient"
-                : usage < 500
-                ? "Normal"
-                : usage < 1000
-                ? "High"
-                : "Critical"}
+              {getUsageCondition(usage).label}
             </span>
           </div>
         )}
@@ -278,6 +301,7 @@ export const EnergyUsageWidget = ({ config }: Props) => {
     );
   };
 
+  const styles = getStatusStyles();
   const PeriodIcon = getPeriodIcon();
 
   return (
@@ -285,35 +309,47 @@ export const EnergyUsageWidget = ({ config }: Props) => {
       ref={containerRef}
       className={`
         w-full h-full relative overflow-hidden cursor-move
-        bg-gradient-to-br from-white to-slate-50
-     
-        rounded-xl shadow-sm hover:shadow-md
+        bg-white
+        border border-slate-200/60 rounded-xl
+        shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
-        group
+        group hover:scale-[1.01] transform-gpu
       `}
       style={{
         minWidth: 160,
         minHeight: 100,
       }}
     >
-      {/* Status indicator */}
-      <div className="absolute top-2 right-2 opacity-75 group-hover:opacity-100 transition-opacity">
+      {/* Status indicators */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+        {/* Energy icon */}
         <Zap
-          className={getStatusIcon()}
+          className="text-slate-400"
           style={{
             width: Math.max(titleFontSize * 0.8, 12),
             height: Math.max(titleFontSize * 0.8, 12),
           }}
         />
+
+        {/* Activity indicator */}
+        <div
+          className={`rounded-full transition-all duration-300 ${
+            styles.indicator
+          } ${styles.pulse ? "animate-pulse" : ""}`}
+          style={{
+            width: Math.max(titleFontSize * 0.6, 8),
+            height: Math.max(titleFontSize * 0.6, 8),
+          }}
+        />
       </div>
 
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-3">
+      <div className="absolute top-0 left-0 right-0 p-4 pr-16">
         <h3
-          className="font-semibold text-slate-700 truncate text-left"
+          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
           style={{
             fontSize: `${titleFontSize}px`,
-            lineHeight: 1.2,
+            lineHeight: 1.3,
           }}
           title={config.widgetTitle}
         >
@@ -322,31 +358,39 @@ export const EnergyUsageWidget = ({ config }: Props) => {
       </div>
 
       {/* Main content area */}
-      <div className="absolute inset-0 pt-12 pb-4 px-4 flex items-center justify-center">
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingTop: titleFontSize * 2.5,
+          paddingBottom: titleFontSize * 2,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
         {renderContent()}
       </div>
 
-      {/* Period indicator */}
-      <div className="absolute bottom-2 left-2 opacity-50 group-hover:opacity-75 transition-opacity">
-        <div className="flex items-center space-x-1">
+      {/* Period indicator at bottom */}
+      <div className="absolute bottom-3 left-3 opacity-50 group-hover:opacity-75 transition-opacity">
+        <div className="flex items-center gap-1">
           <PeriodIcon
             className="text-slate-400"
             style={{
-              width: `${Math.max(titleFontSize * 0.6, 8)}px`,
-              height: `${Math.max(titleFontSize * 0.6, 8)}px`,
+              width: Math.max(titleFontSize * 0.6, 10),
+              height: Math.max(titleFontSize * 0.6, 10),
             }}
           />
           <span
             className="text-slate-400 font-medium uppercase tracking-wider"
-            style={{ fontSize: `${Math.max(titleFontSize * 0.6, 8)}px` }}
+            style={{ fontSize: `${Math.max(titleFontSize * 0.6, 9)}px` }}
           >
             {config.period === "current_month" ? "CURRENT" : "LAST"}
           </span>
         </div>
       </div>
 
-      {/* Subtle gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Minimal hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

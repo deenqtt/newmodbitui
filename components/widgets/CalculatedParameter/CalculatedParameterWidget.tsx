@@ -10,24 +10,40 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
-import { Loader2, AlertTriangle, Sigma, Calculator } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Calculator,
+  TrendingUp,
+  BarChart3,
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Tipe untuk operand dari config
+// Configuration types
 interface OperandConfig {
   deviceUniqId: string;
   selectedKey: string;
 }
 
-// Hook kustom untuk mengelola nilai dari banyak operand
+interface Props {
+  config: {
+    title: string;
+    calculation: "SUM" | "AVERAGE" | "MIN" | "MAX" | "DIFFERENCE";
+    units?: string;
+    operands: OperandConfig[];
+  };
+}
+
+// Hook for managing operand values
 const useOperandValues = (operands: OperandConfig[]) => {
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
   const [values, setValues] = useState<Record<string, number>>({});
   const [topics, setTopics] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"loading" | "error" | "ok">("loading");
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // 1. Ambil semua topik untuk semua device unik
+  // Fetch topics for all unique devices
   useEffect(() => {
     const fetchTopics = async () => {
       const deviceIds = [...new Set(operands.map((op) => op.deviceUniqId))];
@@ -41,20 +57,23 @@ const useOperandValues = (operands: OperandConfig[]) => {
           return { id, topic: null };
         }
       });
+
       const results = await Promise.all(topicPromises);
       const newTopics = results.reduce((acc, { id, topic }) => {
         if (topic) acc[id] = topic;
         return acc;
       }, {} as Record<string, string>);
+
       setTopics(newTopics);
-      setStatus("ok");
+      setStatus(Object.keys(newTopics).length > 0 ? "ok" : "error");
     };
+
     if (operands.length > 0) {
       fetchTopics();
     }
   }, [operands]);
 
-  // 2. Handler untuk pesan MQTT
+  // MQTT message handler
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
       try {
@@ -64,7 +83,7 @@ const useOperandValues = (operands: OperandConfig[]) => {
             ? JSON.parse(payload.value)
             : payload.value || {};
 
-        // Cari operand mana yang cocok dengan topik ini
+        // Find matching operands for this topic
         operands.forEach((op, index) => {
           if (
             topics[op.deviceUniqId] === topic &&
@@ -73,17 +92,18 @@ const useOperandValues = (operands: OperandConfig[]) => {
             const value = innerPayload[op.selectedKey];
             if (typeof value === "number") {
               setValues((prev) => ({ ...prev, [`operand-${index}`]: value }));
+              setLastUpdate(new Date());
             }
           }
         });
       } catch (e) {
-        /* silent fail */
+        console.error("Failed to parse MQTT payload for calculation:", e);
       }
     },
     [operands, topics]
   );
 
-  // 3. Subscribe ke semua topik yang relevan
+  // Subscribe to relevant topics
   useEffect(() => {
     const allTopics = [...new Set(Object.values(topics))];
     if (isReady && connectionStatus === "Connected" && allTopics.length > 0) {
@@ -101,10 +121,10 @@ const useOperandValues = (operands: OperandConfig[]) => {
     handleMqttMessage,
   ]);
 
-  return { values: Object.values(values), status };
+  return { values: Object.values(values), status, lastUpdate };
 };
 
-// Fungsi untuk melakukan kalkulasi
+// Calculation functions
 const calculateResult = (values: number[], type: string): number | null => {
   if (values.length === 0) return null;
 
@@ -124,73 +144,23 @@ const calculateResult = (values: number[], type: string): number | null => {
   }
 };
 
-// Get calculation-specific styling
-const getCalculationStyle = (calculation: string, status: string) => {
-  if (status !== "ok") {
-    return {
-      border: status === "error" ? "border-red-200" : "border-amber-200",
-      bg: status === "error" ? "bg-red-50" : "bg-amber-50",
-    };
-  }
-
-  switch (calculation) {
-    case "SUM":
-      return {
-        border: "border-blue-200",
-        bg: "bg-blue-50",
-      };
-    case "AVERAGE":
-      return {
-        border: "border-emerald-200",
-        bg: "bg-emerald-50",
-      };
-    case "MIN":
-      return {
-        border: "border-purple-200",
-        bg: "bg-purple-50",
-      };
-    case "MAX":
-      return {
-        border: "border-orange-200",
-        bg: "bg-orange-50",
-      };
-    case "DIFFERENCE":
-      return {
-        border: "border-pink-200",
-        bg: "bg-pink-50",
-      };
-    default:
-      return {
-        border: "border-slate-200",
-        bg: "bg-slate-50",
-      };
-  }
-};
-
-interface Props {
-  config: {
-    title: string;
-    calculation: "SUM" | "AVERAGE" | "MIN" | "MAX" | "DIFFERENCE";
-    units?: string;
-    operands: OperandConfig[];
-  };
-}
-
 export const CalculatedParameterWidget = ({ config }: Props) => {
-  const { values, status } = useOperandValues(config.operands || []);
+  const { values, status, lastUpdate } = useOperandValues(
+    config.operands || []
+  );
   const result = useMemo(
     () => calculateResult(values, config.calculation),
     [values, config.calculation]
   );
 
-  // Responsive sizing setup (sama seperti SingleValueCard)
+  // Responsive sizing
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [titleFontSize, setTitleFontSize] = useState(14);
   const [valueFontSize, setValueFontSize] = useState(24);
   const [unitFontSize, setUnitFontSize] = useState(12);
+  const [layoutMode, setLayoutMode] = useState<"compact" | "normal">("normal");
 
-  // Enhanced responsive calculation
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -198,26 +168,33 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
     const updateDimensions = () => {
       const rect = container.getBoundingClientRect();
       const { width, height } = rect;
-
       setDimensions({ width, height });
 
-      // Advanced responsive scaling
+      // Determine layout mode
       const area = width * height;
-      const baseScale = Math.sqrt(area) / 100;
-      const minScale = Math.min(width / 150, height / 100);
-      const scale = Math.min(baseScale, minScale);
+      const currentLayoutMode =
+        area < 25000 || height < 130 ? "compact" : "normal";
+      setLayoutMode(currentLayoutMode);
 
-      // Dynamic font sizes with better proportions
-      const newValueSize = Math.max(Math.min(width / 6, height / 2.5), 16);
+      // Improved scaling algorithm
+      const minDimension = Math.min(width, height);
+      const scaleFactor = Math.sqrt(area) / 120;
+      const minScaleFactor = Math.min(width / 180, height / 120);
+      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
+
+      const baseValueSize = Math.max(minDimension * 0.15, 18);
+      const maxValueSize = Math.min(width * 0.3, height * 0.4);
+      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
+
       const newTitleSize = Math.max(
-        Math.min(width / 15, height / 8, newValueSize * 0.5),
-        10
+        Math.min(newValueSize * 0.45, width * 0.08),
+        12
       );
-      const newUnitSize = Math.max(newValueSize * 0.35, 10);
+      const newUnitSize = Math.max(newValueSize * 0.4, 10);
 
-      setValueFontSize(newValueSize);
-      setTitleFontSize(newTitleSize);
-      setUnitFontSize(newUnitSize);
+      setValueFontSize(Math.round(newValueSize));
+      setTitleFontSize(Math.round(newTitleSize));
+      setUnitFontSize(Math.round(newUnitSize));
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
@@ -227,53 +204,149 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  const calcStyle = getCalculationStyle(config.calculation, status);
+  // Clean minimal status styling
+  const getStatusStyles = () => {
+    const baseStyles = {
+      title: "text-slate-700",
+      value: "text-slate-900",
+      unit: "text-slate-500",
+    };
+
+    switch (status) {
+      case "ok":
+        return {
+          ...baseStyles,
+          indicator: "bg-emerald-500",
+          pulse: false,
+        };
+      case "error":
+        return {
+          ...baseStyles,
+          indicator: "bg-red-500",
+          pulse: false,
+          title: "text-red-600",
+          value: "text-red-700",
+        };
+      case "loading":
+        return {
+          ...baseStyles,
+          indicator: "bg-amber-500",
+          pulse: true,
+          title: "text-slate-600",
+          value: "text-slate-700",
+        };
+      default:
+        return {
+          ...baseStyles,
+          indicator: "bg-slate-400",
+          pulse: false,
+        };
+    }
+  };
+
+  // Get calculation info for better display
+  const getCalculationInfo = () => {
+    switch (config.calculation) {
+      case "SUM":
+        return {
+          symbol: "∑",
+          name: "Sum",
+          description: `Total of ${values.length} values`,
+          icon: BarChart3,
+        };
+      case "AVERAGE":
+        return {
+          symbol: "μ",
+          name: "Average",
+          description: `Mean of ${values.length} values`,
+          icon: TrendingUp,
+        };
+      case "MIN":
+        return {
+          symbol: "↓",
+          name: "Minimum",
+          description: `Lowest of ${values.length} values`,
+          icon: TrendingUp,
+        };
+      case "MAX":
+        return {
+          symbol: "↑",
+          name: "Maximum",
+          description: `Highest of ${values.length} values`,
+          icon: TrendingUp,
+        };
+      case "DIFFERENCE":
+        return {
+          symbol: "Δ",
+          name: "Difference",
+          description: "Value A - Value B",
+          icon: Calculator,
+        };
+      default:
+        return {
+          symbol: "Σ",
+          name: "Calculation",
+          description: "Computing...",
+          icon: Calculator,
+        };
+    }
+  };
 
   const formatValue = (value: number | null) => {
     if (value === null) return "—";
+
+    // Smart number formatting
+    if (Math.abs(value) >= 1000000) {
+      return (
+        (value / 1000000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "M"
+      );
+    }
+    if (Math.abs(value) >= 1000) {
+      return (
+        (value / 1000).toLocaleString(undefined, {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }) + "K"
+      );
+    }
     return value.toLocaleString(undefined, {
       maximumFractionDigits: 2,
       minimumFractionDigits: value % 1 === 0 ? 0 : 1,
     });
   };
 
-  const getCalculationIcon = () => {
-    switch (config.calculation) {
-      case "SUM":
-        return "∑";
-      case "AVERAGE":
-        return "μ";
-      case "MIN":
-        return "↓";
-      case "MAX":
-        return "↑";
-      case "DIFFERENCE":
-        return "Δ";
-      default:
-        return "Σ";
-    }
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 30000) return "now";
+    if (diff < 60000) return `${Math.floor(diff / 1000)}s`;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const renderContent = () => {
-    const isLoading = status === "loading" || result === null;
+    const styles = getStatusStyles();
+    const calcInfo = getCalculationInfo();
 
     if (status === "loading") {
       return (
         <div className="flex flex-col items-center justify-center gap-3">
-          <div className="relative">
-            <Loader2
-              className="animate-spin text-amber-500"
-              style={{
-                width: Math.max(dimensions.width / 8, 24),
-                height: Math.max(dimensions.width / 8, 24),
-              }}
-            />
-          </div>
+          <Loader2
+            className="animate-spin text-slate-400"
+            style={{
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
+            }}
+          />
           <p
-            className="text-slate-500 font-medium"
+            className={`font-medium ${styles.title}`}
             style={{ fontSize: `${titleFontSize}px` }}
           >
-            Loading...
+            Loading operands...
           </p>
         </div>
       );
@@ -281,17 +354,17 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
 
     if (status === "error") {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
             className="text-red-500"
             style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
+              width: Math.max(dimensions.width / 8, 28),
+              height: Math.max(dimensions.width / 8, 28),
             }}
           />
           <p
-            className="text-red-600 font-semibold max-w-full break-words"
-            style={{ fontSize: `${titleFontSize}px` }}
+            className={`font-semibold break-words ${styles.value}`}
+            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
           >
             Configuration Error
           </p>
@@ -302,103 +375,136 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
     if (result === null) {
       return (
         <div className="flex flex-col items-center justify-center gap-3">
-          <Loader2
-            className="animate-spin text-slate-400"
-            style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
-            }}
-          />
+          <div className="relative">
+            <Calculator
+              className="text-slate-400"
+              style={{
+                width: Math.max(dimensions.width / 8, 28),
+                height: Math.max(dimensions.width / 8, 28),
+              }}
+            />
+            <div className="absolute -top-1 -right-1">
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+            </div>
+          </div>
           <p
-            className="text-slate-500 font-medium"
+            className={`font-medium ${styles.title}`}
             style={{ fontSize: `${titleFontSize}px` }}
           >
-            Calculating...
+            Calculating {calcInfo.name.toLowerCase()}...
           </p>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-col items-center justify-center text-center w-full">
-        <div className="flex items-baseline justify-center gap-1 w-full">
-          <span
-            className="font-bold tracking-tight text-slate-900 transition-colors duration-200"
-            style={{
-              fontSize: `${valueFontSize}px`,
-              lineHeight: 0.9,
-            }}
-          >
-            {formatValue(result)}
-          </span>
-          {config.units && (
+      <div className="flex flex-col items-center justify-center text-center w-full gap-3">
+        {/* Main result display */}
+        <div className="space-y-1">
+          <div className="flex items-baseline justify-center gap-2 w-full">
             <span
-              className="font-medium text-slate-500 transition-colors duration-200"
+              className={`font-bold tracking-tight transition-all duration-300 ${styles.value}`}
               style={{
-                fontSize: `${unitFontSize}px`,
-                lineHeight: 1,
+                fontSize: `${valueFontSize}px`,
+                lineHeight: 0.9,
               }}
             >
-              {config.units}
+              {formatValue(result)}
             </span>
-          )}
+            {config.units && (
+              <span
+                className={`font-medium transition-colors duration-200 ${styles.unit}`}
+                style={{
+                  fontSize: `${unitFontSize}px`,
+                  lineHeight: 1,
+                }}
+              >
+                {config.units}
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Calculation context */}
+        {layoutMode === "normal" && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full">
+            <span
+              className="font-bold text-slate-600"
+              style={{ fontSize: `${Math.max(titleFontSize * 1.1, 14)}px` }}
+            >
+              {calcInfo.symbol}
+            </span>
+            <span
+              className="text-slate-600 font-medium"
+              style={{ fontSize: `${Math.max(titleFontSize * 0.9, 10)}px` }}
+            >
+              {calcInfo.description}
+            </span>
+          </div>
+        )}
+
+        {/* Update time for normal mode */}
+        {layoutMode === "normal" && lastUpdate && (
+          <p
+            className="text-slate-400"
+            style={{ fontSize: `${Math.max(titleFontSize * 0.8, 9)}px` }}
+          >
+            Updated {formatTime(lastUpdate)}
+          </p>
+        )}
       </div>
     );
   };
+
+  const styles = getStatusStyles();
+  const calcInfo = getCalculationInfo();
 
   return (
     <div
       ref={containerRef}
       className={`
         w-full h-full relative overflow-hidden cursor-move
-        bg-gradient-to-br from-white to-slate-50
-     
-        rounded-xl shadow-sm hover:shadow-md
+        bg-white
+        border border-slate-200/60 rounded-xl
+        shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
-        group
+        group hover:scale-[1.01] transform-gpu
       `}
       style={{
         minWidth: 160,
         minHeight: 100,
       }}
     >
-      {/* Status indicator dengan calculation icon */}
-      <div className="absolute top-2 right-2 opacity-75 group-hover:opacity-100 transition-opacity">
-        <div className="flex items-center space-x-1">
+      {/* Status indicators */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+        {/* Calculation symbol */}
+        <div className="flex items-center justify-center w-6 h-6 bg-slate-100 rounded-full">
           <span
-            className={`
-              font-bold text-center leading-none
-              ${
-                status === "ok"
-                  ? config.calculation === "SUM"
-                    ? "text-blue-500"
-                    : config.calculation === "AVERAGE"
-                    ? "text-emerald-500"
-                    : config.calculation === "MIN"
-                    ? "text-purple-500"
-                    : config.calculation === "MAX"
-                    ? "text-orange-500"
-                    : "text-pink-500"
-                  : status === "error"
-                  ? "text-red-500"
-                  : "text-amber-500"
-              }
-            `}
+            className="font-bold text-slate-600"
             style={{ fontSize: `${Math.max(titleFontSize * 0.8, 10)}px` }}
           >
-            {getCalculationIcon()}
+            {calcInfo.symbol}
           </span>
         </div>
+
+        <div
+          className={`rounded-full transition-all duration-300 ${
+            styles.indicator
+          } ${styles.pulse ? "animate-pulse" : ""}`}
+          style={{
+            width: Math.max(titleFontSize * 0.6, 8),
+            height: Math.max(titleFontSize * 0.6, 8),
+          }}
+        />
       </div>
 
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-3">
+      <div className="absolute top-0 left-0 right-0 p-4 pr-20">
         <h3
-          className="font-semibold text-slate-700 truncate text-left"
+          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
           style={{
             fontSize: `${titleFontSize}px`,
-            lineHeight: 1.2,
+            lineHeight: 1.3,
           }}
           title={config.title}
         >
@@ -407,22 +513,20 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
       </div>
 
       {/* Main content area */}
-      <div className="absolute inset-0 pt-12 pb-4 px-4 flex items-center justify-center">
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          paddingTop: titleFontSize * 2.5,
+          paddingBottom: 16,
+          paddingLeft: 16,
+          paddingRight: 16,
+        }}
+      >
         {renderContent()}
       </div>
 
-      {/* Calculation type badge */}
-      <div className="absolute bottom-2 left-2 opacity-50 group-hover:opacity-75 transition-opacity">
-        <span
-          className="text-slate-400 font-medium uppercase tracking-wider"
-          style={{ fontSize: `${Math.max(titleFontSize * 0.6, 8)}px` }}
-        >
-          {config.calculation}
-        </span>
-      </div>
-
-      {/* Subtle gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Minimal hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };
