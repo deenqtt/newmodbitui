@@ -79,10 +79,10 @@ export function MqttProvider({ children }: { children: ReactNode }) {
       if (process.env.NODE_ENV === "production") {
         // Di production, gunakan window.location.hostname jika tersedia
         if (typeof window !== "undefined") {
-          return window.location.hostname;
+          return process.env.NEXT_PUBLIC_MQTT_HOST;
         }
-        // Fallback jika window belum tersedia
-        return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+
+        return "localhost";
       } else {
         // Di development, gunakan environment variable
         return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
@@ -90,11 +90,9 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     };
 
     const mqttHost = getMqttHost();
-    const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000", 10);
-    // Menggunakan slice() yang lebih modern daripada substr()
-    const clientId = `web-client-${Math.random().toString(16).slice(2, 10)}`;
+    const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
+    const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
 
-    // [FIXED] Menambahkan backtick ` di awal string
     console.log(
       `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
     );
@@ -124,7 +122,6 @@ export function MqttProvider({ children }: { children: ReactNode }) {
         });
       },
       onFailure: (responseObject: Paho.MQTTError) => {
-        console.error("MQTT Connection Failure:", responseObject.errorMessage);
         setConnectionStatus("Failed to Connect");
         setIsReady(false); // Set isReady ke false jika koneksi gagal
       },
