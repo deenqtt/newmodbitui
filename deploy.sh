@@ -1,9 +1,7 @@
 #!/bin/bash
-
 # IoT Dashboard Deployment Script
-# Author: Claude Code Assistant  
-# Description: Automated deployment script for IoT Dashboard with PostgreSQL and PM2
-
+# Author: Automated Deployment Assistant
+# Description: Complete deployment script for IoT Dashboard with MQTT integration
 set -e  # Exit on any error
 
 # Colors for output
@@ -16,11 +14,8 @@ NC='\033[0m' # No Color
 # Project configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="iot-dashboard"
-DB_NAME="iot_dashboard"
-DB_USER="root" 
-DB_PASSWORD=""
-APP_PORT=3001
-NGINX_PORT=80
+APP_PORT=3000
+NGINX_PORT=8080
 NODE_VERSION="18"
 
 # Log functions
@@ -43,11 +38,6 @@ log_warning() {
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
-}
-
-# Function to check if service is running
-is_service_running() {
-    systemctl is-active --quiet "$1"
 }
 
 # Function to check Node.js installation
@@ -75,29 +65,6 @@ install_nodejs() {
     curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
     sudo apt-get install -y nodejs
     log_success "Node.js $(node --version) installed successfully"
-}
-
-# Function to check PostgreSQL installation
-check_postgresql() {
-    log "Checking PostgreSQL installation..."
-    if command_exists psql && command_exists pg_config; then
-        PG_VERSION=$(psql --version | awk '{print $3}' | sed 's/,.*//')
-        log_success "PostgreSQL $PG_VERSION is installed"
-        return 0
-    else
-        log_error "PostgreSQL not found"
-        return 1
-    fi
-}
-
-# Function to install PostgreSQL
-install_postgresql() {
-    log "Installing PostgreSQL..."
-    sudo apt-get update
-    sudo apt-get install -y postgresql postgresql-contrib
-    sudo systemctl start postgresql
-    sudo systemctl enable postgresql
-    log_success "PostgreSQL installed and started successfully"
 }
 
 # Function to check PM2 installation
@@ -144,27 +111,6 @@ install_nginx() {
     log_success "Nginx installed and started successfully"
 }
 
-# Function to check Mosquitto MQTT installation
-check_mosquitto() {
-    log "Checking Mosquitto MQTT installation..."
-    if command_exists mosquitto && command_exists mosquitto_pub; then
-        log_success "Mosquitto MQTT Broker is installed"
-        return 0
-    else
-        log_error "Mosquitto not found"
-        return 1
-    fi
-}
-
-# Function to install Mosquitto
-install_mosquitto() {
-    log "Installing Mosquitto MQTT Broker..."
-    sudo apt-get install -y mosquitto mosquitto-clients
-    sudo systemctl enable mosquitto
-    sudo systemctl start mosquitto
-    log_success "Mosquitto MQTT Broker installed and started successfully"
-}
-
 # Function to check all dependencies
 check_dependencies() {
     log "=== Checking Dependencies ==="
@@ -175,14 +121,10 @@ check_dependencies() {
     sudo apt-get update
     
     # Install essential tools
-    sudo apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates sqlite3
+    sudo apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates
     
     if ! check_nodejs; then
         missing_deps+=("nodejs")
-    fi
-    
-    if ! check_postgresql; then
-        missing_deps+=("postgresql")
     fi
     
     if ! check_pm2; then
@@ -191,10 +133,6 @@ check_dependencies() {
     
     if ! check_nginx; then
         missing_deps+=("nginx")
-    fi
-    
-    if ! check_mosquitto; then
-        missing_deps+=("mosquitto")
     fi
     
     if [ ${#missing_deps[@]} -eq 0 ]; then
@@ -214,10 +152,6 @@ install_dependencies() {
         install_nodejs
     fi
     
-    if ! check_postgresql; then
-        install_postgresql
-    fi
-    
     if ! check_pm2; then
         install_pm2
     fi
@@ -225,53 +159,6 @@ install_dependencies() {
     if ! check_nginx; then
         install_nginx
     fi
-    
-    if ! check_mosquitto; then
-        install_mosquitto
-    fi
-}
-
-# Function to setup PostgreSQL database
-setup_database() {
-    log "=== Setting Up PostgreSQL Database ==="
-    
-    # Create database and user
-    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;" 2>/dev/null || log_warning "Database $DB_NAME already exists"
-    sudo -u postgres psql -c "CREATE USER $DB_USER;" 2>/dev/null || log_warning "User $DB_USER already exists"
-    sudo -u postgres psql -c "ALTER USER $DB_USER WITH SUPERUSER;" 2>/dev/null || true
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
-    
-    # Configure pg_hba.conf for trust authentication
-    PG_VERSION=$(sudo -u postgres psql -t -c "SELECT version();" | grep -oP "PostgreSQL \K[0-9]+")
-    PG_HBA_FILE="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
-    
-    if [[ -f "$PG_HBA_FILE" ]]; then
-        # Backup original file
-        sudo cp "$PG_HBA_FILE" "$PG_HBA_FILE.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
-        
-        # Add trust authentication for root user
-        if ! sudo grep -q "local.*$DB_NAME.*$DB_USER.*trust" "$PG_HBA_FILE"; then
-            sudo sed -i "1i local   $DB_NAME   $DB_USER                            trust" "$PG_HBA_FILE"
-            sudo sed -i "2i host    $DB_NAME   $DB_USER    127.0.0.1/32            trust" "$PG_HBA_FILE"
-        fi
-        
-        # Restart PostgreSQL
-        sudo systemctl restart postgresql
-        sleep 2
-        
-        # Test connection
-        if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
-            log_success "Database connection test successful"
-        else
-            log_error "Database connection test failed"
-            exit 1
-        fi
-    else
-        log_error "PostgreSQL configuration file not found at $PG_HBA_FILE"
-        exit 1
-    fi
-    
-    log_success "Database setup completed"
 }
 
 # Function to configure environment
@@ -280,32 +167,20 @@ configure_environment() {
     
     cd "$PROJECT_ROOT"
     
-    # Create .env file
-    cat > .env << EOF
-# Database Configuration
-DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME"
-
-# JWT Configuration  
-JWT_SECRET="$(openssl rand -hex 32)"
-
-# Application Configuration
+    # Create .env file with your specific configuration
+    cat > .env << 'EOF'
+NEXT_PUBLIC_MQTT_HOST="127.0.0.1"
+NEXT_PUBLIC_MQTT_PORT="9000"
+NEXT_PUBLIC_MQTT_USERNAME=""
+NEXT_PUBLIC_MQTT_PASSWORD=""
+JWT_SECRET="your-super-secret-key-that-is-very-long-and-random"
+WEBHOOK_PORT="3001"
+WEBHOOK_SECRET="masukkan_string_rahasia_anda_di_sini_yang_panjang_dan_acak"
+MQTT_BROKER_URL="ws://192.168.0.139:9000"
+CHIRPSTACK_API_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjaGlycHN0YWNrIiwiaXNzIjoiY2hpcnBzdGFjayIsInN1YiI6ImMyOWRlM2VkLWJjZTItNDY3NC05MWY3LTExZTkxNjJkMzk3OCIsInR5cCI6ImtleSJ9.Y_pGm_QMRwLPU3ShwxEul10r8ReGbc7nu7Aob0a14OA"
+CHIRPSTACK_API_URL="http://192.168.0.139:8090"
 NODE_ENV="production"
-NEXT_RUNTIME="nodejs"
-
-# Cloud Sync (disabled for offline)
-ENABLE_CLOUD_SYNC="false"
-
-# MQTT Configuration
-MQTT_BROKER_URL="mqtt://localhost:1883"
-MQTT_USERNAME=""
-MQTT_PASSWORD=""
-
-# Server Configuration
-PORT=$APP_PORT
-HOST="0.0.0.0"
-
-# Logging
-LOG_LEVEL="info"
+PORT=3000
 EOF
     
     chmod 600 .env
@@ -322,38 +197,7 @@ install_app_dependencies() {
     log "Installing npm dependencies..."
     npm install
     
-    # Install Prisma CLI globally if not present
-    if ! command_exists prisma; then
-        log "Installing Prisma CLI globally..."
-        sudo npm install -g prisma
-    fi
-    
-    # Generate Prisma client
-    log "Generating Prisma client..."
-    npx prisma generate
-    
     log_success "Application dependencies installed"
-}
-
-# Function to setup database schema
-setup_database_schema() {
-    log "=== Setting Up Database Schema ==="
-    
-    cd "$PROJECT_ROOT"
-    
-    # Run database migrations
-    log "Running database migrations..."
-    npx prisma migrate deploy || npx prisma db push
-    
-    # Seed database if script exists
-    if [[ -f "scripts/seed-users.js" ]]; then
-        log "Seeding initial data..."
-        npm run db:seed || node scripts/seed-users.js || log_warning "Seeding failed or not needed"
-    else
-        log_warning "No seed script found, skipping initial data seeding"
-    fi
-    
-    log_success "Database schema setup completed"
 }
 
 # Function to build application
@@ -455,17 +299,13 @@ start_pm2_application() {
 setup_nginx() {
     log "=== Setting Up Nginx Reverse Proxy ==="
     
-    # Create Nginx configuration
-    sudo tee /etc/nginx/sites-available/$APP_NAME > /dev/null << EOF
+    # Create Nginx configuration for iot-dashboard
+    sudo tee /etc/nginx/sites-available/iot-dashboard > /dev/null << EOF
+# IoT Dashboard - Port $NGINX_PORT
 server {
     listen $NGINX_PORT;
-    server_name localhost \$(hostname -I | awk '{print \$1}');
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-
+    server_name localhost;
+    
     location / {
         proxy_pass http://localhost:$APP_PORT;
         proxy_http_version 1.1;
@@ -476,32 +316,13 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
-        
-        # Increase timeout for long polling
-        proxy_read_timeout 86400;
-        proxy_send_timeout 86400;
-    }
-    
-    # Static files caching
-    location /_next/static {
-        proxy_pass http://localhost:$APP_PORT;
-        add_header Cache-Control "public, immutable, max-age=31536000";
-    }
-    
-    # API routes
-    location /api {
-        proxy_pass http://localhost:$APP_PORT;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
     
-    # Enable site and remove default
+    # Remove default site and enable iot-dashboard
     sudo rm -f /etc/nginx/sites-enabled/default
-    sudo ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
+    sudo ln -sf /etc/nginx/sites-available/iot-dashboard /etc/nginx/sites-enabled/
     
     # Test Nginx configuration
     if sudo nginx -t; then
@@ -514,72 +335,11 @@ EOF
     fi
 }
 
-# Function to setup firewall
-setup_firewall() {
-    log "=== Setting Up Firewall ==="
-    
-    # Install UFW if not present
-    if ! command_exists ufw; then
-        sudo apt-get install -y ufw
-    fi
-    
-    # Configure firewall rules
-    sudo ufw --force enable
-    sudo ufw allow ssh
-    sudo ufw allow $NGINX_PORT/tcp
-    sudo ufw allow $APP_PORT/tcp  # Direct app access
-    sudo ufw allow 1883/tcp       # MQTT
-    sudo ufw allow 5432/tcp       # PostgreSQL (local only)
-    
-    log_success "Firewall configured successfully"
-}
-
-# Function to create backup service
-setup_backup_service() {
-    log "=== Setting Up Backup Service ==="
-    
-    # Create backup script
-    sudo tee /usr/local/bin/backup-$APP_NAME.sh > /dev/null << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/var/backups/iot-dashboard"
-DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p $BACKUP_DIR
-
-# Database backup
-pg_dump -h localhost -U root iot_dashboard > $BACKUP_DIR/db_backup_$DATE.sql
-
-# Application backup (excluding node_modules)
-tar -czf $BACKUP_DIR/app_backup_$DATE.tar.gz -C /opt --exclude='node_modules' --exclude='.next' iot-dashboard/
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
-
-echo "Backup completed: $DATE"
-EOF
-    
-    sudo chmod +x /usr/local/bin/backup-$APP_NAME.sh
-    
-    # Setup daily backup cron job at 2 AM
-    (crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/backup-$APP_NAME.sh") | crontab -
-    
-    log_success "Backup service configured"
-}
-
 # Function to verify deployment
 verify_deployment() {
     log "=== Verifying Deployment ==="
     
     local all_tests_passed=true
-    
-    # Test database connection
-    log "Testing database connection..."
-    if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
-        log_success "Database connection test passed"
-    else
-        log_error "Database connection test failed"
-        all_tests_passed=false
-    fi
     
     # Test application health
     log "Testing application health..."
@@ -607,14 +367,6 @@ verify_deployment() {
         log_warning "Nginx proxy test failed (may need manual configuration)"
     fi
     
-    # Test MQTT broker
-    log "Testing MQTT broker..."
-    if mosquitto_pub -h localhost -t test/topic -m "test" >/dev/null 2>&1; then
-        log_success "MQTT broker test passed"
-    else
-        log_warning "MQTT broker test failed"
-    fi
-    
     if [ "$all_tests_passed" = true ]; then
         log_success "All critical tests passed"
     else
@@ -633,9 +385,7 @@ show_deployment_status() {
     
     echo ""
     log "System Services Status:"
-    echo "PostgreSQL: $(systemctl is-active postgresql)"
-    echo "Nginx: $(systemctl is-active nginx)"  
-    echo "Mosquitto: $(systemctl is-active mosquitto)"
+    echo "Nginx: $(systemctl is-active nginx)"
     
     echo ""
     log "Application URLs:"
@@ -644,42 +394,30 @@ show_deployment_status() {
     echo "  Server IP: http://$(hostname -I | awk '{print $1}'):$NGINX_PORT"
     
     echo ""
-    log "Database Information:"
-    if [ -f "$PROJECT_ROOT/prisma/iot_dashboard.db" ]; then
-        local db_size=$(du -h "$PROJECT_ROOT/prisma/iot_dashboard.db" | cut -f1)
-        echo "  Database file: $PROJECT_ROOT/prisma/iot_dashboard.db ($db_size)"
-    fi
-    echo "  PostgreSQL Database: $DB_NAME"
-    echo "  Database User: $DB_USER"
-    
-    echo ""
-    log "MQTT Broker:"
-    echo "  URL: mqtt://localhost:1883"
-    echo "  Test: mosquitto_pub -h localhost -t test/topic -m 'Hello World'"
-    
-    echo ""
-    log "Default Login Credentials:"
-    echo "  Email: admin@admin.com"
-    echo "  Password: admin123"
+    log "Configuration Files:"
+    echo "  Environment: $PROJECT_ROOT/.env"
+    echo "  PM2 Config: $PROJECT_ROOT/ecosystem.config.js"
+    echo "  Nginx Config: /etc/nginx/sites-available/iot-dashboard"
     
     echo ""
     log "Useful Commands:"
     echo "  View app logs: pm2 logs $APP_NAME"
     echo "  Restart app: pm2 restart $APP_NAME"
     echo "  Monitor PM2: pm2 monit"
-    echo "  View system logs: sudo journalctl -u postgresql nginx mosquitto"
-    echo "  Database backup: sudo /usr/local/bin/backup-$APP_NAME.sh"
+    echo "  Reload Nginx: sudo systemctl reload nginx"
+    echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
     
     echo ""
     log_success "IoT Dashboard deployment completed successfully!"
-    log_warning "IMPORTANT: Change default login credentials after first login!"
+    log_warning "Make sure your MQTT broker is running on the configured host:port"
 }
 
 # Main deployment function
 main() {
     log "=== IoT Dashboard Deployment Script ==="
     log "Project Root: $PROJECT_ROOT"
-    log "Target Port: $APP_PORT"
+    log "App Port: $APP_PORT"
+    log "Nginx Port: $NGINX_PORT"
     
     # Step 1: Check and install dependencies
     if ! check_dependencies; then
@@ -693,44 +431,32 @@ main() {
         fi
     fi
     
-    # Step 2: Setup database
-    setup_database
-    
-    # Step 3: Configure environment
+    # Step 2: Configure environment
     configure_environment
     
-    # Step 4: Install application dependencies
+    # Step 3: Install application dependencies
     install_app_dependencies
     
-    # Step 5: Setup database schema
-    setup_database_schema
-    
-    # Step 6: Build application
+    # Step 4: Build application
     build_application
     
-    # Step 7: Create PM2 configuration
+    # Step 5: Create PM2 configuration
     create_pm2_config
     
-    # Step 8: Start application with PM2
+    # Step 6: Start application with PM2
     start_pm2_application
     
-    # Step 9: Setup Nginx
+    # Step 7: Setup Nginx
     setup_nginx
     
-    # Step 10: Setup firewall
-    setup_firewall
-    
-    # Step 11: Setup backup service
-    setup_backup_service
-    
-    # Step 12: Verify deployment
+    # Step 8: Verify deployment
     if verify_deployment; then
         log_success "Deployment verification passed"
     else
         log_warning "Some verification tests failed, but deployment may still be functional"
     fi
     
-    # Step 13: Show deployment status
+    # Step 9: Show deployment status
     show_deployment_status
 }
 
