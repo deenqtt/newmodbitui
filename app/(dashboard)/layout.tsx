@@ -78,7 +78,8 @@ function UserNav() {
 
 function MainHeader() {
   const pathname = usePathname();
-  const title = generateTitleFromPathname(pathname);
+  const isLayout2DPage = pathname.includes('/layout2d');
+  const title = isLayout2DPage ? "Layout-2D" : generateTitleFromPathname(pathname);
 
   return (
     <header className="flex h-16 items-center justify-between gap-4 border-b bg-white dark:bg-gray-950 px-4 md:px-6">
@@ -93,12 +94,14 @@ function MainHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Link href="/manage-dashboard">
-          <Button variant="outline">
-            <Settings className="h-4 w-4 mr-2" />
-            Manage
-          </Button>
-        </Link>
+        {!isLayout2DPage && (
+          <Link href="/manage-dashboard">
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Manage
+            </Button>
+          </Link>
+        )}
         <NotificationBell />
         <UserNav />
       </div>
@@ -111,13 +114,18 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isLayout2DPage = pathname.includes('/layout2d');
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={!isLayout2DPage}>
       <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900/50">
         <AppSidebar />
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-h-0">
           <MainHeader />
-          <MqttProvider>{children}</MqttProvider>
+          <div className="flex-1 min-h-0">
+            <MqttProvider>{children}</MqttProvider>
+          </div>
         </div>
       </div>
     </SidebarProvider>

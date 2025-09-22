@@ -1,12 +1,6 @@
 // File: app/api/auth/me/route.ts
 import { NextResponse } from "next/server";
-import { jwtVerify } from "jose";
-
-const getJwtSecretKey = () => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET is not set");
-  return new TextEncoder().encode(secret);
-};
+import jwt from "jsonwebtoken";
 
 export async function GET(request: Request) {
   const tokenCookie = (request.headers.get("cookie") || "").match(
@@ -18,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { payload } = await jwtVerify(tokenCookie[1], getJwtSecretKey());
+    const payload = jwt.verify(tokenCookie[1], process.env.JWT_SECRET!) as any;
     return NextResponse.json({
       userId: payload.userId,
       email: payload.email,
