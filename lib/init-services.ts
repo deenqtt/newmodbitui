@@ -3,7 +3,7 @@ import { getAlarmMonitorService } from "./services/alarm-monitor";
 import { getCalculationService } from "./services/calculation-service";
 import { getHealthCheckService } from "./services/health-check";
 import { getLogListenerService } from "./services/log-listener";
-
+import { getZkTecoService } from "./services/zkteco-service";
 import { getStatsListenerService } from "./services/stats-listener";
 import { getLoraListenerService } from "./services/lora-listener";
 import { getCleanupService } from "./services/cleanup-service";
@@ -36,7 +36,7 @@ export async function initializeBackgroundServices() {
   getCalculationService();
   getHealthCheckService();
   getLogListenerService();
-
+  getZkTecoService();
   getStatsListenerService();
   // getLoraListenerService();
   getCleanupService();
@@ -50,4 +50,5 @@ export async function initializeBackgroundServices() {
   getThermalListenerService();
 
   servicesInitialized = true;
+  console.log("All background services started.");
 }
