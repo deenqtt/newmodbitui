@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="iot-dashboard"
 APP_PORT=3000
-NGINX_PORT=8080
+NGINX_PORT=3001
 NODE_VERSION="18"
 
 # Log functions
@@ -169,7 +169,7 @@ configure_environment() {
     
     # Create .env file with your specific configuration
     cat > .env << 'EOF'
-NEXT_PUBLIC_MQTT_HOST="127.0.0.1"
+
 NEXT_PUBLIC_MQTT_PORT="9000"
 NEXT_PUBLIC_MQTT_USERNAME=""
 NEXT_PUBLIC_MQTT_PASSWORD=""

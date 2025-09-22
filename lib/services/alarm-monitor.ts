@@ -101,7 +101,8 @@ class AlarmMonitorService {
       (global as any).mqttClient.end(true);
     }
 
-    const brokerHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+    // UBAH INI - Dynamic host resolution
+    const brokerHost = this.getMQTTHost();
     const brokerPort = 1883;
     const brokerUrl = `mqtt://${brokerHost}:${brokerPort}`;
 
@@ -130,7 +131,20 @@ class AlarmMonitorService {
       console.error("[ALARM SERVICE] MQTT Error:", error)
     );
   }
+  private getMQTTHost(): string {
+    // Development: gunakan env variable
+    if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+      return process.env.NEXT_PUBLIC_MQTT_HOST;
+    }
 
+    // Production: gunakan window.location.hostname jika tersedia (browser only)
+    if (typeof window !== "undefined" && window.location) {
+      return window.location.hostname;
+    }
+
+    // Fallback ke localhost
+    return "localhost";
+  }
   private handleMessage(topic: string, payloadStr: string) {
     const configs = this.alarmConfigs.get(topic);
     if (!configs) {

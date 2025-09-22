@@ -168,9 +168,12 @@ class CalculationService {
     if ((global as any).calcMqttClient) {
       (global as any).calcMqttClient.end(true);
     }
-    const brokerHost = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+
+    // UBAH INI - Dynamic host resolution
+    const brokerHost = this.getMQTTHost();
     const brokerPort = 1883;
     const brokerUrl = `mqtt://${brokerHost}:${brokerPort}`;
+
     const options = {
       protocolVersion: 4,
       clientId: `calculation-service-${Math.random()
@@ -214,7 +217,21 @@ class CalculationService {
       });
     } catch (error) {}
   }
+  // TAMBAH function helper ini di class
+  private getMQTTHost(): string {
+    // Development: gunakan env variable
+    if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+      return process.env.NEXT_PUBLIC_MQTT_HOST;
+    }
 
+    // Production: gunakan window.location.hostname jika tersedia (browser only)
+    if (typeof window !== "undefined" && window.location) {
+      return window.location.hostname;
+    }
+
+    // Fallback ke localhost
+    return "localhost";
+  }
   private triggerCalculation(config: AnyConfig) {
     if (
       config.sourceDevices.every((s) =>

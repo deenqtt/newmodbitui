@@ -43,6 +43,7 @@ import { MaintenanceStatisticsWidget } from "./MaintenanceStatistics/Maintenance
 import { RackServer3dWidget } from "./RackServer3d/RackServer3dWidget";
 // Di masa depan, Anda akan mengimpor komponen widget lain di sini
 import { ZigbeeDeviceWidget } from "./ZigbeeDevice/ZigbeeDeviceWidget";
+import { ThermalCameraWidget } from "./ThermalCamera/ThermalCameraWidget";
 
 interface Props {
   item: {
@@ -151,6 +152,8 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <RackServer3dWidget config={config} />;
     case "Zigbee Device":
       return <ZigbeeDeviceWidget config={config} />;
+    case "Thermal Camera":
+      return <ThermalCameraWidget config={config} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

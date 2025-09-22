@@ -1,0 +1,27 @@
+{
+  "mqtt": {
+    "broker_host": "192.168.0.138",
+    "broker_port": 1883,
+    "username": null,
+    "password": null,
+    "keepalive": 60,
+    "qos": 1
+  },
+  "device": {
+    "device_id": "thermal_cam_rpi1",
+    "device_name": "Thermal Camera RPi1",
+    "location": "Room A"
+  },
+  "topic": "sensors/thermal_cam_rpi1/data",
+  "publishing": {
+    "interval": 1.0
+  },
+  "thermal": {
+    "interface": "usb",
+    "spi_device": "/dev/spidev0.0",
+    "i2c_addr": "0x40",
+    "usb_device": "/dev/ttyUSB0",
+    "senxor_path": "/home/containment/pysenxor-master",
+    "auto_detect": true
+  }
+}

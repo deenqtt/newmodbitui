@@ -74,19 +74,19 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (clientRef.current) return;
 
-    // Fungsi untuk mendapatkan MQTT host berdasarkan environment
     const getMqttHost = () => {
-      if (process.env.NODE_ENV === "production") {
-        // Di production, gunakan window.location.hostname jika tersedia
-        if (typeof window !== "undefined") {
-          return process.env.NEXT_PUBLIC_MQTT_HOST;
-        }
-
-        return "localhost";
-      } else {
-        // Di development, gunakan environment variable
-        return process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+      // Development: gunakan env variable
+      if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+        return process.env.NEXT_PUBLIC_MQTT_HOST;
       }
+
+      // Production: gunakan window.location.hostname jika tersedia (browser only)
+      if (typeof window !== "undefined" && window.location) {
+        return window.location.hostname;
+      }
+
+      // Fallback ke localhost
+      return "localhost";
     };
 
     const mqttHost = getMqttHost();

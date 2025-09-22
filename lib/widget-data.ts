@@ -246,7 +246,13 @@ export const widgets: Widget[] = [
     description:
       "Monitor and control Zigbee devices connected to your network.",
   },
-
+  {
+    name: "Thermal Camera",
+    category: "IoT",
+    icon: Thermometer,
+    description:
+      "Real-time thermal camera heatmap visualization with temperature monitoring.",
+  },
   {
     name: "Button Control Modbus",
     category: "Toggle Control",

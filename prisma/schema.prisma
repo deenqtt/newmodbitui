@@ -76,8 +76,26 @@ model DeviceExternal {
   maintenanceTasks            Maintenance[]               // Ubah dari required ke optional
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
+ 
+  // NEW: Thermal data relation
+  thermalData                 ThermalData[]
 }
 
+// Schema Update - Remove rawData field
+model ThermalData {
+  id        Int      @id @default(autoincrement())
+  deviceId  String
+  timestamp DateTime @default(now())
+  minTemp   Float?
+  maxTemp   Float?
+  avgTemp   Float?
+  // rawData   String?  // REMOVED - tidak perlu disimpan
+  frameCount Int?     // Optional: untuk tracking frame number
+  
+  device    DeviceExternal @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@index([deviceId, timestamp])
+}
 model LoggingConfiguration {
   id           String         @id @default(cuid())
   customName   String

@@ -72,6 +72,7 @@ import { MaintenanceListConfigModal } from "@/components/widgets/MaintenanceList
 import { MaintenanceCalendarConfigModal } from "@/components/widgets/MaintenanceCalendar/MaintenanceCalendarConfigModal";
 import { MaintenanceStatisticsConfigModal } from "@/components/widgets/MaintenanceStatistics/MaintenanceStatisticsConfigModal";
 import { ZigbeeDeviceConfigModal } from "@/components/widgets/ZigbeeDevice/ZigbeeDeviceConfigModal";
+import { ThermalCameraConfigModal } from "@/components/widgets/ThermalCamera/ThermalCameraConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -235,6 +236,7 @@ export default function DashboardEditorPage({
           "Maintenance Statistics",
           "3D Rack Server View",
           "Zigbee Device",
+          "Thermal Camera",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -319,6 +321,12 @@ export default function DashboardEditorPage({
         defaultWidth = 6;
         defaultHeight = 6;
         minW = 4;
+        minH = 4;
+        break;
+      case "Thermal Camera":
+        defaultWidth = 4;
+        defaultHeight = 6;
+        minW = 3;
         minH = 4;
         break;
     }
@@ -690,6 +698,14 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
+      {isConfigModalOpen && configuringWidget?.name === "Thermal Camera" && (
+        <ThermalCameraConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
           {dashboardData?.name}
