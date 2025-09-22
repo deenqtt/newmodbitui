@@ -18,10 +18,20 @@ export async function GET() {
   // Ambil semua topic unik yang perlu di-subscribe
   const topics = [...new Set(configs.map((c) => c.device.topic))];
   const latestPayloads: Record<string, any> = {};
+  function getMQTTHost(): string {
+    // Development: gunakan env variable
+    if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+      return process.env.NEXT_PUBLIC_MQTT_HOST;
+    }
 
+    // Server-side fallback ke localhost
+    return "localhost";
+  }
+
+  // Ganti bagian client initialization:
   const client = new Paho.Client(
-    process.env.NEXT_PUBLIC_MQTT_HOST!,
-    parseInt(process.env.NEXT_PUBLIC_MQTT_PORT!),
+    getMQTTHost(), // UBAH INI
+    parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"), // UBAH INI
     `cron-logger-${Date.now()}`
   );
 

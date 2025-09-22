@@ -11,10 +11,21 @@ const getLatestMqttData = (topics: string[]): Promise<Record<string, any>> => {
   return new Promise((resolve, reject) => {
     const latestPayloads: Record<string, any> = {};
 
+    function getMQTTHost(): string {
+      // Development: gunakan env variable
+      if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+        return process.env.NEXT_PUBLIC_MQTT_HOST;
+      }
+
+      // Server-side fallback ke localhost
+      return "localhost";
+    }
+
+    // Ganti bagian client initialization:
     const client = new Paho.Client(
-      process.env.NEXT_PUBLIC_MQTT_HOST!,
-      parseInt(process.env.NEXT_PUBLIC_MQTT_PORT!),
-      `cron-bill-logger-${Date.now()}`
+      getMQTTHost(), // UBAH INI
+      parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"), // UBAH INI
+      `cron-logger-${Date.now()}`
     );
 
     client.onMessageArrived = (message) => {
