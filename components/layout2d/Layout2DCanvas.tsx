@@ -4,6 +4,12 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { useMqtt } from "@/contexts/MqttContext";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import DeviceDetailModal from "./DeviceDetailModal";
 import {
   AlertDialog,
@@ -19,6 +25,7 @@ import {
   Plus,
   Edit,
   Trash2,
+  Copy,
   Move,
   LayoutGrid,
   // Common icons used in IoT/monitoring
@@ -82,10 +89,10 @@ import {
   Compass,
   Radar,
   Radio,
-  ArrowLeft,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight,
+  ArrowBigLeft,
+  ArrowBigUp,
+  ArrowBigDown,
+  ArrowBigRight,
 } from "lucide-react";
 
 // Icon resolver function
@@ -211,6 +218,9 @@ interface Layout2DFlowIndicator {
   warningEnabled: boolean;
   warningOperator?: string;
   warningValue?: string;
+  // NEW: Multi-logic fields
+  useMultiLogic?: boolean;
+  multiLogicConfig?: string;
   device: {
     uniqId: string;
     name: string;
@@ -229,6 +239,7 @@ interface Layout2DCanvasProps {
   onDeleteDataPoint?: (dataPointId: string) => void;
   onAddFlowIndicator?: (x: number, y: number) => void;
   onEditFlowIndicator?: (indicator: Layout2DFlowIndicator) => void;
+  onCopyFlowIndicator?: (indicator: Layout2DFlowIndicator) => void;
   onDeleteFlowIndicator?: (indicatorId: string) => void;
   refreshTrigger?: string; // Trigger untuk refresh data points
 }
@@ -243,6 +254,7 @@ export default function Layout2DCanvas({
   onDeleteDataPoint,
   onAddFlowIndicator,
   onEditFlowIndicator,
+  onCopyFlowIndicator,
   onDeleteFlowIndicator,
   refreshTrigger,
 }: Layout2DCanvasProps) {
@@ -277,18 +289,25 @@ export default function Layout2DCanvas({
   const [deleteDataPointId, setDeleteDataPointId] = useState<string | null>(
     null
   );
+  const [deleteFlowIndicatorId, setDeleteFlowIndicatorId] = useState<
+    string | null
+  >(null);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log("deviceDetailModalOpen changed:", deviceDetailModalOpen);
-  }, [deviceDetailModalOpen]);
+  // Image loading states for optimization
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [isImageError, setIsImageError] = useState(false);
+  const [cachedImage, setCachedImage] = useState<HTMLImageElement | null>(null);
 
-  useEffect(() => {
-    console.log(
-      "selectedDataPointForDetail changed:",
-      selectedDataPointForDetail
-    );
-  }, [selectedDataPointForDetail]);
+  // DataPoint Tooltip states
+  const [dataPointTooltip, setDataPointTooltip] = useState<{
+    visible: boolean;
+    dataPoint: Layout2DDataPoint | null;
+    position: { x: number; y: number };
+  }>({
+    visible: false,
+    dataPoint: null,
+    position: { x: 0, y: 0 }
+  });
 
   const { subscribe, unsubscribe, isReady, connectionStatus } = useMqtt();
 
@@ -437,10 +456,35 @@ export default function Layout2DCanvas({
     return () => window.removeEventListener("resize", updateCanvasSize);
   }, [backgroundImage]);
 
-  // Image size handler - determine canvas size based on image
+  // Optimized image loading with caching and loading states
   useEffect(() => {
     if (backgroundImage) {
+      // Check if image is already cached
+      if (cachedImage && cachedImage.src === backgroundImage) {
+        // Use cached image immediately
+        setImageSize({
+          width: cachedImage.width,
+          height: cachedImage.height,
+        });
+
+        const aspectRatio = cachedImage.height / cachedImage.width;
+        const scaledHeight = canvasSize.width * aspectRatio;
+
+        setActualCanvasSize({
+          width: canvasSize.width,
+          height: scaledHeight,
+        });
+        setIsImageLoading(false);
+        setIsImageError(false);
+        return;
+      }
+
+      // Start loading new image
+      setIsImageLoading(true);
+      setIsImageError(false);
+
       const img = new Image();
+
       img.onload = () => {
         setImageSize({
           width: img.width,
@@ -455,13 +499,32 @@ export default function Layout2DCanvas({
           width: canvasSize.width,
           height: scaledHeight,
         });
+
+        // Cache the loaded image
+        setCachedImage(img);
+        setIsImageLoading(false);
+        setIsImageError(false);
       };
+
+      img.onerror = () => {
+        console.error("Failed to load background image:", backgroundImage);
+        setIsImageLoading(false);
+        setIsImageError(true);
+        // Fall back to container size
+        setActualCanvasSize(canvasSize);
+      };
+
+      // Add loading optimization
+      img.loading = "eager";
       img.src = backgroundImage;
     } else {
       // Use container size for grid if no image
       setActualCanvasSize(canvasSize);
+      setIsImageLoading(false);
+      setIsImageError(false);
+      setCachedImage(null);
     }
-  }, [backgroundImage, canvasSize]);
+  }, [backgroundImage, canvasSize, cachedImage]);
 
   // Draw canvas
   useEffect(() => {
@@ -474,20 +537,16 @@ export default function Layout2DCanvas({
     // Clear canvas
     ctx.clearRect(0, 0, actualCanvasSize.width, actualCanvasSize.height);
 
-    // Draw background image if provided
-    if (backgroundImage) {
-      const img = new Image();
-      img.onload = () => {
-        // Draw image scaled to fit the canvas dimensions (fixed width, proportional height)
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          actualCanvasSize.width,
-          actualCanvasSize.height
-        );
-      };
-      img.src = backgroundImage;
+    // Draw background image if provided and cached
+    if (backgroundImage && cachedImage && cachedImage.src === backgroundImage) {
+      // Use cached image immediately - no need to reload
+      ctx.drawImage(
+        cachedImage,
+        0,
+        0,
+        actualCanvasSize.width,
+        actualCanvasSize.height
+      );
     } else {
       // Draw default grid pattern
       ctx.strokeStyle = "#e5e7eb";
@@ -507,7 +566,7 @@ export default function Layout2DCanvas({
         ctx.stroke();
       }
     }
-  }, [backgroundImage, actualCanvasSize]);
+  }, [backgroundImage, actualCanvasSize, cachedImage]);
 
   // Handle canvas click
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -543,27 +602,22 @@ export default function Layout2DCanvas({
     });
 
     if (clickedDataPoint) {
-      console.log("Data point clicked:", clickedDataPoint);
-      console.log("Is manage mode:", isManageMode);
       setSelectedDataPoint(clickedDataPoint.id);
       setSelectedFlowIndicator(null); // Clear flow indicator selection
       // If not in manage mode, show device detail modal
       if (!isManageMode) {
-        console.log(
-          "Opening device detail modal for:",
-          clickedDataPoint.customName
-        );
         setSelectedDataPointForDetail(clickedDataPoint);
         setDeviceDetailModalOpen(true);
       }
     } else if (clickedFlowIndicator) {
-      console.log("Flow indicator clicked:", clickedFlowIndicator);
       setSelectedFlowIndicator(clickedFlowIndicator.id);
       setSelectedDataPoint(null); // Clear data point selection
       // Flow indicators don't show detail modal in non-manage mode
     } else {
       setSelectedDataPoint(null);
       setSelectedFlowIndicator(null);
+      // Hide tooltip when clicking on empty area
+      hideDataPointTooltip();
       // Only add new items if not clicking on existing ones and in manage mode
       if (isManageMode) {
         // For now, default to adding data points
@@ -619,7 +673,164 @@ export default function Layout2DCanvas({
     return { value: "—", isBoolean: false };
   };
 
-  // Evaluate flow indicator logic condition
+  // NEW: Define types for multi-logic configuration
+  type LogicCondition = {
+    operator: string;
+    value: any;
+    valueType: "number" | "string" | "boolean";
+  };
+
+  type LogicState = {
+    name: string;
+    color: string;
+    animation: boolean;
+    conditions: LogicCondition[];
+    conditionLogic: "AND" | "OR"; // How to combine multiple conditions
+  };
+
+  type MultiLogicConfig = {
+    states: LogicState[];
+    defaultState: string;
+  };
+
+  // NEW: Evaluate multi-logic configuration
+  const evaluateMultiLogicCondition = (
+    indicator: Layout2DFlowIndicator,
+    currentValue: any
+  ): { state: string; color: string; animation: boolean } => {
+    // More robust validation before attempting multi-logic evaluation
+    if (
+      !indicator.useMultiLogic ||
+      !indicator.multiLogicConfig ||
+      indicator.multiLogicConfig.trim() === "" ||
+      indicator.multiLogicConfig === "null" ||
+      indicator.multiLogicConfig === "undefined"
+    ) {
+      // Fallback to legacy system
+      const legacyState = evaluateFlowCondition(indicator, currentValue);
+      return getLegacyVisualState(indicator, legacyState);
+    }
+
+    try {
+      const config: MultiLogicConfig = JSON.parse(indicator.multiLogicConfig);
+
+      // Check if config and states are valid with more comprehensive validation
+      if (
+        !config ||
+        typeof config !== "object" ||
+        !config.states ||
+        !Array.isArray(config.states) ||
+        config.states.length === 0 ||
+        !config.defaultState ||
+        typeof config.defaultState !== "string"
+      ) {
+        // Silently fall back to legacy system instead of logging warnings
+        const legacyState = evaluateFlowCondition(indicator, currentValue);
+        return getLegacyVisualState(indicator, legacyState);
+      }
+
+      // Evaluate each state's conditions
+      for (const state of config.states) {
+        const conditionResults = state.conditions.map((condition) => {
+          const convertedValue = convertValueByType(
+            currentValue,
+            condition.valueType
+          );
+          const convertedCompareValue = convertValueByType(
+            condition.value,
+            condition.valueType
+          );
+          return evaluateCondition(
+            convertedValue,
+            condition.operator,
+            convertedCompareValue
+          );
+        });
+
+        // Apply condition logic (AND/OR)
+        const stateMatches =
+          state.conditionLogic === "AND"
+            ? conditionResults.every((result) => result)
+            : conditionResults.some((result) => result);
+
+        if (stateMatches) {
+          return {
+            state: state.name,
+            color: state.color,
+            animation: state.animation,
+          };
+        }
+      }
+
+      // No conditions matched, return default state
+      if (config.states && Array.isArray(config.states)) {
+        const defaultState = config.states.find(
+          (s) => s.name === config.defaultState
+        );
+        if (defaultState) {
+          return {
+            state: defaultState.name,
+            color: defaultState.color,
+            animation: defaultState.animation,
+          };
+        }
+      }
+
+      // Fallback if no default state found
+      return { state: "unknown", color: "#666666", animation: false };
+    } catch (error) {
+      // Silently fall back to legacy system on JSON parse errors
+      const legacyState = evaluateFlowCondition(indicator, currentValue);
+      return getLegacyVisualState(indicator, legacyState);
+    }
+  };
+
+  // Helper function to convert values by type
+  const convertValueByType = (value: any, valueType: string): any => {
+    try {
+      switch (valueType) {
+        case "number":
+          return Number(value);
+        case "boolean":
+          return Boolean(value === "true" || value === true || value === 1);
+        case "string":
+        default:
+          return String(value);
+      }
+    } catch (error) {
+      return value;
+    }
+  };
+
+  // Helper function to get legacy visual state
+  const getLegacyVisualState = (
+    indicator: Layout2DFlowIndicator,
+    state: "true" | "false" | "warning"
+  ) => {
+    switch (state) {
+      case "true":
+        return {
+          state,
+          color: indicator.trueColor,
+          animation: indicator.trueAnimation,
+        };
+      case "warning":
+        return {
+          state,
+          color: indicator.warningColor,
+          animation: indicator.warningAnimation,
+        };
+      case "false":
+      default:
+        return {
+          state,
+          color: indicator.falseColor,
+          animation: indicator.falseAnimation,
+        };
+    }
+  };
+
+  // Evaluate flow indicator logic condition (Legacy - kept for backward compatibility)
   const evaluateFlowCondition = (
     indicator: Layout2DFlowIndicator,
     currentValue: any
@@ -705,6 +916,44 @@ export default function Layout2DCanvas({
   const getFlowIndicatorState = (indicator: Layout2DFlowIndicator) => {
     const topicData = dataValues[indicator.device.topic];
     if (!topicData || !topicData.hasOwnProperty(indicator.selectedKey)) {
+      // Return default state when no data available
+      if (
+        indicator.useMultiLogic &&
+        indicator.multiLogicConfig &&
+        indicator.multiLogicConfig.trim() !== "" &&
+        indicator.multiLogicConfig !== "null" &&
+        indicator.multiLogicConfig !== "undefined"
+      ) {
+        try {
+          const config: MultiLogicConfig = JSON.parse(
+            indicator.multiLogicConfig
+          );
+          if (
+            config &&
+            typeof config === "object" &&
+            config.states &&
+            Array.isArray(config.states) &&
+            config.states.length > 0 &&
+            config.defaultState &&
+            typeof config.defaultState === "string"
+          ) {
+            const defaultState = config.states.find(
+              (s) => s.name === config.defaultState
+            );
+            if (defaultState) {
+              return {
+                state: defaultState.name,
+                color: defaultState.color,
+                animation: defaultState.animation,
+              };
+            }
+          }
+        } catch (error) {
+          // Silently fall through to legacy fallback
+        }
+      }
+
+      // Fallback to legacy default
       return {
         state: "false" as const,
         color: indicator.falseColor,
@@ -713,29 +962,9 @@ export default function Layout2DCanvas({
     }
 
     const currentValue = topicData[indicator.selectedKey];
-    const state = evaluateFlowCondition(indicator, currentValue);
 
-    switch (state) {
-      case "true":
-        return {
-          state,
-          color: indicator.trueColor,
-          animation: indicator.trueAnimation,
-        };
-      case "warning":
-        return {
-          state,
-          color: indicator.warningColor,
-          animation: indicator.warningAnimation,
-        };
-      case "false":
-      default:
-        return {
-          state,
-          color: indicator.falseColor,
-          animation: indicator.falseAnimation,
-        };
-    }
+    // Use new multi-logic system if enabled, otherwise fallback to legacy
+    return evaluateMultiLogicCondition(indicator, currentValue);
   };
 
   // Helper function to process raw values
@@ -794,17 +1023,35 @@ export default function Layout2DCanvas({
     e: React.MouseEvent,
     dataPointId: string
   ) => {
-    if (!isManageMode) return;
+    if (!isManageMode) {
+      console.log('🔧 [Drag&Drop] Not in manage mode, ignoring mouse down');
+      return;
+    }
+
+    console.log('🔧 [Drag&Drop] Data point mouse down:', { dataPointId, isManageMode });
 
     e.stopPropagation();
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {
+      console.error('🔧 [Drag&Drop] Container ref not available');
+      return;
+    }
 
     const dataPoint = dataPoints.find((dp) => dp.id === dataPointId);
-    if (!dataPoint) return;
+    if (!dataPoint) {
+      console.error('🔧 [Drag&Drop] Data point not found:', dataPointId);
+      return;
+    }
 
     const dataPointX = (dataPoint.positionX / 100) * actualCanvasSize.width;
     const dataPointY = (dataPoint.positionY / 100) * actualCanvasSize.height;
+
+    console.log('🔧 [Drag&Drop] Starting data point drag:', {
+      dataPointName: dataPoint.customName,
+      currentPosition: { x: dataPoint.positionX, y: dataPoint.positionY },
+      pixelPosition: { x: dataPointX, y: dataPointY },
+      mousePosition: { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    });
 
     setIsDragging(true);
     setDraggedDataPoint(dataPointId);
@@ -813,8 +1060,11 @@ export default function Layout2DCanvas({
       x: e.clientX - rect.left - dataPointX,
       y: e.clientY - rect.top - dataPointY,
     });
+
+    // No tooltip in manage mode during drag
   };
 
+  // Handler untuk manage mode
   const handleDataPointClick = (
     e: React.MouseEvent,
     dataPoint: Layout2DDataPoint
@@ -824,6 +1074,7 @@ export default function Layout2DCanvas({
     e.stopPropagation();
     if (!isDragging) {
       setSelectedDataPoint(dataPoint.id);
+
       // Double click to edit
       if (e.detail === 2) {
         onEditDataPoint?.(dataPoint);
@@ -831,86 +1082,78 @@ export default function Layout2DCanvas({
     }
   };
 
-  // Global mouse move and up handlers
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !draggedDataPoint || !containerRef.current) return;
+  // Handler untuk view mode (non-manage mode)
+  const handleDataPointViewClick = (
+    e: React.MouseEvent,
+    dataPoint: Layout2DDataPoint
+  ) => {
+    if (isManageMode) return;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const newX =
-      ((e.clientX - rect.left - dragOffset.x) / actualCanvasSize.width) * 100;
-    const newY =
-      ((e.clientY - rect.top - dragOffset.y) / actualCanvasSize.height) * 100;
+    e.stopPropagation();
 
-    // Constrain to canvas bounds
-    const constrainedX = Math.max(0, Math.min(100, newX));
-    const constrainedY = Math.max(0, Math.min(100, newY));
-
-    // Update position immediately for smooth dragging
-    setDataPoints((prev) =>
-      prev.map((dp) =>
-        dp.id === draggedDataPoint
-          ? { ...dp, positionX: constrainedX, positionY: constrainedY }
-          : dp
-      )
-    );
+    // Show tooltip on click in view mode
+    showDataPointTooltip(dataPoint, e);
   };
 
-  const handleMouseUp = () => {
-    if (isDragging && draggedDataPoint) {
-      const draggedDataPointData = dataPoints.find(
-        (dp) => dp.id === draggedDataPoint
-      );
-      if (draggedDataPointData) {
-        updateDataPointPosition(
-          draggedDataPoint,
-          draggedDataPointData.positionX,
-          draggedDataPointData.positionY
-        );
-      }
-    }
+  // Removed duplicate mouse handlers - using updated handlers below
 
-    setIsDragging(false);
-    setDraggedDataPoint(null);
-    setDragOffset({ x: 0, y: 0 });
-  };
-
-  // Add global event listeners for drag
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [isDragging, draggedDataPoint, dragOffset, actualCanvasSize]);
+  // Removed duplicate drag handlers - using updated handlers below
 
   // Update data point position
-  const updateDataPointPosition = async (
+  const updateDataPointPosition = useCallback(async (
     dataPointId: string,
     x: number,
     y: number
   ) => {
+    console.log('🔧 [Drag&Drop] Updating data point position:', { dataPointId, x, y });
+    console.log('🔧 [Drag&Drop] Current dataPoints count:', dataPoints.length);
+    console.log('🔧 [Drag&Drop] Layout ID:', layoutId);
+    console.log('🔧 [Drag&Drop] API Base URL:', API_BASE_URL);
+
     try {
       const dataPoint = dataPoints.find((dp) => dp.id === dataPointId);
-      if (!dataPoint) return;
+      if (!dataPoint) {
+        console.error('🔧 [Drag&Drop] Data point not found:', dataPointId);
+        return;
+      }
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/layout2d/${layoutId}/datapoints/${dataPointId}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...dataPoint,
-            positionX: x,
-            positionY: y,
-          }),
-        }
-      );
+      console.log('🔧 [Drag&Drop] Found data point:', dataPoint.customName);
+
+      // Prepare update data with all required fields
+      const updateData = {
+        deviceUniqId: dataPoint.device.uniqId,
+        selectedKeys: dataPoint.selectedKeys,
+        selectedKey: dataPoint.selectedKey,
+        units: dataPoint.units,
+        multiply: dataPoint.multiply,
+        customName: dataPoint.customName,
+        positionX: x,
+        positionY: y,
+        fontSize: dataPoint.fontSize,
+        color: dataPoint.color,
+        iconName: dataPoint.iconName,
+        iconColor: dataPoint.iconColor,
+        showIcon: dataPoint.showIcon,
+        displayLayout: dataPoint.displayLayout,
+      };
+
+      const apiUrl = `${API_BASE_URL}/api/layout2d/${layoutId}/datapoints/${dataPointId}`;
+      console.log('🔧 [Drag&Drop] Making API call to:', apiUrl);
+      console.log('🔧 [Drag&Drop] Update data:', updateData);
+
+      const response = await fetch(apiUrl, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      console.log('🔧 [Drag&Drop] API response status:', response.status);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔧 [Drag&Drop] API error:', errorText);
+
         // Revert position if update fails
         setDataPoints((prev) =>
           prev.map((dp) =>
@@ -923,25 +1166,58 @@ export default function Layout2DCanvas({
               : dp
           )
         );
-        console.error("Failed to update data point position");
+        throw new Error(`Failed to update data point position: ${errorText}`);
       }
+
+      const responseData = await response.json();
+      console.log('🔧 [Drag&Drop] API success response:', responseData);
+      console.log('✅ [Drag&Drop] Data point position updated successfully');
     } catch (error) {
-      console.error("Failed to update data point position:", error);
+      console.error('❌ [Drag&Drop] Failed to update data point position:', error);
+
+      // Revert on error - use current dataPoints state
+      const originalDataPoint = dataPoints.find((dp) => dp.id === dataPointId);
+      if (originalDataPoint) {
+        console.log('🔧 [Drag&Drop] Reverting to original position:', {
+          x: originalDataPoint.positionX,
+          y: originalDataPoint.positionY
+        });
+
+        setDataPoints((prev) =>
+          prev.map((dp) =>
+            dp.id === dataPointId
+              ? {
+                  ...dp,
+                  positionX: originalDataPoint.positionX,
+                  positionY: originalDataPoint.positionY,
+                }
+              : dp
+          )
+        );
+      }
     }
-  };
+  }, [dataPoints, layoutId, API_BASE_URL]);
 
   // Flow indicator handlers
   const handleFlowIndicatorMouseDown = (
     e: React.MouseEvent,
     indicatorId: string
   ) => {
-    if (!isManageMode) return;
+    if (!isManageMode) {
+      console.log('🔧 [Drag&Drop] Not in manage mode, ignoring flow indicator mouse down');
+      return;
+    }
+
+    console.log('🔧 [Drag&Drop] Flow indicator mouse down:', { indicatorId, isManageMode });
 
     e.preventDefault();
     e.stopPropagation();
 
     const indicator = flowIndicators.find((fi) => fi.id === indicatorId);
-    if (!indicator) return;
+    if (!indicator) {
+      console.error('🔧 [Drag&Drop] Flow indicator not found:', indicatorId);
+      return;
+    }
 
     setSelectedFlowIndicator(indicatorId);
     setIsDragging(true);
@@ -951,6 +1227,14 @@ export default function Layout2DCanvas({
       const rect = containerRef.current.getBoundingClientRect();
       const indicatorX = (indicator.positionX / 100) * actualCanvasSize.width;
       const indicatorY = (indicator.positionY / 100) * actualCanvasSize.height;
+
+      console.log('🔧 [Drag&Drop] Starting flow indicator drag:', {
+        indicatorName: indicator.customName,
+        currentPosition: { x: indicator.positionX, y: indicator.positionY },
+        pixelPosition: { x: indicatorX, y: indicatorY },
+        mousePosition: { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      });
+
       setDragOffset({
         x: e.clientX - rect.left - indicatorX,
         y: e.clientY - rect.top - indicatorY,
@@ -973,30 +1257,66 @@ export default function Layout2DCanvas({
   };
 
   // Update flow indicator position
-  const updateFlowIndicatorPosition = async (
+  const updateFlowIndicatorPosition = useCallback(async (
     indicatorId: string,
     x: number,
     y: number
   ) => {
+    console.log('🔧 [Drag&Drop] Updating flow indicator position:', { indicatorId, x, y });
+    console.log('🔧 [Drag&Drop] Current flowIndicators count:', flowIndicators.length);
+    console.log('🔧 [Drag&Drop] Layout ID:', layoutId);
+    console.log('🔧 [Drag&Drop] API Base URL:', API_BASE_URL);
+
     try {
       const indicator = flowIndicators.find((fi) => fi.id === indicatorId);
-      if (!indicator) return;
+      if (!indicator) {
+        console.error('🔧 [Drag&Drop] Flow indicator not found:', indicatorId);
+        return;
+      }
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/layout2d/${layoutId}/flowindicators/${indicatorId}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...indicator,
-            positionX: x,
-            positionY: y,
-          }),
-        }
-      );
+      console.log('🔧 [Drag&Drop] Found flow indicator:', indicator.customName);
+
+      // Prepare update data with all required fields
+      const updateData = {
+        deviceUniqId: indicator.device.uniqId,
+        selectedKey: indicator.selectedKey,
+        customName: indicator.customName,
+        positionX: x,
+        positionY: y,
+        arrowDirection: indicator.arrowDirection,
+        logicOperator: indicator.logicOperator,
+        compareValue: indicator.compareValue,
+        valueType: indicator.valueType,
+        trueColor: indicator.trueColor,
+        trueAnimation: indicator.trueAnimation,
+        falseColor: indicator.falseColor,
+        falseAnimation: indicator.falseAnimation,
+        warningColor: indicator.warningColor,
+        warningAnimation: indicator.warningAnimation,
+        warningEnabled: indicator.warningEnabled,
+        warningOperator: indicator.warningOperator,
+        warningValue: indicator.warningValue,
+        useMultiLogic: indicator.useMultiLogic,
+        multiLogicConfig: indicator.multiLogicConfig,
+      };
+
+      const apiUrl = `${API_BASE_URL}/api/layout2d/${layoutId}/flowindicators/${indicatorId}`;
+      console.log('🔧 [Drag&Drop] Making API call to:', apiUrl);
+      console.log('🔧 [Drag&Drop] Update data:', updateData);
+
+      const response = await fetch(apiUrl, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      console.log('🔧 [Drag&Drop] API response status:', response.status);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔧 [Drag&Drop] API error:', errorText);
+
         // Revert position if update fails
         setFlowIndicators((prev) =>
           prev.map((fi) =>
@@ -1009,15 +1329,54 @@ export default function Layout2DCanvas({
               : fi
           )
         );
-        console.error("Failed to update flow indicator position");
+        throw new Error(`Failed to update flow indicator position: ${errorText}`);
       }
+
+      const responseData = await response.json();
+      console.log('🔧 [Drag&Drop] API success response:', responseData);
+      console.log('✅ [Drag&Drop] Flow indicator position updated successfully');
     } catch (error) {
-      console.error("Failed to update flow indicator position:", error);
+      console.error('❌ [Drag&Drop] Failed to update flow indicator position:', error);
+
+      // Revert on error - use current flowIndicators state
+      const originalIndicator = flowIndicators.find((fi) => fi.id === indicatorId);
+      if (originalIndicator) {
+        console.log('🔧 [Drag&Drop] Reverting to original position:', {
+          x: originalIndicator.positionX,
+          y: originalIndicator.positionY
+        });
+
+        setFlowIndicators((prev) =>
+          prev.map((fi) =>
+            fi.id === indicatorId
+              ? {
+                  ...fi,
+                  positionX: originalIndicator.positionX,
+                  positionY: originalIndicator.positionY,
+                }
+              : fi
+          )
+        );
+      }
     }
-  };
+  }, [flowIndicators, layoutId, API_BASE_URL]);
+
+  // Tooltip helper function - moved here to be available for handleMouseMoveUpdated
+  const updateTooltipPosition = useCallback((mouseEvent: MouseEvent) => {
+    if (!dataPointTooltip.visible || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    setDataPointTooltip(prev => ({
+      ...prev,
+      position: {
+        x: mouseEvent.clientX - rect.left,
+        y: mouseEvent.clientY - rect.top
+      }
+    }));
+  }, [dataPointTooltip.visible]);
 
   // Updated global mouse handlers to support both data points and flow indicators
-  const handleMouseMoveUpdated = (e: MouseEvent) => {
+  const handleMouseMoveUpdated = useCallback((e: MouseEvent) => {
     if (!isDragging || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -1029,6 +1388,16 @@ export default function Layout2DCanvas({
     // Constrain to canvas bounds
     const constrainedX = Math.max(0, Math.min(100, newX));
     const constrainedY = Math.max(0, Math.min(100, newY));
+
+    console.log('🔧 [Drag&Drop] Mouse move - new position:', {
+      constrainedX: constrainedX.toFixed(2),
+      constrainedY: constrainedY.toFixed(2),
+      draggedDataPoint,
+      draggedFlowIndicator
+    });
+
+    // Update tooltip position during drag
+    updateTooltipPosition(e);
 
     if (draggedDataPoint) {
       // Update data point position
@@ -1049,14 +1418,24 @@ export default function Layout2DCanvas({
         )
       );
     }
-  };
+  }, [isDragging, dragOffset, actualCanvasSize, draggedDataPoint, draggedFlowIndicator, updateTooltipPosition]);
 
-  const handleMouseUpUpdated = () => {
+  const handleMouseUpUpdated = useCallback(() => {
+    console.log('🔧 [Drag&Drop] Mouse up - ending drag operation', {
+      isDragging,
+      draggedDataPoint,
+      draggedFlowIndicator
+    });
+
     if (isDragging && draggedDataPoint) {
       const draggedDataPointData = dataPoints.find(
         (dp) => dp.id === draggedDataPoint
       );
       if (draggedDataPointData) {
+        console.log('🔧 [Drag&Drop] Calling updateDataPointPosition with final position:', {
+          x: draggedDataPointData.positionX,
+          y: draggedDataPointData.positionY
+        });
         updateDataPointPosition(
           draggedDataPoint,
           draggedDataPointData.positionX,
@@ -1068,6 +1447,10 @@ export default function Layout2DCanvas({
         (fi) => fi.id === draggedFlowIndicator
       );
       if (draggedIndicatorData) {
+        console.log('🔧 [Drag&Drop] Calling updateFlowIndicatorPosition with final position:', {
+          x: draggedIndicatorData.positionX,
+          y: draggedIndicatorData.positionY
+        });
         updateFlowIndicatorPosition(
           draggedFlowIndicator,
           draggedIndicatorData.positionX,
@@ -1080,28 +1463,74 @@ export default function Layout2DCanvas({
     setDraggedDataPoint(null);
     setDraggedFlowIndicator(null);
     setDragOffset({ x: 0, y: 0 });
-  };
-
-  // Update the existing useEffect to use the new handlers
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMoveUpdated);
-      document.addEventListener("mouseup", handleMouseUpUpdated);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMoveUpdated);
-        document.removeEventListener("mouseup", handleMouseUpUpdated);
-      };
-    }
+    console.log('🔧 [Drag&Drop] Drag operation completed');
   }, [
     isDragging,
     draggedDataPoint,
     draggedFlowIndicator,
-    dragOffset,
-    actualCanvasSize,
+    dataPoints,
+    flowIndicators,
+    updateDataPointPosition,
+    updateFlowIndicatorPosition
   ]);
 
+  // Update the existing useEffect to use the new handlers
+  useEffect(() => {
+    console.log('🔧 [Drag&Drop] Setting up event listeners', { isDragging });
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMoveUpdated);
+      document.addEventListener("mouseup", handleMouseUpUpdated);
+      console.log('🔧 [Drag&Drop] Event listeners added');
+
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMoveUpdated);
+        document.removeEventListener("mouseup", handleMouseUpUpdated);
+        console.log('🔧 [Drag&Drop] Event listeners removed');
+      };
+    }
+  }, [isDragging, handleMouseMoveUpdated, handleMouseUpUpdated]);
+
+  // Tooltip helper functions - only show tooltip when NOT in manage mode
+  const showDataPointTooltip = useCallback((dataPoint: Layout2DDataPoint, mouseEvent: React.MouseEvent) => {
+    if (!containerRef.current || isManageMode) return; // ← ADDED isManageMode check
+
+    const rect = containerRef.current.getBoundingClientRect();
+    setDataPointTooltip({
+      visible: true,
+      dataPoint,
+      position: {
+        x: mouseEvent.clientX - rect.left,
+        y: mouseEvent.clientY - rect.top
+      }
+    });
+  }, [isManageMode]); // ← ADDED isManageMode dependency
+
+  const hideDataPointTooltip = useCallback(() => {
+    setDataPointTooltip({
+      visible: false,
+      dataPoint: null,
+      position: { x: 0, y: 0 }
+    });
+  }, []);
+
+  // Auto-hide tooltip when not dragging or when entering manage mode
+  useEffect(() => {
+    if (isManageMode && dataPointTooltip.visible) {
+      // Immediately hide tooltip when entering manage mode
+      hideDataPointTooltip();
+    } else if (!isDragging && dataPointTooltip.visible && !isManageMode) {
+      const timer = setTimeout(() => {
+        hideDataPointTooltip();
+      }, 3000); // Hide after 3 seconds in view mode
+
+      return () => clearTimeout(timer);
+    }
+  }, [isDragging, dataPointTooltip.visible, isManageMode, hideDataPointTooltip]);
+
   return (
-    <Card className={className}>
+    <TooltipProvider>
+      <Card className={className}>
       <div
         ref={containerRef}
         className="relative w-full overflow-auto"
@@ -1110,11 +1539,82 @@ export default function Layout2DCanvas({
           minHeight: "400px",
         }}
       >
+        {/* Skeleton Loading State */}
+        {isImageLoading && backgroundImage && (
+          <div
+            className="absolute inset-0 z-30 bg-gray-50 animate-pulse"
+            style={{
+              width: actualCanvasSize.width,
+              height: actualCanvasSize.height,
+            }}
+          >
+            <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 relative overflow-hidden">
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shimmer" />
+
+              {/* Grid pattern placeholder */}
+              <div className="absolute inset-0 opacity-30">
+                {Array.from({
+                  length: Math.ceil(actualCanvasSize.height / 50),
+                }).map((_, rowIndex) =>
+                  Array.from({
+                    length: Math.ceil(actualCanvasSize.width / 50),
+                  }).map((_, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className="absolute border border-gray-300/30"
+                      style={{
+                        left: colIndex * 50,
+                        top: rowIndex * 50,
+                        width: 50,
+                        height: 50,
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Loading indicator */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <span className="text-sm text-gray-600 font-medium">
+                      Loading background image...
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {isImageError && backgroundImage && (
+          <div className="absolute inset-0 z-30 bg-red-50 border-2 border-red-200 border-dashed">
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-medium text-red-800 mb-2">
+                  Failed to load image
+                </h3>
+                <p className="text-red-600 text-sm">
+                  The background image could not be loaded.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <canvas
           ref={canvasRef}
           width={actualCanvasSize.width}
           height={actualCanvasSize.height}
-          className="block cursor-pointer w-full h-auto"
+          className={`block cursor-pointer w-full h-auto ${
+            isImageLoading ? "opacity-0" : "opacity-100"
+          } transition-opacity duration-300`}
           onClick={handleCanvasClick}
           style={{
             maxWidth: "100%",
@@ -1146,21 +1646,27 @@ export default function Layout2DCanvas({
                 color: dataPoint.color || "#000000",
                 zIndex: isSelected ? 20 : 10,
               }}
-              onMouseDown={(e) => handleDataPointMouseDown(e, dataPoint.id)}
-              onClick={(e) => handleDataPointClick(e, dataPoint)}
+              onMouseDown={(e) => isManageMode && handleDataPointMouseDown(e, dataPoint.id)}
+              onClick={(e) => {
+                if (isManageMode) {
+                  handleDataPointClick(e, dataPoint);
+                } else {
+                  handleDataPointViewClick(e, dataPoint);
+                }
+              }}
             >
               <div
                 className={`
-                bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border
-                ${isSelected ? "ring-2 ring-blue-500" : ""}
-                ${
-                  isDragging && draggedDataPoint === dataPoint.id
-                    ? "shadow-2xl scale-105"
-                    : ""
-                }
-                transition-all duration-200 hover:shadow-xl
-                ${isManageMode ? "hover:ring-1 hover:ring-blue-300" : ""}
-              `}
+        bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border
+        ${isSelected ? "ring-2 ring-blue-500" : ""}
+        ${
+          isDragging && draggedDataPoint === dataPoint.id
+            ? "shadow-2xl scale-105"
+            : ""
+        }
+        transition-all duration-200 hover:shadow-xl
+        ${isManageMode ? "hover:ring-1 hover:ring-blue-300" : ""}
+      `}
               >
                 {/* Header with icon and name */}
                 <div className="flex items-center gap-2 mb-1">
@@ -1248,39 +1754,40 @@ export default function Layout2DCanvas({
           const ArrowIcon = (() => {
             switch (indicator.arrowDirection) {
               case "left":
-                return ArrowLeft;
+                return ArrowBigLeft;
               case "up":
-                return ArrowUp;
+                return ArrowBigUp;
               case "down":
-                return ArrowDown;
+                return ArrowBigDown;
               case "right":
               default:
-                return ArrowRight;
+                return ArrowBigRight;
             }
           })();
 
           return (
-            <div
-              key={indicator.id}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
-                isManageMode ? "cursor-move" : "cursor-default"
-              } ${
-                isDragging && draggedFlowIndicator === indicator.id
-                  ? "z-50"
-                  : ""
-              }`}
-              style={{
-                left: x,
-                top: y,
-                zIndex: isSelected ? 25 : 15,
-              }}
-              onMouseDown={(e) =>
-                isManageMode && handleFlowIndicatorMouseDown(e, indicator.id)
-              }
-              onClick={(e) =>
-                isManageMode && handleFlowIndicatorClick(e, indicator)
-              }
-            >
+            <Tooltip key={indicator.id}>
+              <TooltipTrigger asChild>
+                <div
+                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
+                    isManageMode ? "cursor-move" : "cursor-default"
+                  } ${
+                    isDragging && draggedFlowIndicator === indicator.id
+                      ? "z-50"
+                      : ""
+                  }`}
+                  style={{
+                    left: x,
+                    top: y,
+                    zIndex: isSelected ? 25 : 15,
+                  }}
+                  onMouseDown={(e) =>
+                    isManageMode && handleFlowIndicatorMouseDown(e, indicator.id)
+                  }
+                  onClick={(e) =>
+                    isManageMode && handleFlowIndicatorClick(e, indicator)
+                  }
+                >
               <div
                 className={`
                   flex items-center justify-center p-2 rounded-full
@@ -1292,23 +1799,29 @@ export default function Layout2DCanvas({
                   }
                   transition-all duration-200
                   ${isManageMode ? "hover:ring-1 hover:ring-blue-300" : ""}
-                  ${visualState.animation ? "animate-pulse" : ""}
+                  ${
+                    visualState.animation && !isManageMode
+                      ? "animate-pulse"
+                      : ""
+                  }
                 `}
                 style={{
                   backgroundColor: `${visualState.color}20`, // 20% opacity background
                   border: `2px solid ${visualState.color}`,
                 }}
-                title={`${indicator.customName} (${indicator.device.name}: ${indicator.selectedKey})`}
               >
                 <ArrowIcon
                   className={`h-6 w-6 ${
-                    visualState.animation ? "animate-pulse" : ""
+                    visualState.animation && !isManageMode
+                      ? "animate-pulse"
+                      : ""
                   }`}
                   style={{
                     color: visualState.color,
-                    filter: visualState.animation
-                      ? "drop-shadow(0 0 4px currentColor)"
-                      : "none",
+                    filter:
+                      visualState.animation && !isManageMode
+                        ? "drop-shadow(0 0 4px currentColor)"
+                        : "none",
                   }}
                 />
               </div>
@@ -1322,7 +1835,7 @@ export default function Layout2DCanvas({
 
               {/* Edit/Delete buttons for selected indicator in manage mode */}
               {isManageMode && isSelected && (
-                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex gap-1">
+                <div className="absolute -top-12 -right-4 flex gap-1">
                   <Button
                     size="sm"
                     variant="outline"
@@ -1337,11 +1850,23 @@ export default function Layout2DCanvas({
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    className="h-8 w-8 p-0 bg-white hover:bg-gray-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCopyFlowIndicator?.(indicator);
+                    }}
+                    title="Copy Flow Indicator"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="destructive"
                     className="h-8 w-8 p-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDeleteFlowIndicator?.(indicator.id);
+                      setDeleteFlowIndicatorId(indicator.id);
                     }}
                     title="Delete Flow Indicator"
                   >
@@ -1349,7 +1874,36 @@ export default function Layout2DCanvas({
                   </Button>
                 </div>
               )}
-            </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">
+                  <div className="font-semibold">{indicator.customName}</div>
+                  <div className="text-muted-foreground">
+                    Device: {indicator.device.name}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Key: {indicator.selectedKey}
+                  </div>
+                  <div className="text-muted-foreground">
+                    State: {visualState.state}
+                  </div>
+                  {/* Show current value if available */}
+                  {(() => {
+                    const topicData = dataValues[indicator.device.topic];
+                    const currentValue = topicData?.[indicator.selectedKey];
+                    if (currentValue !== undefined) {
+                      return (
+                        <div className="text-muted-foreground">
+                          Value: {String(currentValue)}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </TooltipContent>
+            </Tooltip>
           );
         })}
 
@@ -1467,7 +2021,126 @@ export default function Layout2DCanvas({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Flow Indicator Confirmation Dialog */}
+        <AlertDialog
+          open={deleteFlowIndicatorId !== null}
+          onOpenChange={() => setDeleteFlowIndicatorId(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Hapus Flow Indicator</AlertDialogTitle>
+              <AlertDialogDescription>
+                Apakah Anda yakin ingin menghapus flow indicator ini? Tindakan
+                ini tidak dapat dibatalkan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (deleteFlowIndicatorId) {
+                    onDeleteFlowIndicator?.(deleteFlowIndicatorId);
+                    setDeleteFlowIndicatorId(null);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Hapus
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* DataPoint Tooltip */}
+        {dataPointTooltip.visible && dataPointTooltip.dataPoint && (
+          <div
+            className="absolute z-50 pointer-events-none animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
+            style={{
+              left: Math.min(dataPointTooltip.position.x + 15, window.innerWidth - 320),
+              top: Math.max(dataPointTooltip.position.y - 10, 10),
+              transform: dataPointTooltip.position.y > 100 ? 'translateY(-100%)' : 'translateY(0)'
+            }}
+          >
+            <div className="bg-white border border-gray-200 text-gray-900 text-sm rounded-lg shadow-xl px-4 py-3 max-w-xs backdrop-blur-sm">
+              <div className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                {dataPointTooltip.dataPoint.iconName && (
+                  <div className="text-blue-500">
+                    {(() => {
+                      const IconComponent = getIconComponent(dataPointTooltip.dataPoint.iconName);
+                      return IconComponent ? <IconComponent size={16} /> : null;
+                    })()}
+                  </div>
+                )}
+                <span className="truncate">{dataPointTooltip.dataPoint.customName}</span>
+              </div>
+              <div className="text-gray-600 text-xs space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 min-w-[50px]">Device:</span>
+                  <span className="font-medium text-gray-700 truncate">{dataPointTooltip.dataPoint.device.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 min-w-[50px]">Value:</span>
+                  <span className="font-mono text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded font-semibold">
+                    {(() => {
+                      const valueData = formatValue(dataPointTooltip.dataPoint);
+                      return valueData.value;
+                    })()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 min-w-[50px]">Position:</span>
+                  <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
+                    {dataPointTooltip.dataPoint.positionX.toFixed(1)}%, {dataPointTooltip.dataPoint.positionY.toFixed(1)}%
+                  </span>
+                </div>
+                {dataPointTooltip.dataPoint.units && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 min-w-[50px]">Units:</span>
+                    <span className="text-blue-600 font-medium">{dataPointTooltip.dataPoint.units}</span>
+                  </div>
+                )}
+                {dataPointTooltip.dataPoint.multiply && dataPointTooltip.dataPoint.multiply !== 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 min-w-[50px]">Multiply:</span>
+                    <span className="text-orange-600 font-medium">×{dataPointTooltip.dataPoint.multiply}</span>
+                  </div>
+                )}
+                {dataPointTooltip.dataPoint.selectedKeys && dataPointTooltip.dataPoint.selectedKeys.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-400 min-w-[50px]">Keys:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {dataPointTooltip.dataPoint.selectedKeys.map((k, index) => (
+                        <span key={index} className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-mono">
+                          {k.key}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {dataPointTooltip.dataPoint.selectedKey && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 min-w-[50px]">Key:</span>
+                    <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-mono">
+                      {dataPointTooltip.dataPoint.selectedKey}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Tooltip arrow */}
+              <div
+                className="absolute w-2 h-2 bg-white border-l border-t border-gray-200 transform rotate-45"
+                style={{
+                  top: dataPointTooltip.position.y > 100 ? '100%' : '-4px',
+                  left: '16px',
+                  marginTop: dataPointTooltip.position.y > 100 ? '-4px' : '0'
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
+    </TooltipProvider>
   );
 }

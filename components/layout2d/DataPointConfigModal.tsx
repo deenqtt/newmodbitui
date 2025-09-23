@@ -447,7 +447,6 @@ export default function DataPointConfigModal({
                         <Label className="text-xs">Multiplier</Label>
                         <Input
                           type="number"
-                          step="0.01"
                           value={keyConfig.multiply || 1}
                           onChange={(e) =>
                             updateKeyConfig(keyConfig.key, {
@@ -577,36 +576,40 @@ export default function DataPointConfigModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="positionX">X Position (%)</Label>
-                      <Input
+                      <input
                         id="positionX"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={config.positionX}
-                        onChange={(e) =>
-                          setConfig((prev) => ({
-                            ...prev,
-                            positionX: parseFloat(e.target.value) || 0,
-                          }))
-                        }
+                        type="text"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                        value={Math.round(config.positionX * 10) / 10}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          if (!isNaN(value)) {
+                            setConfig((prev) => ({
+                              ...prev,
+                              positionX: Math.max(0, Math.min(100, value)),
+                            }));
+                          }
+                        }}
+                        placeholder="0-100"
                       />
                     </div>
                     <div>
                       <Label htmlFor="positionY">Y Position (%)</Label>
-                      <Input
+                      <input
                         id="positionY"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={config.positionY}
-                        onChange={(e) =>
-                          setConfig((prev) => ({
-                            ...prev,
-                            positionY: parseFloat(e.target.value) || 0,
-                          }))
-                        }
+                        type="text"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                        value={Math.round(config.positionY * 10) / 10}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          if (!isNaN(value)) {
+                            setConfig((prev) => ({
+                              ...prev,
+                              positionY: Math.max(0, Math.min(100, value)),
+                            }));
+                          }
+                        }}
+                        placeholder="0-100"
                       />
                     </div>
                   </div>

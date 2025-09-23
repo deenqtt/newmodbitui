@@ -72,10 +72,6 @@ export default function DeviceDetailModal({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const { connectionStatus } = useMqtt();
 
-  // Debug props
-  useEffect(() => {
-    console.log('DeviceDetailModal props:', { dataPoint, isOpen });
-  }, [dataPoint, isOpen]);
 
   // Parse last payload for initial data
   useEffect(() => {

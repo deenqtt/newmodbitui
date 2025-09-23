@@ -422,12 +422,12 @@ model Layout2DFlowIndicator {
   positionY      Float
   arrowDirection String @default("right") // "right", "left", "up", "down"
 
-  // Logic conditions
+  // Logic conditions (Legacy - kept for backward compatibility)
   logicOperator String // ">", "<", ">=", "<=", "==", "!="
   compareValue  String // Value to compare (supports number, string, boolean)
   valueType     String @default("number") // "number", "string", "boolean"
 
-  // Visual states based on condition result
+  // Visual states based on condition result (Legacy)
   // When condition is TRUE
   trueColor     String  @default("#22c55e") // green
   trueAnimation Boolean @default(true)
@@ -436,12 +436,17 @@ model Layout2DFlowIndicator {
   falseColor     String  @default("#ef4444") // red
   falseAnimation Boolean @default(false)
 
-  // Warning state (optional for range conditions)
+  // Warning state (optional for range conditions) (Legacy)
   warningColor     String  @default("#f59e0b") // orange
   warningAnimation Boolean @default(true)
   warningEnabled   Boolean @default(false)
   warningOperator  String? // Secondary condition for warning
   warningValue     String?
+
+  // NEW: Flexible Multi-Logic Configuration (JSON format)
+  // This allows unlimited conditions and states
+  multiLogicConfig String? // JSON: { conditions: [...], states: [...], defaultState: "..." }
+  useMultiLogic    Boolean @default(false) // Switch between legacy and new system
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
