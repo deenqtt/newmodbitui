@@ -67,7 +67,10 @@ interface MenuConfigData {
 }
 
 const defaultMenuConfig: MenuConfigData = {
-  Monitoring: { enabled: true, submenus: { "Main Dashboard": true } },
+  Monitoring: {
+    enabled: true,
+    submenus: { "Main Dashboard": true, "Layout-2D": true },
+  },
   Devices: {
     enabled: true,
     submenus: {
@@ -151,6 +154,7 @@ const menuOrder = [
 ];
 
 const submenuOrder: { [key: string]: string[] } = {
+  Monitoring: ["Main Dashboard", "Layout-2D"],
   Devices: [
     "Devices Internal",
     "Devices External",
@@ -189,6 +193,7 @@ const submenuOrder: { [key: string]: string[] } = {
 // Enhanced icon mapping with more appropriate icons
 const iconMap: { [key: string]: React.ElementType } = {
   "Main Dashboard": LayoutDashboard,
+  "Layout-2D": Menu,
   "Devices Internal": HardDrive,
   "Devices External": Package,
   "Devices for Logging": FileText,

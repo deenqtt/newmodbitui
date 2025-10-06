@@ -93,9 +93,9 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
     const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
 
-    console.log(
-      `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
-    );
+    // console.log(
+    //   `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
+    // );
 
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
@@ -138,8 +138,6 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    console.log("[Global Cron] Memulai interval logging di background.");
-
     const intervalId = setInterval(() => {
       console.log("[Global Cron] Memicu semua cron job...");
 
@@ -153,7 +151,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     }, 600000); // 600000 ms = 10 menit
 
     return () => {
-      console.log("[Global Cron] Menghentikan interval logging di background.");
+      // console.log("[Global Cron] Menghentikan interval logging di background.");
       clearInterval(intervalId);
     };
   }, []);

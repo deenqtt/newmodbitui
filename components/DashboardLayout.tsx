@@ -1,6 +1,15 @@
 // components/DashboardLayout.tsx
 import { Responsive, WidthProvider, Layout } from "react-grid-layout";
-import { WidgetLayout } from "@/app/(dashboard)/page";
+// Import the interface directly
+interface WidgetLayout {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  widgetType: string;
+  config: any;
+}
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -31,16 +40,23 @@ export default function DashboardLayout({ layout }: DashboardLayoutProps) {
       isDraggable={false}
       isResizable={false}
     >
-      {layout.map((item) => (
-        <div
-          key={item.i}
-          className="bg-background rounded-lg shadow-sm border flex flex-col overflow-hidden"
-        >
-          <div className="flex-1 w-full h-full">
-            <WidgetRenderer item={item} />
+      {layout.map((item) => {
+        // Filter out items that don't have required properties
+        if (!item.widgetType || !item.config) {
+          return null;
+        }
+
+        return (
+          <div
+            key={item.i}
+            className="bg-background rounded-lg shadow-sm border flex flex-col overflow-hidden"
+          >
+            <div className="flex-1 w-full h-full">
+              <WidgetRenderer item={item} />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </ResponsiveGridLayout>
   );
 }

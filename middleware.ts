@@ -16,6 +16,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const tokenCookie = request.cookies.get("authToken");
 
+  // Skip middleware untuk API routes (penting untuk mencegah redirect loop)
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   // Halaman publik yang bisa diakses tanpa login
   const publicPaths = ["/login", "/register"];
 

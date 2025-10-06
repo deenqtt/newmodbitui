@@ -41,7 +41,6 @@ import { MaintenanceListWidget } from "./MaintenanceList/MaintenanceListWidget";
 import { MaintenanceCalendarWidget } from "./MaintenanceCalendar/MaintenanceCalendarWidget";
 import { MaintenanceStatisticsWidget } from "./MaintenanceStatistics/MaintenanceStatisticsWidget";
 import { RackServer3dWidget } from "./RackServer3d/RackServer3dWidget";
-// Di masa depan, Anda akan mengimpor komponen widget lain di sini
 import { ZigbeeDeviceWidget } from "./ZigbeeDevice/ZigbeeDeviceWidget";
 import { ThermalCameraWidget } from "./ThermalCamera/ThermalCameraWidget";
 
@@ -120,11 +119,10 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <DashboardShortcutWidget config={config} />;
     case "Camera Last Snapshot":
       return <CameraSnapshotWidget config={config} />;
-
     case "Access Controller Status":
-      return <AccessControllerStatusWidget config={config} />; // <-- CASE BARU
+      return <AccessControllerStatusWidget config={config} />;
     case "Lock Access Control":
-      return <LockAccessControlWidget config={config} />; // <-- CASE BARU
+      return <LockAccessControlWidget config={config} />;
     case "3D Subrack View":
       return <Subrack3dWidget config={config} />;
     case "Modular 3D Device View":
@@ -133,22 +131,19 @@ export const WidgetRenderer = ({ item }: Props) => {
       return <Containment3dWidget config={config} />;
     case "3D Container View":
       return <Container3dWidget config={config} />;
-
-    case "LoRaWAN Device Data": // <-- CASE BARU
+    case "LoRaWAN Device Data":
       return <LoRaWANDeviceWidget config={config} />;
-
     case "CCTV Monitor Videos":
       return <CctvMonitorVideosWidget config={config} />;
     case "CCTV Live Stream":
       return <CctvLiveStreamWidget config={config} />;
-
     case "Maintenance List":
       return <MaintenanceListWidget config={config} />;
     case "Maintenance Calendar":
       return <MaintenanceCalendarWidget config={config} />;
     case "Maintenance Statistics":
       return <MaintenanceStatisticsWidget config={config} />;
-    case "3D Rack Server View": // <-- CASE BARU
+    case "3D Rack Server View":
       return <RackServer3dWidget config={config} />;
     case "Zigbee Device":
       return <ZigbeeDeviceWidget config={config} />;

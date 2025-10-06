@@ -56,7 +56,14 @@ interface MainWidgetCategory {
 }
 
 // Kategori utama widget dengan ikon dan deskripsi yang lebih spesifik
+// Urutan disusun berdasarkan logika aplikasi: monitoring dasar, visualisasi, kontrol, notifikasi, feeds, IoT, 3D, utilities, management, process
 export const mainWidgets: MainWidgetCategory[] = [
+  {
+    name: "Monitoring Cards",
+    category: "Monitoring",
+    icon: Gauge,
+    description: "Kartu untuk memonitor nilai dan status.",
+  },
   {
     name: "Chart Widgets",
     category: "Chart",
@@ -64,23 +71,10 @@ export const mainWidgets: MainWidgetCategory[] = [
     description: "Visualisasi data dalam bentuk grafik dan chart.",
   },
   {
-    name: "Monitoring Cards",
-    category: "Monitoring",
-    icon: Gauge,
-    description: "Kartu untuk memonitor nilai dan status.",
-  },
-
-  {
     name: "Control Widgets",
     category: "Toggle Control",
     icon: SlidersHorizontal,
     description: "Tombol interaktif dan saklar kontrol.",
-  },
-  {
-    name: "3D Visualization",
-    category: "3Dimensi",
-    icon: Box,
-    description: "Widget untuk visualisasi objek 3D.",
   },
   {
     name: "Alarm & Events",
@@ -95,6 +89,18 @@ export const mainWidgets: MainWidgetCategory[] = [
     description: "Tampilan gambar dan snapshot dari CCTV.",
   },
   {
+    name: "IoT Devices",
+    category: "IoT",
+    icon: Zap,
+    description: "Monitor and control IoT devices across different protocols.",
+  },
+  {
+    name: "3D Visualization",
+    category: "3Dimensi",
+    icon: Box,
+    description: "Widget untuk visualisasi objek 3D.",
+  },
+  {
     name: "Dashboard Utilities",
     category: "Dashboard",
     icon: LayoutPanelLeft,
@@ -106,78 +112,23 @@ export const mainWidgets: MainWidgetCategory[] = [
     icon: Wrench,
     description: "Widget untuk manajemen dan monitoring maintenance tasks.",
   },
-  {
-    name: "IoT Devices",
-    category: "IoT",
-    icon: Zap, // atau Zap
-    description: "Monitor and control IoT devices across different protocols.",
-  },
 ];
 
 // Daftar semua widget dengan ikon dan deskripsi unik untuk setiap widget
+// Urutan kategori disesuaikan dengan mainWidgets untuk konsistensi
 export const widgets: Widget[] = [
-  // --- Chart ---
-  {
-    name: "Power Generate Chart",
-    category: "Chart",
-    icon: Wind,
-    description: "Grafik real-time produksi daya.",
-  },
-  {
-    name: "Energy Target Chart",
-    category: "Chart",
-    icon: TrendingUp,
-    description: "Perbandingan target dan realisasi energi.",
-  },
-  {
-    name: "Chart Line",
-    category: "Chart",
-    icon: LineChart,
-    description: "Menampilkan data tren dari waktu ke waktu.",
-  },
-  {
-    name: "Chart Bar",
-    category: "Chart",
-    icon: BarChart,
-    description: "Membandingkan nilai antar kategori.",
-  },
-  {
-    name: "Multi-Series Chart",
-    category: "Chart",
-    icon: PieChart,
-    description: "Grafik dengan beberapa set data.",
-  },
-  {
-    name: "Basic Trend Chart",
-    category: "Chart",
-    icon: LineChart,
-    description: "Grafik tren sederhana untuk satu nilai.",
-  },
-  {
-    name: "Power Analyzer Chart",
-    category: "Chart",
-    icon: PieChart,
-    description: "Chart khusus untuk data dari Power Analyzer.",
-  },
-
   // --- Monitoring ---
   {
-    name: "Single Value Card",
+    name: "Access Controller Status",
     category: "Monitoring",
-    icon: ChevronRightSquare,
-    description: "Menampilkan satu nilai penting dari sensor.",
+    icon: Lock,
+    description: "Monitor status real-time dari Access Lock Controller.",
   },
   {
-    name: "Icon Status Card",
+    name: "Analog Gauges",
     category: "Monitoring",
-    icon: ShieldCheck,
-    description: "Menampilkan nilai dengan sebuah ikon status.",
-  },
-  {
-    name: "Grouped Icon Status",
-    category: "Monitoring",
-    icon: List,
-    description: "Menampilkan beberapa status ikon dalam satu grup.",
+    icon: Gauge,
+    description: "Indikator jarum untuk nilai analog.",
   },
   {
     name: "Breaker Status",
@@ -186,22 +137,10 @@ export const widgets: Widget[] = [
     description: "Status on/off untuk pemutus sirkuit.",
   },
   {
-    name: "Running Hours Log",
+    name: "Calculated Parameter Card",
     category: "Monitoring",
-    icon: Clock,
-    description: "Mencatat total jam operasional perangkat.",
-  },
-  {
-    name: "Energy Usage – Last Month",
-    category: "Monitoring",
-    icon: BatteryCharging,
-    description: "Total konsumsi energi bulan lalu.",
-  },
-  {
-    name: "Energy Usage – Current Month",
-    category: "Monitoring",
-    icon: BatteryCharging,
-    description: "Total konsumsi energi bulan berjalan.",
+    icon: Sigma,
+    description: "Menampilkan hasil kalkulasi dari beberapa nilai.",
   },
   {
     name: "Energy Target Gap",
@@ -210,16 +149,28 @@ export const widgets: Widget[] = [
     description: "Selisih antara target dan realisasi energi.",
   },
   {
-    name: "Analogue gauges",
+    name: "Energy Usage – Current Month",
     category: "Monitoring",
-    icon: Gauge,
-    description: "Indikator jarum untuk nilai analog.",
+    icon: BatteryCharging,
+    description: "Total konsumsi energi bulan berjalan.",
   },
   {
-    name: "Temperature Indicator Bar",
+    name: "Energy Usage – Last Month",
     category: "Monitoring",
-    icon: Thermometer,
-    description: "Bar indikator untuk memantau suhu.",
+    icon: BatteryCharging,
+    description: "Total konsumsi energi bulan lalu.",
+  },
+  {
+    name: "Grouped Icon Status",
+    category: "Monitoring",
+    icon: List,
+    description: "Menampilkan beberapa status ikon dalam satu grup.",
+  },
+  {
+    name: "Icon Status Card",
+    category: "Monitoring",
+    icon: ShieldCheck,
+    description: "Menampilkan nilai dengan sebuah ikon status.",
   },
   {
     name: "Multi-Protocol Monitor",
@@ -228,24 +179,24 @@ export const widgets: Widget[] = [
     description: "Monitor perangkat dengan berbagai protokol.",
   },
   {
-    name: "Calculated Parameter Card",
+    name: "Running Hours Log",
     category: "Monitoring",
-    icon: Sigma,
-    description: "Menampilkan hasil kalkulasi dari beberapa nilai.",
+    icon: Clock,
+    description: "Mencatat total jam operasional perangkat.",
   },
   {
-    name: "Access Controller Status",
+    name: "Single Value Card",
     category: "Monitoring",
-    icon: Lock,
-    description: "Monitor status real-time dari  Access Lock Controller.",
+    icon: ChevronRightSquare,
+    description: "Menampilkan satu nilai penting dari sensor.",
   },
   {
-    name: "Zigbee Device",
-    category: "IoT", // atau tetap "Monitoring" kalau mau di grup monitoring
-    icon: Zap,
-    description:
-      "Monitor and control Zigbee devices connected to your network.",
+    name: "Temperature Indicator Bar",
+    category: "Monitoring",
+    icon: Thermometer,
+    description: "Bar indikator untuk memantau suhu.",
   },
+
   {
     name: "Thermal Camera",
     category: "IoT",
@@ -253,17 +204,56 @@ export const widgets: Widget[] = [
     description:
       "Real-time thermal camera heatmap visualization with temperature monitoring.",
   },
+
+  // --- Chart ---
+  {
+    name: "Basic Trend Chart",
+    category: "Chart",
+    icon: LineChart,
+    description: "Grafik tren sederhana untuk satu nilai.",
+  },
+  {
+    name: "Chart Bar",
+    category: "Chart",
+    icon: BarChart,
+    description: "Membandingkan nilai antar kategori.",
+  },
+  {
+    name: "Chart Line",
+    category: "Chart",
+    icon: LineChart,
+    description: "Menampilkan data tren dari waktu ke waktu.",
+  },
+  {
+    name: "Energy Target Chart",
+    category: "Chart",
+    icon: TrendingUp,
+    description: "Perbandingan target dan realisasi energi.",
+  },
+  {
+    name: "Multi-Series Chart",
+    category: "Chart",
+    icon: PieChart,
+    description: "Grafik dengan beberapa set data.",
+  },
+  {
+    name: "Power Analyzer Chart",
+    category: "Chart",
+    icon: PieChart,
+    description: "Chart khusus untuk data dari Power Analyzer.",
+  },
+  {
+    name: "Power Generate Chart",
+    category: "Chart",
+    icon: Wind,
+    description: "Grafik real-time produksi daya.",
+  },
+
   {
     name: "Button Control Modbus",
     category: "Toggle Control",
     icon: Plug,
     description: "Tombol kontrol untuk perangkat Modbus.",
-  },
-  {
-    name: "Button Control Modular",
-    category: "Toggle Control",
-    icon: Plug,
-    description: "Tombol kontrol untuk perangkat modular.",
   },
   {
     name: "Button Control Modbit",
@@ -272,58 +262,30 @@ export const widgets: Widget[] = [
     description: "Tombol kontrol untuk perangkat Modbit.",
   },
   {
+    name: "Button Control Modular",
+    category: "Toggle Control",
+    icon: Plug,
+    description: "Tombol kontrol untuk perangkat modular.",
+  },
+  {
     name: "Lock Access Control",
     category: "Toggle Control",
     icon: Plug,
     description: "Tombol kontrol untuk Lock Access.",
   },
 
-  // --- 3Dimensi ---
-  {
-    name: "3D Rack Server View",
-    category: "3Dimensi",
-    icon: Server,
-    description: "Visualisasi 3D dari rak server.",
-  },
-  {
-    name: "Modular 3D Device View",
-    category: "3Dimensi",
-    description: "3D visualization of modular devices with real-time status",
-    icon: Move3D, // atau icon lain yang sesuai
-  },
-  {
-    name: "3D Container View",
-    category: "3Dimensi",
-    icon: Container,
-    description: "Tampilan 3D dari sebuah kontainer.",
-  },
-  {
-    name: "3D Containment View",
-    category: "3Dimensi",
-    icon: Building,
-    description: "3D visualization of server containment with real-time status",
-  },
-
-  {
-    name: "3D Subrack View",
-    category: "3Dimensi",
-    description:
-      "3D visualization of subrack devices with real-time status via MQTT",
-    icon: Server, // atau icon lain yang sesuai
-  },
-
   // --- Alarms ---
-  {
-    name: "Alarm Summary",
-    category: "Alarms",
-    icon: Bell,
-    description: "Ringkasan jumlah alarm aktif.",
-  },
   {
     name: "Alarm Log List",
     category: "Alarms",
     icon: HardDrive,
     description: "Daftar log historis kejadian alarm.",
+  },
+  {
+    name: "Alarm Summary",
+    category: "Alarms",
+    icon: Bell,
+    description: "Ringkasan jumlah alarm aktif.",
   },
 
   // --- Camera ---
@@ -334,18 +296,67 @@ export const widgets: Widget[] = [
     description: "Menampilkan gambar terakhir dari kamera.",
   },
   {
+    name: "CCTV Live Stream",
+    category: "Camera",
+    icon: MonitorPlay,
+    description:
+      "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
+  },
+  {
     name: "CCTV Monitor Videos",
     category: "Camera",
     icon: Video,
     description:
       "Tampilkan daftar video recorded dari monitor CCTV dengan kontrol playback.",
   },
+
+  // --- IoT ---
   {
-    name: "CCTV Live Stream",
-    category: "Camera",
-    icon: MonitorPlay,
+    name: "LoRaWAN Device Data",
+    category: "IoT",
+    icon: Radio,
+    description: "Displays real-time data from a selected LoRaWAN device.",
+  },
+  {
+    name: "Zigbee Device",
+    category: "IoT",
+    icon: Zap,
     description:
-      "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
+      "Monitor and control Zigbee devices connected to your network.",
+  },
+
+  // --- 3Dimensi ---
+  {
+    name: "3D Container View",
+    category: "3Dimensi",
+    icon: Container,
+    description: "Tampilan 3D dari sebuah kontainer.",
+  },
+  {
+    name: "3D Containment View",
+    category: "3Dimensi",
+    icon: Building,
+    description:
+      "3D visualization of server containment with real-time status.",
+  },
+  {
+    name: "3D Rack Server View",
+    category: "3Dimensi",
+    icon: Server,
+    description: "Visualisasi 3D dari rak server.",
+  },
+  {
+    name: "3D Subrack View",
+    category: "3Dimensi",
+    icon: Server,
+    description:
+      "3D visualization of subrack devices with real-time status via MQTT.",
+  },
+  {
+    name: "Modular 3D Device View",
+    category: "3Dimensi",
+    icon: Move3D,
+    description: "3D visualization of modular devices with real-time status.",
   },
 
   // --- Dashboard ---
@@ -355,26 +366,20 @@ export const widgets: Widget[] = [
     icon: Table,
     description: "Pintasan untuk navigasi ke dashboard lain.",
   },
-  {
-    name: "LoRaWAN Device Data",
-    category: "Monitoring",
-    icon: Radio,
-    description: "Displays real-time data from a selected LoRaWAN device.",
-  },
 
   // --- Maintenance ---
+  {
+    name: "Maintenance Calendar",
+    category: "Maintenance",
+    icon: Calendar,
+    description: "Calendar view of scheduled maintenance tasks and deadlines.",
+  },
   {
     name: "Maintenance List",
     category: "Maintenance",
     icon: Wrench,
     description:
       "Displays recent maintenance tasks with status and scheduling information.",
-  },
-  {
-    name: "Maintenance Calendar",
-    category: "Maintenance",
-    icon: Calendar,
-    description: "Calendar view of scheduled maintenance tasks and deadlines.",
   },
   {
     name: "Maintenance Statistics",

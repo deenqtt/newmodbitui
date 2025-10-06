@@ -72,14 +72,19 @@ import { MaintenanceListConfigModal } from "@/components/widgets/MaintenanceList
 import { MaintenanceCalendarConfigModal } from "@/components/widgets/MaintenanceCalendar/MaintenanceCalendarConfigModal";
 import { MaintenanceStatisticsConfigModal } from "@/components/widgets/MaintenanceStatistics/MaintenanceStatisticsConfigModal";
 import { ZigbeeDeviceConfigModal } from "@/components/widgets/ZigbeeDevice/ZigbeeDeviceConfigModal";
+
 import { ThermalCameraConfigModal } from "@/components/widgets/ThermalCamera/ThermalCameraConfigModal";
+
+import { ProcessConfigModal } from "@/components/widgets/Process/ProcessConfigModal";
+import { ProcessConnectionConfigModal } from "@/components/widgets/Process/ProcessConnectionConfigModal";
+import { ConnectionWidgetConfigModal } from "@/components/widgets/Connection/ConnectionWidgetConfigModal";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 interface WidgetLayout extends Layout {
-  widgetType?: string;
-  config?: any;
+  widgetType: string;
+  config: any;
 }
 
 interface DashboardData {
@@ -156,9 +161,9 @@ export default function DashboardEditorPage({
       const oldItem = layout.find((l) => l.i === newItem.i);
       return {
         ...newItem,
-        widgetType: oldItem?.widgetType,
-        config: oldItem?.config,
-      };
+        widgetType: oldItem?.widgetType || "Unknown",
+        config: oldItem?.config || {},
+      } as WidgetLayout;
     });
     setLayout(updatedLayout);
   };
@@ -237,6 +242,12 @@ export default function DashboardEditorPage({
           "3D Rack Server View",
           "Zigbee Device",
           "Thermal Camera",
+
+          "Process Box",
+          "Process Cylinder",
+          "Process Circle",
+          "Process Triangle",
+          "Process Connection",
         ].includes(widgetData.name)
       ) {
         setIsConfigModalOpen(true);
@@ -323,11 +334,19 @@ export default function DashboardEditorPage({
         minW = 4;
         minH = 4;
         break;
+
       case "Thermal Camera":
         defaultWidth = 4;
         defaultHeight = 6;
         minW = 3;
         minH = 4;
+
+      case "Process":
+        defaultWidth = 3;
+        defaultHeight = 3;
+        minW = 1;
+        minH = 1;
+
         break;
     }
 
@@ -698,8 +717,66 @@ export default function DashboardEditorPage({
           onSave={handleSaveWidgetConfig}
         />
       )}
+
       {isConfigModalOpen && configuringWidget?.name === "Thermal Camera" && (
         <ThermalCameraConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Process" && (
+        <ProcessConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Process Box" && (
+        <ProcessConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Process Cylinder" && (
+        <ProcessConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Process Circle" && (
+        <ProcessConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Process Triangle" && (
+        <ProcessConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          onSave={handleSaveWidgetConfig}
+        />
+      )}
+
+      {isConfigModalOpen &&
+        configuringWidget?.name === "Process Connection" && (
+          <ProcessConnectionConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => setIsConfigModalOpen(false)}
+            onSave={handleSaveWidgetConfig}
+          />
+        )}
+
+      {isConfigModalOpen && configuringWidget?.name === "Connection" && (
+        <ConnectionWidgetConfigModal
           isOpen={isConfigModalOpen}
           onClose={() => setIsConfigModalOpen(false)}
           onSave={handleSaveWidgetConfig}
