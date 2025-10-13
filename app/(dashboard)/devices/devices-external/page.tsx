@@ -304,8 +304,8 @@ function DevicesExternalContent() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className=" p-4 md:p-6 space-y-8">
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto p-4 md:p-6 space-y-8">
           {/* Header Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">

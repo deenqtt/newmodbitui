@@ -142,17 +142,18 @@ export default function LoraWANProfilesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Package className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">LoRaWAN Device Profiles</h1>
-            <p className="text-muted-foreground">
-              Manage templates for your LoRaWAN devices.
-            </p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Package className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">LoRaWAN Device Profiles</h1>
+              <p className="text-muted-foreground">
+                Manage templates for your LoRaWAN devices.
+              </p>
+            </div>
           </div>
-        </div>
 
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
@@ -279,9 +280,11 @@ export default function LoraWANProfilesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
+
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y">
             <thead className="bg-gray-50">

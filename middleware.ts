@@ -59,5 +59,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Jalankan middleware di semua rute kecuali file statis dan API
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images/).*)"],
 };

@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { formatDistanceToNow } from "date-fns";
 
 // Definisikan tipe data untuk notifikasi agar sesuai dengan data dari API
@@ -37,7 +37,16 @@ export function NotificationBell() {
       const newUnreadCount = response.data.filter((n) => !n.isRead).length;
       setUnreadCount(newUnreadCount);
     } catch (error) {
-      console.error("Failed to fetch notifications:", error);
+      // Only log error if it's not a redirect/too many redirects error
+      if (error instanceof AxiosError) {
+        if (error.code !== 'ERR_TOO_MANY_REDIRECTS' && error.code !== 'ERR_NETWORK') {
+          console.error("Failed to fetch notifications:", error);
+        }
+      } else {
+        // Handle non-AxiosError cases (rare but defensive)
+        // Silenced as per request
+      }
+      // Don't print/log ERR_TOO_MANY_REDIRECTS errors as requested
     }
   };
 
@@ -49,7 +58,7 @@ export function NotificationBell() {
       setUnreadCount(0);
       setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
     } catch (error) {
-      console.error("Failed to mark notifications as read:", error);
+      // Silenced as per request
     }
   };
 
@@ -64,7 +73,7 @@ export function NotificationBell() {
       setNotifications([]);
       setUnreadCount(0);
     } catch (error) {
-      console.error("Failed to clear notifications:", error);
+      // Silenced as per request
     }
   };
 

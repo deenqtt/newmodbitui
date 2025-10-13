@@ -257,10 +257,10 @@ export default function AccessControllersPage() {
 
   return (
     <>
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 bg-background">
         {/* Form Add New Controller tidak berubah */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-3">Add New Controller</h2>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-3 text-foreground">Add New Controller</h2>
           <form
             onSubmit={handleAddDevice}
             className="flex flex-wrap md:flex-nowrap items-end gap-4"
@@ -492,7 +492,6 @@ export default function AccessControllersPage() {
         isOpen={isLogModalOpen}
         onClose={() => setIsLogModalOpen(false)}
         title={`Activity Log for "${selectedController?.name || ""}"`}
-        size="2xl"
       >
         <div className="max-h-[60vh] flex flex-col">
           <div className="flex-grow overflow-y-auto pr-2">

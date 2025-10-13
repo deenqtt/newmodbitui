@@ -12,7 +12,7 @@ model User {
   id                   String            @id @default(cuid())
   email                String            @unique
   password             String
-  role                 Role              @default(USER)
+  roleId               String?           // Nullable untuk backward compatibility
   fingerprintId        String?           @unique
   cardUid              String?           @unique
   createdAt            DateTime          @default(now())
@@ -21,6 +21,88 @@ model User {
   dashboards           DashboardLayout[]
   assignedMaintenances Maintenance[]     @relation("AssignedToUser")
   notifications        Notification[]
+  role                 Role?             @relation(fields: [roleId], references: [id])
+}
+
+model Role {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  isSystem    Boolean     @default(false) // Untuk prevent deletion system roles
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  users       User[]
+  permissions RolePermission[]
+  menus       RoleMenuPermission[]
+}
+
+model Permission {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  resource    String      // e.g., 'menu', 'user', 'device'
+  action      String      // e.g., 'create', 'read', 'update', 'delete'
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model MenuGroup {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  label       String
+  icon        String?    // Icon name
+  order       Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  menuItems   MenuItem[]
+}
+
+model MenuItem {
+  id           String             @id @default(cuid())
+  menuGroupId  String
+  name         String             @unique
+  label        String
+  path         String
+  icon         String?
+  component    String?            // Component name for lazy loading
+  order        Int                @default(0)
+  isActive     Boolean            @default(true)
+  isDeveloper  Boolean            @default(false) // Advanced features flag
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  menuGroup    MenuGroup          @relation(fields: [menuGroupId], references: [id], onDelete: Cascade)
+  permissions  RoleMenuPermission[]
+}
+
+model RoleMenuPermission {
+  id          String   @id @default(cuid())
+  roleId      String
+  menuItemId  String
+  canView     Boolean  @default(true)
+  canCreate   Boolean  @default(false)
+  canUpdate   Boolean  @default(false)
+  canDelete   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, menuItemId])
 }
 
 // Tambah ke schema.prisma
@@ -95,10 +177,47 @@ model ThermalData {
   avgTemp   Float?
   // rawData   String?  // REMOVED - tidak perlu disimpan
   frameCount Int?     // Optional: untuk tracking frame number
-  
+
   device    DeviceExternal @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  
+
   @@index([deviceId, timestamp])
+}
+
+model Rack {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  capacityU Int        @default(42) // Typical rack size
+  location  String?    // Data center room/location
+  notes     String?    // Additional notes
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  devices DeviceInternal[]
+}
+
+model DeviceInternal {
+  id            String            @id @default(cuid())
+  name          String
+  deviceType    String            // Server, Sensor, Switch, Router, NAS, etc
+  manufacturer  String?
+  modelId       String?
+  firmware      String?
+  rackId        String?
+  positionU     Int?              // U position in rack (1-42 for 42U rack)
+  sizeU         Int               @default(1)  // How many U spaces it occupies
+  powerWatt     Int?              // Power consumption
+  notes         String?
+  status        String            @default("offline") // online, offline, maintenance
+  ipAddress     String?
+  lastSeen      DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  rack          Rack?             @relation(fields: [rackId], references: [id], onDelete: SetNull)
+
+  // Ensure unique position per rack
+  @@unique([rackId, positionU])
 }
 model LoggingConfiguration {
   id           String         @id @default(cuid())
@@ -171,12 +290,6 @@ model PowerAnalyzerConfiguration {
   apiTopic       DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
 }
 
-model MenuConfiguration {
-  id        String   @id @default(cuid())
-  structure String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
 
 model AlarmConfiguration {
   id           String                  @id @default(cuid())
@@ -476,10 +589,7 @@ model Layout2DFlowIndicator {
   @@unique([layoutId, deviceUniqId, selectedKey, positionX, positionY])
 }
 
-enum Role {
-  ADMIN
-  USER
-}
+
 
 enum AlarmType {
   CRITICAL

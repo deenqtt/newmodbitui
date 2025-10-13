@@ -205,9 +205,9 @@ export const IconStatusCardWidget = ({ config }: Props) => {
   // Clean minimal styling - consistent dengan SingleValueCard
   const getStatusStyling = () => {
     const baseStyles = {
-      title: "text-slate-700",
-      value: "text-slate-900",
-      unit: "text-slate-500",
+      title: "text-slate-700 dark:text-slate-300",
+      value: "text-slate-900 dark:text-slate-100",
+      unit: "text-slate-500 dark:text-slate-400",
       // Icon selalu neutral gray kecuali ada custom color
       iconBg: config.iconBgColor || "#64748B",
       iconColor: config.iconColor || "#FFFFFF",
@@ -217,31 +217,31 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500",
+          indicator: "bg-emerald-500 dark:bg-emerald-400",
           pulse: false,
         };
       case "error":
         return {
           ...baseStyles,
-          indicator: "bg-red-500",
+          indicator: "bg-red-500 dark:bg-red-400",
           pulse: false,
           // Sedikit hint warna di text untuk error
-          title: "text-red-600",
-          value: "text-red-700",
+          title: "text-red-600 dark:text-red-400",
+          value: "text-red-700 dark:text-red-300",
         };
       case "loading":
       case "waiting":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500",
+          indicator: "bg-amber-500 dark:bg-amber-400",
           pulse: true,
-          title: "text-slate-600",
-          value: "text-slate-700",
+          title: "text-slate-600 dark:text-slate-400",
+          value: "text-slate-700 dark:text-slate-300",
         };
       default:
         return {
           ...baseStyles,
-          indicator: "bg-slate-400",
+          indicator: "bg-slate-400 dark:bg-slate-500",
           pulse: false,
         };
     }
@@ -292,14 +292,14 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       <div className="flex flex-col items-center justify-center gap-3 text-center">
         <div className="relative">
           <div
-            className="bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+            className="bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-600"
             style={{
               width: dynamicSizes.iconSize * 1.3,
               height: dynamicSizes.iconSize * 1.3,
             }}
           >
             <Loader2
-              className="animate-spin text-slate-400"
+              className="animate-spin text-slate-400 dark:text-slate-500"
               style={{
                 width: dynamicSizes.iconSize * 0.6,
                 height: dynamicSizes.iconSize * 0.6,
@@ -309,7 +309,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
         </div>
         {layoutMode !== "compact" && (
           <p
-            className="font-medium text-slate-600"
+            className="font-medium text-slate-600 dark:text-slate-400"
             style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
           >
             Loading data...
@@ -327,7 +327,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       <div className="flex flex-col items-center justify-center gap-3 text-center">
         <div className="relative">
           <div
-            className="bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+            className="bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-600"
             style={{
               width: dynamicSizes.iconSize * 1.3,
               height: dynamicSizes.iconSize * 1.3,
@@ -335,7 +335,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
           >
             {isOffline ? (
               <WifiOff
-                className="text-slate-500"
+                className="text-slate-500 dark:text-slate-300"
                 style={{
                   width: dynamicSizes.iconSize * 0.6,
                   height: dynamicSizes.iconSize * 0.6,
@@ -343,7 +343,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
               />
             ) : (
               <AlertTriangle
-                className="text-red-500"
+                className="text-red-500 dark:text-red-400"
                 style={{
                   width: dynamicSizes.iconSize * 0.6,
                   height: dynamicSizes.iconSize * 0.6,
@@ -533,8 +533,8 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       ref={containerRef}
       className={`
         w-full h-full relative overflow-hidden cursor-move
-        bg-white
-        border border-slate-200/60 rounded-xl
+        bg-card
+        border border-border/60 rounded-xl
         shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
         group hover:scale-[1.01] transform-gpu

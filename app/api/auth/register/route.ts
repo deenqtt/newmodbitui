@@ -1,6 +1,6 @@
 // File: app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -32,6 +32,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get USER role
+    const userRole = await prisma.role.findUnique({
+      where: { name: "USER" },
+    });
+
+    if (!userRole) {
+      return NextResponse.json(
+        { message: "Default user role not found. Please run database seeding first." },
+        { status: 500 }
+      );
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -40,7 +52,7 @@ export async function POST(request: Request) {
       data: {
         email,
         password: hashedPassword,
-        role: Role.USER, // Pengguna baru selalu menjadi USER
+        roleId: userRole.id, // Pengguna baru selalu menjadi USER
       },
     });
 

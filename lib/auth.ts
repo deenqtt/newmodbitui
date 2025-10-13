@@ -1,10 +1,11 @@
 // File: lib/auth.ts
 import { Role } from "@prisma/client";
+import { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 interface AuthPayload {
   userId: string;
-  role: Role;
+  roleId: string;
   email: string;
   iat: number;
   exp: number;
@@ -39,9 +40,15 @@ export async function getAuthFromCookie(
   try {
     // Verifikasi token menggunakan jose
     const { payload } = await jwtVerify(token, getJwtSecretKey());
-    return payload as AuthPayload;
+    return payload as unknown as AuthPayload;
   } catch (error) {
     console.error("Invalid token from cookie:", error);
     return null;
   }
+}
+
+// Fungsi untuk server-side session
+export async function getServerSession(request?: NextRequest) {
+  const auth = await getAuthFromCookie(request as Request);
+  return auth ? { userId: auth.userId, roleId: auth.roleId, email: auth.email } : null;
 }

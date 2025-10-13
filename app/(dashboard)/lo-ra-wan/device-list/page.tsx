@@ -75,16 +75,17 @@ export default function LoraWANPage() {
   }, [devices, currentPage]);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Network className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">LoRaWAN Devices</h1>
-          <p className="text-muted-foreground">
-            List of all LoRaWAN devices sending data via ChirpStack.
-          </p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-4 md:p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Network className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">LoRaWAN Devices</h1>
+            <p className="text-muted-foreground">
+              List of all LoRaWAN devices sending data via ChirpStack.
+            </p>
+          </div>
         </div>
-      </div>
 
       <Card>
         <CardHeader>
@@ -185,6 +186,7 @@ export default function LoraWANPage() {
           </div>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 }

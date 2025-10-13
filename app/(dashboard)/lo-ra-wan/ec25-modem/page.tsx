@@ -294,15 +294,15 @@ export default function EC25ModemPage() {
   }, [showApnDialog, gsmData]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950 p-4 md:p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               EC25 Modem Monitor
             </h1>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-slate-400">
               Real-time monitoring and configuration for Quectel EC25 cellular
               modem
             </p>
@@ -311,11 +311,11 @@ export default function EC25ModemPage() {
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 {connectionStatus}
               </span>
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               {mounted ? `Last update: ${lastUpdate}` : "Last update: --:--:--"}
             </div>
             <Button
@@ -331,25 +331,25 @@ export default function EC25ModemPage() {
 
         {/* Quick Status Cards with Real Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Network</p>
-                  <p className="text-lg font-bold text-slate-900">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Network</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {currentData.gsm.network.operator}
                   </p>
                 </div>
                 <div
                   className={`p-2 rounded-full ${
-                    currentData.gsm.connected ? "bg-green-100" : "bg-red-100"
+                    currentData.gsm.connected ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
                   }`}
                 >
                   <Smartphone
                     className={`w-5 h-5 ${
                       currentData.gsm.connected
-                        ? "text-green-600"
-                        : "text-red-600"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
                     }`}
                   />
                 </div>
@@ -367,12 +367,12 @@ export default function EC25ModemPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Signal</p>
-                  <p className="text-lg font-bold text-slate-900">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Signal</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {currentData.gsm.network.signal_strength} dBm
                   </p>
                 </div>
@@ -381,7 +381,7 @@ export default function EC25ModemPage() {
                     <div
                       key={bar}
                       className={`w-1 h-4 rounded-full ${
-                        bar <= getSignalBars() ? "bg-blue-500" : "bg-slate-200"
+                        bar <= getSignalBars() ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700"
                       }`}
                     />
                   ))}
@@ -398,29 +398,29 @@ export default function EC25ModemPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     GPS Status
                   </p>
-                  <p className="text-lg font-bold text-slate-900">
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {currentData.gps.satellites} Satellites
                   </p>
                 </div>
                 <div
                   className={`p-2 rounded-full ${
                     currentData.gps.fix_status === "GPS Fix"
-                      ? "bg-green-100"
-                      : "bg-yellow-100"
+                      ? "bg-green-100 dark:bg-green-900/30"
+                      : "bg-yellow-100 dark:bg-yellow-900/30"
                   }`}
                 >
                   <Satellite
                     className={`w-5 h-5 ${
                       currentData.gps.fix_status === "GPS Fix"
-                        ? "text-green-600"
-                        : "text-yellow-600"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-yellow-600 dark:text-yellow-400"
                     }`}
                   />
                 </div>
@@ -440,18 +440,18 @@ export default function EC25ModemPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+          <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Uptime</p>
-                  <p className="text-lg font-bold text-slate-900">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Uptime</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {Math.floor(currentData.status.uptime / 3600)}h{" "}
                     {Math.floor((currentData.status.uptime % 3600) / 60)}m
                   </p>
                 </div>
-                <div className="p-2 rounded-full bg-blue-100">
-                  <Clock className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
               <div className="flex items-center mt-2">
@@ -466,9 +466,9 @@ export default function EC25ModemPage() {
 
       {/* Connection Alert */}
       {!isConnected && (
-        <Alert className="mb-6 border-orange-200 bg-orange-50">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
+        <Alert className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/30">
+          <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <AlertDescription className="text-orange-800 dark:text-orange-300">
             Connecting to EC25 modem service via MQTT...
           </AlertDescription>
         </Alert>
@@ -593,7 +593,7 @@ export default function EC25ModemPage() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-6 bg-white/70 backdrop-blur-sm">
+        <TabsList className="grid w-full grid-cols-6 mb-6 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <Activity className="w-4 h-4" />
             <span>Overview</span>

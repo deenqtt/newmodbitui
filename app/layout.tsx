@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { AuthProvider } from "@/contexts/AuthContext"; // Impor AuthProvider
+import { AuthProvider } from "@/contexts/AuthContext";
+import { MenuProvider } from "@/contexts/MenuContext";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -16,10 +18,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {/* AuthProvider membungkus semua halaman agar status login bisa diakses di mana saja */}
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* AuthProvider membungkus semua halaman agar status login bisa diakses di mana saja */}
+          <AuthProvider>
+            <MenuProvider>
+              {children}
+            </MenuProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

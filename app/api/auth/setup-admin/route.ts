@@ -1,16 +1,28 @@
 // File: app/api/auth/setup-admin/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // 1. Cek apakah sudah ada admin di database
-    const existingAdmin = await prisma.user.findFirst({
-      where: { role: Role.ADMIN },
+    // 1. Get ADMIN role
+    const adminRole = await prisma.role.findUnique({
+      where: { name: "ADMIN" },
     });
+
+    // 2. Cek apakah sudah ada admin di database
+    const existingAdmin = await prisma.user.findFirst({
+      where: { roleId: adminRole?.id },
+    });
+
+    if (!adminRole) {
+      return NextResponse.json(
+        { message: "Admin role not found. Please run database seeding first." },
+        { status: 500 }
+      );
+    }
 
     // 2. Jika sudah ada, kembalikan error untuk mencegah pembuatan admin ganda
     if (existingAdmin) {
@@ -29,7 +41,7 @@ export async function GET() {
       data: {
         email: "admin@example.com",
         password: hashedPassword,
-        role: Role.ADMIN,
+        roleId: adminRole.id,
       },
     });
 
