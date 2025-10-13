@@ -9,7 +9,11 @@ import {
   Wifi,
   WifiOff,
   Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { Button } from "@/components/ui/button";
@@ -29,6 +33,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 import withReactContent from "sweetalert2-react-content";
 
@@ -110,6 +117,35 @@ export default function GatewaysPage() {
   const [gateways, setGateways] = useState<Gateway[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Sorting hook for gateways table
+  const { sorted: sortedGateways, sortKey, sortDirection, handleSort } = useSortableTable(
+    useMemo(() => gateways.filter(gateway =>
+      gateway.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      gateway.gatewayId.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [gateways, searchTerm])
+  );
+
+  // Pagination calculations
+  const { filteredGateways, totalPages, paginatedGateways } = useMemo(() => {
+    const filtered = sortedGateways;
+    const total = Math.ceil(filtered.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+    return {
+      filteredGateways: filtered,
+      totalPages: total,
+      paginatedGateways: paginated,
+    };
+  }, [sortedGateways, currentPage, itemsPerPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection, itemsPerPage]);
 
   const fetchGateways = async () => {
     console.log("Fetching gateways..."); // Debug log
@@ -322,20 +358,87 @@ export default function GatewaysPage() {
             )}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Gateway Name</TableHead>
-                  <TableHead>Gateway ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Seen</TableHead>
-                  <TableHead>Packets (24h)</TableHead>
-                  <TableHead>CRC Success</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+          <CardContent>
+            {/* Search and Controls */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+              <div className="relative max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search gateways by name or ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">
+                  Items per page:
+                </span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleSort('name')}>
+                      <div className="flex items-center gap-2">
+                        <span>Gateway Name</span>
+                        {!sortKey || sortKey !== 'name' ? (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        ) : sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleSort('gatewayId')}>
+                      <div className="flex items-center gap-2">
+                        <span>Gateway ID</span>
+                        {!sortKey || sortKey !== 'gatewayId' ? (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        ) : sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleSort('lastSeen')}>
+                      <div className="flex items-center gap-2">
+                        <span>Last Seen</span>
+                        {!sortKey || sortKey !== 'lastSeen' ? (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        ) : sortDirection === 'asc' ? (
+                          <ArrowUp className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      Packets (24h)
+                    </TableHead>
+                    <TableHead>CRC Success</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
@@ -347,10 +450,13 @@ export default function GatewaysPage() {
                     </TableCell>
                   </TableRow>
                 ) : gateways.length > 0 ? (
-                  gateways.map((gateway) => (
-                    <TableRow key={gateway.id}>
+                  paginatedGateways.map((gateway) => (
+                    <TableRow key={gateway.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        {gateway.name}
+                        <div className="flex items-center gap-2">
+                          <Router className="h-4 w-4 text-muted-foreground" />
+                          {gateway.name}
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {gateway.gatewayId}
@@ -359,11 +465,11 @@ export default function GatewaysPage() {
                         {getStatusBadge(gateway.isOnline, gateway.lastSeen)}
                       </TableCell>
                       <TableCell>{formatTimestamp(gateway.lastSeen)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground">
                         {gateway.stats?.[0]?.rfPacketsReceived?.toLocaleString() ||
                           "0"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground">
                         {gateway.stats?.[0]?.crcOkRatio
                           ? `${(gateway.stats[0].crcOkRatio * 100).toFixed(1)}%`
                           : "N/A"}
@@ -406,6 +512,54 @@ export default function GatewaysPage() {
                       they send data.
                     </TableCell>
                   </TableRow>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 border-t border-border pt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredGateways.length)} to{" "}
+                      {Math.min(currentPage * itemsPerPage, filteredGateways.length)} of{" "}
+                      {filteredGateways.length} results
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (page > totalPages) return null;
+                        return (
+                          <Button
+                            key={page}
+                            variant={page === currentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="min-w-9"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </TableBody>
             </Table>

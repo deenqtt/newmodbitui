@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import { v4 as uuidv4 } from "uuid";
 import { connectMQTT, getMQTTClient, disconnectMQTT } from "@/lib/mqttClient";
 
@@ -1454,16 +1455,46 @@ const RemappingControl = () => {
     ) || 0, 0
   );
 
+  // Sorting and pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Fixed items per page
+
+  // Filter data based on search query
+  const filteredConfigs = remappingConfigs.remapping_configs.filter(config =>
+    config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    config.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    config.mqtt_publish_config.topic.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Use sortable table hook
+  const { sorted, sortKey, sortDirection, handleSort } = useSortableTable(filteredConfigs);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(sorted.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentConfigs = sorted.slice(startIndex, endIndex);
+
+  // Reset to first page when search or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortKey, sortDirection]);
+
+  // Calculate displayed summary data
+  const displayedTotalConfigs = sorted.length;
+  const displayedTotalSourceDevices = sorted.slice(startIndex, endIndex).reduce(
+    (sum, config) => sum + (config.source_devices?.length || 0), 0
+  );
+  const displayedTotalKeyMappings = sorted.slice(startIndex, endIndex).reduce(
+    (sum, config) => sum + config.source_devices?.reduce(
+      (deviceSum, device) => deviceSum + (device.key_mappings?.length || 0), 0
+    ) || 0, 0
+  );
+
   return (
-    <SidebarInset>
-      {/* Header */}
-      <header className="flex h-16 items-center justify-between border-b px-4">
-        <div className="flex items-center gap-2">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <ArrowLeftRight className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">Payload Remapping</h1>
-        </div>
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+
         <div className="flex items-center gap-2">
           <MqttStatus />
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={getConfigs}>
@@ -1474,47 +1505,46 @@ const RemappingControl = () => {
             Add Remapping Config
           </Button>
         </div>
-      </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Configurations</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Configurations</CardTitle>
               <Settings2 className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalConfigs}</div>
-              <p className="text-xs text-muted-foreground">Active remapping configurations</p>
+              <p className="text-xs text-muted-foreground">Active configurations</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Source Devices</CardTitle>
+              <CardTitle className="text-sm font-medium">Current Page</CardTitle>
               <Activity className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalSourceDevices}</div>
-              <p className="text-xs text-muted-foreground">Devices being monitored</p>
+              <div className="text-2xl font-bold">{currentPage}</div>
+              <p className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Key Mappings</CardTitle>
+              <CardTitle className="text-sm font-medium">Filtered Results</CardTitle>
               <Code className="h-5 w-5 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalKeyMappings}</div>
-              <p className="text-xs text-muted-foreground">Field transformations</p>
+              <div className="text-2xl font-bold">{displayedTotalConfigs}</div>
+              <p className="text-xs text-muted-foreground">Matching configurations</p>
             </CardContent>
           </Card>
 
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Real-time Status</CardTitle>
+              <CardTitle className="text-sm font-medium">Real-time Data</CardTitle>
               <TrendingUp className="h-5 w-5 text-orange-600" />
             </CardHeader>
             <CardContent>
@@ -1589,137 +1619,232 @@ const RemappingControl = () => {
 
         {/* Configurations Table */}
         <div className="rounded-lg border bg-background shadow-sm">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="text-lg font-semibold">
-              Remapping Configurations ({remappingConfigs.remapping_configs.length})
-            </h3>
-            <Button size="sm" onClick={() => openModal()}>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Add Configuration
-            </Button>
+          <div className="p-4 border-b space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Remapping Configurations ({displayedTotalConfigs})
+              </h3>
+              <Button size="sm" onClick={() => openModal()}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add Configuration
+              </Button>
+            </div>
+
+            {/* Search and Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <div className="relative flex-1 max-w-sm">
+                  <Input
+                    placeholder="Search configurations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8"
+                  />
+                  <div className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pagination Info */}
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(endIndex, sorted.length)} of {sorted.length} configurations
+              </div>
+            </div>
           </div>
+
           <div className="p-4">
-            {remappingConfigs.remapping_configs.length === 0 ? (
+            {sorted.length === 0 ? (
               <div className="text-center py-8">
                 <Code className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No remapping configurations</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchQuery ? "No configurations match your search" : "No remapping configurations"}
+                </h3>
                 <p className="text-muted-foreground mb-4">
-                  Create your first remapping configuration to get started
+                  {searchQuery
+                    ? "Try adjusting your search terms"
+                    : "Create your first remapping configuration to get started"
+                  }
                 </p>
                 <Button onClick={() => openModal()}>Add Configuration</Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-16">#</TableHead>
-                      <TableHead className="min-w-36">Configuration</TableHead>
-                      <TableHead className="min-w-40">MQTT Broker</TableHead>
-                      <TableHead className="min-w-64">Source Devices & Keys</TableHead>
-                      <TableHead className="min-w-48">Publish Settings</TableHead>
-                      <TableHead className="text-center w-32">Controls</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {remappingConfigs.remapping_configs.map((config, index) => (
-                      <TableRow key={config.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="text-center font-medium text-muted-foreground">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-base flex items-center gap-2">
-                              {config.name}
-                              <Switch checked={config.enabled} disabled className="scale-75" />
-                              <Badge variant={config.enabled ? "default" : "secondary"} className="text-xs">
-                                {config.enabled ? "Active" : "Inactive"}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-muted-foreground">{config.description}</div>
-                            {config.created_at && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(config.created_at).toLocaleDateString("id-ID", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              </div>
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-16">#</TableHead>
+                        <TableHead
+                          className="min-w-36 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort('name')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Configuration
+                            {sortKey === 'name' && (
+                              <span className="text-muted-foreground">
+                                {sortDirection === 'asc' ? '↑' : '↓'}
+                              </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-mono bg-muted/50 rounded px-2 py-1 text-xs whitespace-nowrap">
-                            {config.mqtt_publish_config.broker_url}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-left">
-                          <div className="space-y-2 max-w-sm">
-                            <div className="text-sm font-medium text-muted-foreground">
-                              Devices ({config.source_devices?.length || 0})
-                            </div>
-                            {config.source_devices?.slice(0, 2).map((device, deviceIdx) => (
-                              <div key={deviceIdx} className="border rounded-md p-2 bg-muted/20">
-                                <div className="flex items-center justify-between mb-1">
-                                  <Badge variant="secondary" className="text-xs">{device.device_name}</Badge>
-                                  <div className="flex items-center gap-1">
-                                    <Badge variant="default" className="text-xs">
-                                      {device.key_mappings?.length || 0}
-                                    </Badge>
-                                    <Badge variant="outline" className="text-xs">
-                                      {device.available_keys?.length || 0}
-                                    </Badge>
-                                  </div>
+                        </TableHead>
+                        <TableHead className="min-w-40">MQTT Broker</TableHead>
+                        <TableHead className="min-w-64">Source Devices & Keys</TableHead>
+                        <TableHead className="min-w-48">Publish Settings</TableHead>
+                        <TableHead className="text-center w-32">Controls</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentConfigs.map((config, index) => (
+                        <TableRow key={config.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="text-center font-medium text-muted-foreground">
+                            {startIndex + index + 1}
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="font-medium text-base flex items-center gap-2">
+                                {config.name}
+                                <Switch checked={config.enabled} disabled className="scale-75" />
+                                <Badge variant={config.enabled ? "default" : "secondary"} className="text-xs">
+                                  {config.enabled ? "Active" : "Inactive"}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">{config.description}</div>
+                              {config.created_at && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(config.created_at).toLocaleDateString("id-ID", {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  })}
                                 </div>
-                                <div className="text-xs text-muted-foreground">Topic: {device.mqtt_topic}</div>
-                              </div>
-                            ))}
-                            {(config.source_devices?.length || 0) > 2 && (
-                              <div className="text-xs text-muted-foreground text-center py-1">
-                                +{(config.source_devices?.length || 0) - 2} more devices
-                              </div>
-                            )}
-                            <div className="text-sm font-medium text-muted-foreground">
-                              Total Mappings: {config.source_devices?.reduce((sum, device) => sum + (device.key_mappings?.length || 0), 0) || 0}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-left">
-                          <div className="space-y-1">
-                            <div className="text-sm font-medium font-mono bg-muted/50 rounded px-2 py-1 text-xs truncate">
-                              {config.mqtt_publish_config.topic}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                QoS {config.mqtt_publish_config.qos}
-                              </Badge>
-                              {config.mqtt_publish_config.retain && (
-                                <Badge variant="outline" className="text-xs">Retain</Badge>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              Interval: {config.mqtt_publish_config.publish_interval_seccond}s
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm font-mono bg-muted/50 rounded px-2 py-1 text-xs whitespace-nowrap">
+                              {config.mqtt_publish_config.broker_url}
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-center gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => openDetailDialog(config)} title="View Details">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => openModal(config)} title="Edit Configuration">
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => confirmDelete(config)} title="Delete">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </TableCell>
+                          <TableCell className="text-left">
+                            <div className="space-y-2 max-w-sm">
+                              <div className="text-sm font-medium text-muted-foreground">
+                                Devices ({config.source_devices?.length || 0})
+                              </div>
+                              {config.source_devices?.slice(0, 2).map((device, deviceIdx) => (
+                                <div key={deviceIdx} className="border rounded-md p-2 bg-muted/20">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <Badge variant="secondary" className="text-xs">{device.device_name}</Badge>
+                                    <div className="flex items-center gap-1">
+                                      <Badge variant="default" className="text-xs">
+                                        {device.key_mappings?.length || 0}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        {device.available_keys?.length || 0}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">Topic: {device.mqtt_topic}</div>
+                                </div>
+                              ))}
+                              {(config.source_devices?.length || 0) > 2 && (
+                                <div className="text-xs text-muted-foreground text-center py-1">
+                                  +{(config.source_devices?.length || 0) - 2} more devices
+                                </div>
+                              )}
+                              <div className="text-sm font-medium text-muted-foreground">
+                                Total Mappings: {config.source_devices?.reduce((sum, device) => sum + (device.key_mappings?.length || 0), 0) || 0}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-left">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium font-mono bg-muted/50 rounded px-2 py-1 text-xs truncate">
+                                {config.mqtt_publish_config.topic}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  QoS {config.mqtt_publish_config.qos}
+                                </Badge>
+                                {config.mqtt_publish_config.retain && (
+                                  <Badge variant="outline" className="text-xs">Retain</Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Interval: {config.mqtt_publish_config.publish_interval_seccond}s
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openDetailDialog(config)} title="View Details">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => openModal(config)} title="Edit Configuration">
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => confirmDelete(config)} title="Delete">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Last
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2018,7 +2143,11 @@ const RemappingControl = () => {
         onOpenChange={setConfirmationDialogOpen}
         title={confirmationDialogContent.title}
         description={confirmationDialogContent.description}
+        type="destructive"
+        confirmText="Delete"
+        cancelText="Cancel"
         onConfirm={confirmationDialogContent.confirmAction}
+        onCancel={() => setConfirmationDialogOpen(false)}
       />
 
       {/* Data Preview Dialog (for configuration output preview) */}
@@ -2314,7 +2443,600 @@ const RemappingControl = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SidebarInset>
+
+      {/* Configuration Modal */}
+      <Dialog open={isModalOpen} onOpenChange={closeModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Code className="h-5 w-5" />
+              <DialogTitle>
+                {isEditing ? "Edit Remapping Configuration" : "Create Remapping Configuration"}
+              </DialogTitle>
+            </div>
+            <DialogDescription>
+              Configure MQTT payload remapping with custom key transformations
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={saveConfig} className="space-y-6">
+            {/* Basic Configuration */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Basic Configuration
+                </div>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="configName">Configuration Name *</Label>
+                  <Input
+                    id="configName"
+                    value={currentConfig.name}
+                    onChange={(e) => setCurrentConfig((prev) => ({...prev, name: e.target.value }))}
+                    placeholder="Enter configuration name"
+                    required
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enabled"
+                    checked={currentConfig.enabled}
+                    onCheckedChange={(checked) => setCurrentConfig((prev) => ({...prev, enabled: checked }))}
+                  />
+                  <Label htmlFor="enabled">Enabled</Label>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="configDescription">Description</Label>
+                <Textarea
+                  id="configDescription"
+                  value={currentConfig.description}
+                  onChange={(e) => setCurrentConfig((prev) => ({...prev, description: e.target.value}))}
+                  placeholder="Enter configuration description"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            {/* Source Devices */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Source Devices
+                </div>
+              </h4>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Select devices to monitor and extract data from
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={addSourceDevice}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add Device
+                  </Button>
+                </div>
+
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  {/* DRAG & DROP AREA HEADER */}
+                  <div className="flex items-center gap-2 mb-4 pb-3 border-b">
+                    <Shuffle className="h-5 w-5 text-blue-600" />
+                    <h4 className="font-medium text-blue-900">Device Order</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {currentConfig.source_devices.length} device{currentConfig.source_devices.length !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    <SortableContext items={currentConfig.source_devices.map((_, index) => `device-${index}`)} strategy={verticalListSortingStrategy}>
+                      {currentConfig.source_devices.map((device, deviceIndex) => (
+                        <DraggableDeviceEditor
+                          key={`device-${deviceIndex}`}
+                          id={`device-${deviceIndex}`}
+                          device={device}
+                          index={deviceIndex}
+                          onUpdate={(updatedDevice) => updateSourceDevice(deviceIndex, updatedDevice)}
+                          onRemove={() => removeSourceDevice(deviceIndex)}
+                          availableDevices={availableDevices}
+                        />
+                      ))}
+                    </SortableContext>
+
+                    {currentConfig.source_devices.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Shuffle className="mx-auto h-12 w-12 mb-3 opacity-40" />
+                        <p className="font-semibold mb-1">Drop Zone Ready</p>
+                        <p className="text-sm">Add devices above to enable drag and drop reordering</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {currentConfig.source_devices.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded">
+                      <Layers className="mx-auto h-8 w-8 mb-2" />
+                      <p className="font-medium">No devices added yet</p>
+                      <p className="text-sm">Click "Add Device" to get started</p>
+                    </div>
+                  )}
+                </DndContext>
+              </div>
+            </div>
+
+            {/* MQTT Publish Configuration */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  MQTT Publish Configuration
+                </div>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="brokerUrl">Broker URL</Label>
+                  <Input
+                    id="brokerUrl"
+                    value={currentConfig.mqtt_publish_config.broker_url}
+                    onChange={(e) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        broker_url: e.target.value,
+                      },
+                    }))}
+                    placeholder="mqtt://localhost:1883"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="clientId">Client ID</Label>
+                  <Input
+                    id="clientId"
+                    value={currentConfig.mqtt_publish_config.client_id}
+                    onChange={(e) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        client_id: e.target.value,
+                      },
+                    }))}
+                    placeholder="remapper_client_001"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="publishTopic">Publish Topic *</Label>
+                  <Input
+                    id="publishTopic"
+                    value={currentConfig.mqtt_publish_config.topic}
+                    onChange={(e) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        topic: e.target.value,
+                      },
+                    }))}
+                    placeholder="e.g., REMAP/sensor_data"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="qos">QoS Level</Label>
+                  <Select
+                    value={currentConfig.mqtt_publish_config.qos.toString()}
+                    onValueChange={(value) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        qos: parseInt(value),
+                      },
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">QoS 0 - At most once</SelectItem>
+                      <SelectItem value="1">QoS 1 - At least once</SelectItem>
+                      <SelectItem value="2">QoS 2 - Exactly once</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="publishInterval">Publish Interval (seconds)</Label>
+                  <Input
+                    id="publishInterval"
+                    type="number"
+                    min="1"
+                    value={currentConfig.mqtt_publish_config.publish_interval_seccond}
+                    onChange={(e) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        publish_interval_seccond: parseInt(e.target.value) || 10,
+                      },
+                    }))}
+                    placeholder="10"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="retain"
+                    checked={currentConfig.mqtt_publish_config.retain}
+                    onCheckedChange={(checked) => setCurrentConfig((prev) => ({
+                      ...prev,
+                      mqtt_publish_config: {
+                        ...prev.mqtt_publish_config,
+                        retain: checked,
+                      },
+                    }))}
+                  />
+                  <div>
+                    <Label htmlFor="retain">Retain Message</Label>
+                    <p className="text-xs text-muted-foreground">Keep message on broker</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDataPreviewDialogOpen(true)}
+                disabled={!currentConfig.name}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview Output
+              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={closeModal}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loadingDevices}>
+                  {isEditing ? "Update Configuration" : "Create Configuration"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog */}
+      <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{alertDialogContent.title}</AlertDialogTitle>
+            <AlertDialogDescription>{alertDialogContent.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAlertDialogOpen(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={confirmationDialogOpen}
+        onOpenChange={setConfirmationDialogOpen}
+        title={confirmationDialogContent.title}
+        description={confirmationDialogContent.description}
+        type="destructive"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmationDialogContent.confirmAction}
+        onCancel={() => setConfirmationDialogOpen(false)}
+      />
+
+      {/* Data Preview Dialog (for configuration output preview) */}
+      <Dialog open={isDataPreviewDialogOpen} onOpenChange={setIsDataPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              <DialogTitle>Configuration Output Preview</DialogTitle>
+            </div>
+            <DialogDescription>
+              Preview of the remapped data structure that will be published to MQTT
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {(() => {
+              // Generate preview JSON based on current configuration
+              const previewOutput: any = {};
+              const configName = currentConfig.name || "Unknown_Config";
+
+              // Process each device and apply mappings
+              currentConfig.source_devices.forEach((device) => {
+                if (!device.key_mappings || device.key_mappings.length === 0) return;
+
+                device.key_mappings.forEach((mapping) => {
+                  const { original_key, custom_key } = mapping;
+                  if (!original_key || !custom_key) return;
+
+                  // Simulate sample data for each key
+                  const sampleValue = (() => {
+                    const deviceFields = device.available_keys.find(f => f.var_name === original_key);
+                    if (deviceFields?.data_type === "float") return Math.random() * 100;
+                    if (deviceFields?.data_type === "int") return Math.floor(Math.random() * 1000);
+                    if (deviceFields?.data_type === "bool") return Math.random() > 0.5;
+                    return `Sample_${original_key}`;
+                  })();
+
+                  // Apply grouping logic
+                  if (device.group) {
+                    if (!previewOutput[device.group]) {
+                      previewOutput[device.group] = {};
+                    }
+                    previewOutput[device.group][custom_key] = sampleValue;
+                  } else {
+                    previewOutput[custom_key] = sampleValue;
+                  }
+                });
+              });
+
+              // Add configuration name at root level
+              if (!previewOutput.name) {
+                previewOutput.name = configName;
+              }
+
+              // Add timestamp
+              previewOutput.Timestamp = new Date().toISOString();
+
+              return (
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Code className="h-4 w-4" />
+                        Output JSON Preview
+                      </CardTitle>
+                      <CardDescription>
+                        This is how the data will be published to MQTT topic: <code className="font-mono">{currentConfig.mqtt_publish_config.topic || "Not configured"}</code>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+                        {JSON.stringify(previewOutput, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Grouping Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {currentConfig.source_devices
+                          .filter(device => device.group)
+                          .map((device, index) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span>{device.device_name}:</span>
+                              <Badge variant="outline">{device.group}</Badge>
+                            </div>
+                          ))}
+                        {currentConfig.source_devices.filter(device => device.group).length === 0 && (
+                          <p className="text-sm text-muted-foreground">No grouped devices</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Mapping Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="text-2xl font-bold">
+                          {currentConfig.source_devices.reduce((sum, device) => sum + (device.key_mappings?.length || 0), 0)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Total key transformations</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 p-4 rounded">
+                    <h4 className="font-medium mb-1">How the remapping works:</h4>
+                    <p>• Original sensor readings are mapped to custom field names</p>
+                    <p>• Devices with the same "group" key are merged together in a nested object</p>
+                    <p>• Configuration name is added at the root level</p>
+                    <p>• Timestamp indicates when the data was processed</p>
+                    <p>• Data is published periodically or when new sensor data arrives</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDataPreviewDialogOpen(false)}>
+              Close Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={closePreviewDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              <DialogTitle>Real-time Data Preview</DialogTitle>
+            </div>
+            <DialogDescription>
+              Live data preview from MQTT topic: <code className="font-mono">{previewTopic}</code>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {Object.keys(previewData).length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="mx-auto h-16 w-16 text-muted-foreground mb-4 animate-pulse" />
+                <h3 className="text-lg font-semibold mb-2">Waiting for data...</h3>
+                <p className="text-muted-foreground">
+                  No data received yet. Make sure the device is publishing to this topic.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Latest Data ({Object.keys(previewData).length} fields)
+                  </Label>
+                  <div className="mt-2 space-y-2">
+                    {Object.entries(previewData).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between bg-background p-3 rounded border">
+                        <span className="font-mono text-sm font-medium">{key}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>• This preview shows real-time data as it arrives from the MQTT topic</p>
+                  <p>• Data is automatically parsed and displayed in key-value format</p>
+                  <p>• Use this to understand what data is available for remapping</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={closePreviewDialog}>Close Preview</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={closeDetailDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              <DialogTitle>Configuration Details</DialogTitle>
+            </div>
+            <DialogDescription>Detailed view of remapping configuration</DialogDescription>
+          </DialogHeader>
+          {selectedConfig && (
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Settings2 className="h-5 w-5" />
+                    Basic Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Configuration Name</Label>
+                      <p className="text-base font-medium">{selectedConfig.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={selectedConfig.enabled} disabled />
+                        <span className="text-sm">{selectedConfig.enabled ? "Enabled" : "Disabled"}</span>
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Description</Label>
+                      <p className="text-base">{selectedConfig.description}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Configuration ID</Label>
+                      <p className="text-sm font-mono bg-muted px-2 py-1 rounded">{selectedConfig.id}</p>
+                    </div>
+                    {selectedConfig.created_at && (
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Created At</Label>
+                        <p className="text-base flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {new Date(selectedConfig.created_at).toLocaleDateString("id-ID", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* MQTT Publish Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Zap className="h-5 w-5" />
+                    MQTT Publish Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Publish Topic</Label>
+                      <p className="text-base font-mono bg-muted px-3 py-2 rounded">
+                        {selectedConfig.mqtt_publish_config.topic}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">QoS Level</Label>
+                      <Badge variant="default" className="text-sm">
+                        QoS {selectedConfig.mqtt_publish_config.qos}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Publish Interval</Label>
+                      <p className="text-base">{selectedConfig.mqtt_publish_config.publish_interval_seccond} seconds</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Retain Message</Label>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={selectedConfig.mqtt_publish_config.retain} disabled />
+                        <span className="text-sm">
+                          {selectedConfig.mqtt_publish_config.retain ? "Enabled" : "Disabled"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDetailDialog}>Close</Button>
+            {selectedConfig && (
+              <Button onClick={() => {
+                closeDetailDialog();
+                openModal(selectedConfig);
+              }}>
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit Configuration
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 

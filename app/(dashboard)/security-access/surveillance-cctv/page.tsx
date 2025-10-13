@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import { Separator } from "@/components/ui/separator";
 import {
   Camera,
@@ -232,6 +233,11 @@ export default function CctvPage() {
   const [loading, setLoading] = useState(true);
   const [monitorData, setMonitorData] = useState<MonitorData[]>([]);
   const [videoData, setVideoData] = useState<MonitorData[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [camerasItemsPerPage, setCamerasItemsPerPage] = useState(10);
+  const [currentMonitorsPage, setCurrentMonitorsPage] = useState(1);
+  const [monitorsItemsPerPage, setMonitorsItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const loadCamerasAndMonitorData = async () => {
     setLoading(true);
@@ -305,6 +311,51 @@ export default function CctvPage() {
     }
   };
 
+  // Sorting hooks for different tables
+  const { sorted: sortedCameras, sortKey: camerasSortKey, sortDirection: camerasSortDirection, handleSort: handleCamerasSort } = useSortableTable(
+    useMemo(() => cameras.filter(camera =>
+      camera.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      camera.ipAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (camera.apiKey && camera.apiKey.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (camera.group && camera.group.toLowerCase().includes(searchTerm.toLowerCase()))
+    ), [cameras, searchTerm])
+  );
+
+  const { sorted: sortedMonitors, sortKey: monitorsSortKey, sortDirection: monitorsSortDirection, handleSort: handleMonitorsSort } = useSortableTable(
+    monitorData.map(monitor => ({ ...monitor, name: monitor.data.name }))
+  );
+
+  // Pagination calculations
+  const { filteredCameras, totalCamerasPages, paginatedCameras } = useMemo(() => {
+    const filtered = sortedCameras;
+    const total = Math.ceil(filtered.length / camerasItemsPerPage);
+    const startIndex = (currentPage - 1) * camerasItemsPerPage;
+    const paginated = filtered.slice(startIndex, startIndex + camerasItemsPerPage);
+    return {
+      filteredCameras: filtered,
+      totalCamerasPages: total,
+      paginatedCameras: paginated,
+    };
+  }, [sortedCameras, currentPage, camerasItemsPerPage]);
+
+  const { filteredMonitors, totalMonitorsPages, paginatedMonitors } = useMemo(() => {
+    const filtered = sortedMonitors;
+    const total = Math.ceil(filtered.length / monitorsItemsPerPage);
+    const startIndex = (currentMonitorsPage - 1) * monitorsItemsPerPage;
+    const paginated = filtered.slice(startIndex, startIndex + monitorsItemsPerPage);
+    return {
+      filteredMonitors: filtered,
+      totalMonitorsPages: total,
+      paginatedMonitors: paginated,
+    };
+  }, [sortedMonitors, currentMonitorsPage, monitorsItemsPerPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+    setCurrentMonitorsPage(1);
+  }, [searchTerm, camerasSortKey, camerasSortDirection, monitorsSortKey, monitorsSortDirection, camerasItemsPerPage, monitorsItemsPerPage]);
+
   useEffect(() => {
     loadCamerasAndMonitorData();
   }, []);
@@ -339,108 +390,312 @@ export default function CctvPage() {
         </TabsList>
 
         <TabsContent value="cameras" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>CCTV Camera Data ({cameras.length})</CardTitle>
+          <Card className="border-0 bg-card backdrop-blur-sm">
+            <CardHeader className="border-b">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Camera className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">CCTV Camera Data</CardTitle>
+                  <p className="text-muted-foreground">
+                    Total cameras: {cameras.length}
+                  </p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">#</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>IP Address</TableHead>
-                    <TableHead>API Key</TableHead>
-                    <TableHead>Group</TableHead>
-                    <TableHead>Resolution</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cameras.length > 0 ? (
-                    cameras.map((camera: CctvCamera, index: number) => (
-                      <TableRow key={camera.id}>
-                        <TableCell className="font-medium">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{camera.name}</div>
-                        </TableCell>
-                        <TableCell>
-                          <a
-                            href={`http://${camera.ipAddress}:${camera.port}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {camera.ipAddress}:{camera.port}
-                          </a>
-                        </TableCell>
-                        <TableCell className="w-[80px]">
-                          <span className="block w-full truncate">
-                            {camera.apiKey || "Not set"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {camera.group || "No Group"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600">
-                            {camera.resolution || "640x480"}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="text-center text-gray-500"
-                      >
-                        No CCTV cameras found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent className="p-0">
+              {/* Search and Controls */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 border-b">
+                <div className="relative max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search cameras by name, IP, or API key..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 text-sm border border-input rounded-md leading-5 bg-background placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  />
+                </div>
 
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-2">Monitor List</h3>
-                {monitorData.length > 0 ? (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    Items per page:
+                  </span>
+                  <select
+                    value={camerasItemsPerPage}
+                    onChange={(e) => setCamerasItemsPerPage(Number(e.target.value))}
+                    className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Cameras Table */}
+              <div className="p-6">
+                <div className="border rounded-lg">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-muted/50">
                       <TableRow>
-                        <TableHead className="w-[50px]">#</TableHead>
-                        <TableHead>Monitor Name</TableHead>
-                        <TableHead>Camera Name</TableHead>
-                        <TableHead>MID</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="w-24 cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleCamerasSort('name')}>
+                          <div className="flex items-center gap-2">
+                            <span>Camera Name</span>
+                            {!camerasSortKey || camerasSortKey !== 'name' ? (
+                              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                              </svg>
+                            ) : camerasSortDirection === 'asc' ? (
+                              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
+                              </svg>
+                            )}
+                          </div>
+                        </TableHead>
+                        <TableHead>IP Address</TableHead>
+                        <TableHead>API Key</TableHead>
+                        <TableHead>Group</TableHead>
+                        <TableHead>Resolution</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {monitorData.map((monitor, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell>{monitor.data.name}</TableCell>
-                          <TableCell>{monitor.camera.name}</TableCell>
-                          <TableCell>{monitor.data.mid}</TableCell>
-                          <TableCell>
-                            <Badge className="bg-green-500 hover:bg-green-500 text-white capitalize">
-                              {monitor.data.status}
-                            </Badge>
+                      {paginatedCameras.length > 0 ? (
+                        paginatedCameras.map((camera: CctvCamera, index: number) => (
+                          <TableRow key={camera.id} className="hover:bg-muted/50">
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Camera className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{camera.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={`http://${camera.ipAddress}:${camera.port}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline font-mono"
+                              >
+                                {camera.ipAddress}:{camera.port}
+                              </a>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              <span className="bg-muted px-2 py-1 rounded">
+                                {camera.apiKey || "Not set"}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">
+                                {camera.group || "No Group"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {camera.resolution || "640x480"}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-12">
+                            <div className="flex flex-col items-center gap-3">
+                              <Camera className="h-12 w-12 text-muted-foreground/50" />
+                              <p className="text-muted-foreground font-medium">
+                                {searchTerm ? "No cameras match your search" : "No CCTV cameras found"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {searchTerm ? "Try adjusting your search terms" : "Add cameras to begin monitoring"}
+                              </p>
+                            </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
-                ) : (
-                  <p className="text-center text-gray-500">
-                    No active monitors found.
-                  </p>
+                </div>
+
+                {/* Cameras Pagination */}
+                {totalCamerasPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalCamerasPages}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Previous
+                      </Button>
+
+                      {Array.from({ length: Math.min(5, totalCamerasPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(totalCamerasPages - 4, currentPage - 2)) + i;
+                        if (page > totalCamerasPages) return null;
+                        return (
+                          <Button
+                            key={page}
+                            variant={page === currentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="min-w-9"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalCamerasPages, prev + 1))}
+                        disabled={currentPage === totalCamerasPages}
+                      >
+                        Next
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
                 )}
+
+                {/* Monitor List Section */}
+                <div className="mt-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <MonitorPlay className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Monitor List</h3>
+                      <p className="text-muted-foreground">
+                        Active cameras with monitor streams ({monitorData.length})
+                      </p>
+                    </div>
+                  </div>
+
+                  {monitorData.length > 0 ? (
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead className="w-24 cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleMonitorsSort('name')}>
+                              <div className="flex items-center gap-2">
+                                <span>Monitor Name</span>
+                                {!monitorsSortKey || monitorsSortKey !== 'name' ? (
+                                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                  </svg>
+                                ) : monitorsSortDirection === 'asc' ? (
+                                  <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
+                                  </svg>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>Camera Source</TableHead>
+                            <TableHead>MID</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedMonitors.map((monitor, index) => (
+                            <TableRow key={index} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <MonitorPlay className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{monitor.data.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{monitor.camera.name}</TableCell>
+                              <TableCell className="font-mono">{monitor.data.mid}</TableCell>
+                              <TableCell>
+                                <Badge className="bg-green-500 hover:bg-green-500 text-white capitalize">
+                                  {monitor.data.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      {/* Monitors Pagination */}
+                      {totalMonitorsPages > 1 && (
+                        <div className="flex items-center justify-between mt-6 p-4 border-t">
+                          <div className="text-sm text-muted-foreground">
+                            Showing {Math.min((currentMonitorsPage - 1) * monitorsItemsPerPage + 1, filteredMonitors.length)} to{" "}
+                            {Math.min(currentMonitorsPage * monitorsItemsPerPage, filteredMonitors.length)} of{" "}
+                            {filteredMonitors.length} results
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentMonitorsPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentMonitorsPage === 1}
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                              Previous
+                            </Button>
+
+                            {Array.from({ length: Math.min(5, totalMonitorsPages) }, (_, i) => {
+                              const page = Math.max(1, Math.min(totalMonitorsPages - 4, currentMonitorsPage - 2)) + i;
+                              if (page > totalMonitorsPages) return null;
+                              return (
+                                <Button
+                                  key={page}
+                                  variant={page === currentMonitorsPage ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentMonitorsPage(page)}
+                                  className="min-w-9"
+                                >
+                                  {page}
+                                </Button>
+                              );
+                            })}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentMonitorsPage(prev => Math.min(totalMonitorsPages, prev + 1))}
+                              disabled={currentMonitorsPage === totalMonitorsPages}
+                            >
+                              Next
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground border rounded-lg">
+                      <MonitorPlay className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">No active monitors found</p>
+                      <p className="text-sm">Configure API keys and groups to enable monitoring</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

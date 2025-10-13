@@ -8,23 +8,27 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
 // --- GUNAKAN DYNAMIC IMPORT UNTUK NON-AKTIFKAN SSR ---
 const DashboardLayout = dynamic(() => import("@/components/DashboardLayout"), {
   ssr: false,
   loading: () => <p>Loading dashboard...</p>,
 });
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
+// Define WidgetLayout interface locally to match DashboardLayout expectations
 interface WidgetLayout {
   i: string;
   x: number;
   y: number;
   w: number;
   h: number;
-  widgetType?: string;
-  config?: any;
+  widgetType: string;
+  config: any;
 }
+
+// Remove duplicate interface definition since we import it now
+// interface WidgetLayout { ... }
 
 interface DashboardData {
   id: string;
@@ -62,22 +66,39 @@ export default function MainDashboardPage() {
   const [noDashboardsFound, setNoDashboardsFound] = useState(false);
 
   useEffect(() => {
-    const fetchActiveDashboard = async () => {
+    // Debounce dashboard fetch to prevent rapid re-renders
+    const timeoutId = setTimeout(async () => {
+      await fetchActiveDashboard();
+    }, 100); // Small delay to allow state propagation
+
+    async function fetchActiveDashboard() {
       setIsLoading(true);
       setError(null);
       setNoDashboardsFound(false);
+
       try {
-        const response = await fetch(`${API_BASE_URL}/api/dashboards/active`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await fetch(`${API_BASE_URL}/api/dashboards/active`, {
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
           if (response.status === 404) {
             setNoDashboardsFound(true);
           } else {
-            throw new Error("Failed to fetch active dashboard.");
+            throw new Error(`Failed to fetch dashboard: ${response.status} ${response.statusText}`);
           }
         } else {
           const data: DashboardData = await response.json();
 
-          // ✅ Parse the layout properly
+          // ✅ Parse the layout properly with error handling
           const parsedLayout = parseLayoutSafely(data.layout);
           const processedData = {
             ...data,
@@ -87,12 +108,19 @@ export default function MainDashboardPage() {
           setDashboardData(processedData);
         }
       } catch (err: any) {
-        setError(err.message);
+        if (err.name === 'AbortError') {
+          console.error('Dashboard fetch aborted due to timeout');
+          setError('Dashboard loading timeout. Please try again.');
+        } else {
+          console.error('Dashboard fetch error:', err);
+          setError(err.message || 'Failed to load dashboard');
+        }
       } finally {
         setIsLoading(false);
       }
-    };
-    fetchActiveDashboard();
+    }
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   if (isLoading) {
@@ -160,7 +188,7 @@ export default function MainDashboardPage() {
 
   return (
     <main className="p-4 md:p-6">
-      <DashboardLayout layout={dashboardData.layout} />
+      <DashboardLayout layout={dashboardData.layout as WidgetLayout[]} />
     </main>
   );
 }

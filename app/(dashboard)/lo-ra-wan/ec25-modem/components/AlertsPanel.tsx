@@ -5,6 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   AlertTriangle,
   Info,
   CheckCircle,
@@ -12,7 +20,23 @@ import {
   Clock,
   Filter,
   X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import { getEc25ListenerService } from "@/lib/services/ec25-listener";
 import type { EC25Alert } from "@/lib/services/ec25-listener";
 
@@ -24,6 +48,9 @@ export default function AlertsPanel({ alerts: propAlerts }: AlertsPanelProps) {
   const [alerts, setAlerts] = useState<EC25Alert[]>([]);
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const ec25Service = getEc25ListenerService();
 

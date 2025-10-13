@@ -84,11 +84,21 @@ import {
 import { useSortableTable } from "@/hooks/use-sort-table";
 
 // --- Type Definitions ---
+interface RoleData {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface UserData {
   id: string;
   email: string;
   phoneNumber: string | null;
-  role: Role;
+  role: RoleData;
   createdAt: string;
 }
 
@@ -174,7 +184,7 @@ function UserManagementContent() {
 
   useEffect(() => {
     if (!isAuthLoading) {
-      if (isAuthenticated && user?.role === Role.ADMIN) {
+      if (isAuthenticated && user?.role?.name === "ADMIN") {
         fetchUsers();
       } else {
         setIsLoading(false);
@@ -191,17 +201,14 @@ function UserManagementContent() {
       (u) =>
         u.email.toLowerCase().includes(lowercasedQuery) ||
         (u.phoneNumber && u.phoneNumber.includes(lowercasedQuery)) ||
-        u.role.toLowerCase().includes(lowercasedQuery)
+        u.role.toString().toLowerCase().includes(lowercasedQuery)
     );
   }, [users, searchQuery]);
 
-  const {
-    sorted: sortedUsers,
-    sortKey,
-    sortDirection,
-    handleSort,
-  } = useSortableTable(filteredUsers);
+  // Use sortable table hook
+  const { sorted: sortedUsers, sortKey, sortDirection, handleSort } = useSortableTable(filteredUsers);
 
+  // Paginate the sorted results
   const totalPages = Math.ceil(sortedUsers.length / usersPerPage);
   const startIndex = (currentPage - 1) * usersPerPage;
   const endIndex = startIndex + usersPerPage;
@@ -217,7 +224,18 @@ function UserManagementContent() {
       setCurrentUser(userToEdit);
     } else {
       setIsEditMode(false);
-      setCurrentUser({ role: Role.USER, phoneNumber: null });
+      setCurrentUser({
+        role: {
+          id: "",
+          name: "USER",
+          description: "Regular User",
+          isSystem: true,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        phoneNumber: null
+      });
     }
     setPassword("");
     setIsModalOpen(true);
@@ -233,7 +251,7 @@ function UserManagementContent() {
     const body: any = {
       email: currentUser.email,
       phoneNumber: currentUser.phoneNumber,
-      role: currentUser.role,
+      roleId: currentUser.role?.id,
     };
     if (password) {
       body.password = password;
@@ -307,14 +325,14 @@ function UserManagementContent() {
     }
   };
 
-  const getRoleBadge = (role: Role) => {
-    return role === Role.ADMIN
+  const getRoleBadge = (role: RoleData) => {
+    return role.name === "ADMIN"
       ? "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
       : "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
   };
 
-  const getRoleIcon = (role: Role) => {
-    return role === Role.ADMIN ? (
+  const getRoleIcon = (role: RoleData) => {
+    return role.name === "ADMIN" ? (
       <Crown className="h-3 w-3 mr-1" />
     ) : (
       <UserCheck className="h-3 w-3 mr-1" />
@@ -334,7 +352,7 @@ function UserManagementContent() {
     );
   }
 
-  if (!user || user.role !== Role.ADMIN) {
+    if (!user || !user.role || user.role.name !== "ADMIN") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="container mx-auto p-4 md:p-8">
@@ -401,7 +419,7 @@ function UserManagementContent() {
                       Administrators
                     </p>
                     <p className="text-3xl font-bold text-purple-600">
-                      {users.filter((u) => u.role === Role.ADMIN).length}
+                      {users.filter((u) => u.role.name === "ADMIN").length}
                     </p>
                   </div>
                   <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full">
@@ -419,7 +437,7 @@ function UserManagementContent() {
                       Regular Users
                     </p>
                     <p className="text-3xl font-bold text-green-600">
-                      {users.filter((u) => u.role === Role.USER).length}
+                      {users.filter((u) => u.role.name === "USER").length}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
@@ -613,7 +631,7 @@ function UserManagementContent() {
                                 variant="secondary"
                               >
                                 {getRoleIcon(userData.role)}
-                                {userData.role}
+                                {userData.role.name}
                               </Badge>
                             </TableCell>
 
@@ -811,22 +829,41 @@ function UserManagementContent() {
                 User Role *
               </Label>
               <Select
-                value={currentUser.role}
-                onValueChange={(value: Role) =>
-                  setCurrentUser({ ...currentUser, role: value })
+                value={currentUser.role?.id || ""}
+                onValueChange={(value: string) =>
+                  setCurrentUser({
+                    ...currentUser,
+                    role: value === "admin" ? {
+                      id: "admin",
+                      name: "ADMIN",
+                      description: "Administrator",
+                      isSystem: true,
+                      isActive: true,
+                      createdAt: new Date(),
+                      updatedAt: new Date()
+                    } : {
+                      id: "user",
+                      name: "USER",
+                      description: "Regular User",
+                      isSystem: true,
+                      isActive: true,
+                      createdAt: new Date(),
+                      updatedAt: new Date()
+                    }
+                  })
                 }
               >
                 <SelectTrigger id="role" className="h-10">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Role.ADMIN}>
+                  <SelectItem value="admin">
                     <div className="flex items-center">
                       <Crown className="h-4 w-4 mr-2 text-purple-600" />
                       Administrator
                     </div>
                   </SelectItem>
-                  <SelectItem value={Role.USER}>
+                  <SelectItem value="user">
                     <div className="flex items-center">
                       <UserCheck className="h-4 w-4 mr-2 text-green-600" />
                       Regular User
@@ -839,7 +876,7 @@ function UserManagementContent() {
             {/* Role Description */}
             <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                {currentUser.role === Role.ADMIN ? (
+                {currentUser.role?.name === "ADMIN" ? (
                   <>
                     <strong>Administrator:</strong> Full access to all system
                     features including user management, system configuration,

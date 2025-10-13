@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback, FormEvent } from "react";
 import Swal from "sweetalert2";
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
+import { useSortableTable } from "@/hooks/use-sort-table";
 
 // --- UI Components & Icons ---
 import { Button } from "@/components/ui/button";
@@ -65,10 +66,16 @@ import {
   TrendingUp,
   Clock,
   Database,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 // --- Type Definitions ---
 interface DeviceSelection {
   id: string; // Ini uniqId
+  uniqId: string;
   name: string;
   topic: string;
   lastPayload?: Record<string, any>;
@@ -112,6 +119,10 @@ export function BillCalculationTab() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState<string>("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | "">("");
 
   // --- State untuk Pagination ---
   const [logsPage, setLogsPage] = useState(1);
@@ -167,8 +178,9 @@ export function BillCalculationTab() {
       const devicesData: DeviceSelection[] = await devicesRes.json();
       const logsData = await logsRes.json();
 
-      const formattedDevices = devicesData.map((device) => ({
-        id: device.uniqId,
+      const formattedDevices: DeviceSelection[] = devicesData.map((device) => ({
+        id: device.uniqId || device.id,
+        uniqId: device.uniqId,
         name: device.name,
         topic: device.topic,
         lastPayload: device.lastPayload || {},
@@ -462,66 +474,161 @@ export function BillCalculationTab() {
     setIsModalOpen(true);
   };
   return (
-    <div className="space-y-6">
-      <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                Bill Calculation Configurations
-              </CardTitle>
-              <CardDescription>
-                Configure devices to automatically calculate electricity costs
-                in real-time
-              </CardDescription>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchInitialData(true)}
-                disabled={refreshing || isLoading}
-                className="whitespace-nowrap"
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={openAddModal}
-                disabled={isSubmitting || isLoading || isDeletingConfig}
-                className="bg-primary hover:bg-primary/90 whitespace-nowrap"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Configuration
-              </Button>
-            </div>
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Bill Calculation
+            </h1>
+            <p className="text-muted-foreground">
+              Monitor and calculate electricity costs in real-time
+            </p>
           </div>
 
-          {/* Search Bar */}
-          <div className="pt-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Button onClick={openAddModal}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add Configuration
+          </Button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Calculator className="h-6 w-6 text-primary" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Active Configurations</p>
+                  <p className="text-2xl font-bold">{configs.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Activity className="h-6 w-6 text-emerald-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Live Data Points</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {Object.keys(liveValues).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <DollarSign className="h-6 w-6 text-blue-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Total Logs</p>
+                  <p className="text-2xl font-bold">{allLogs.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Clock className="h-6 w-6 text-amber-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Current Avg Cost</p>
+                  <p className="text-2xl font-bold">
+                    {configs.length > 0
+                      ? formatNumber(
+                          configs.reduce((sum, config) => {
+                            const cost = calculateCost(liveValues[config.id], config.rupiahRatePerKwh);
+                            return sum + (cost || 0);
+                          }, 0) / configs.length
+                        )
+                      : '0.00'
+                    }
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search configurations..."
+                placeholder="Search configurations by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                disabled={isLoading}
-                className="pl-10 bg-background"
+                className="pl-10"
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+
+          <div className="w-full md:w-48">
+            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Items per page" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 per page</SelectItem>
+                <SelectItem value="10">10 per page</SelectItem>
+                <SelectItem value="20">20 per page</SelectItem>
+                <SelectItem value="50">50 per page</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Results info */}
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-sm text-muted-foreground">
+            Showing {filteredConfigs.length} of {configs.length} configurations
+          </span>
+          <Button
+            variant="outline"
+            onClick={() => fetchInitialData(true)}
+            disabled={refreshing || isLoading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Table */}
+        <Card>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Custom Name</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        setSortKey('customName');
+                      }}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Custom Name
+                      {sortKey === 'customName' ? (
+                        sortDirection === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : sortDirection === 'desc' ? (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
                   <TableHead>Source Device</TableHead>
                   <TableHead>Live Data (Watts)</TableHead>
                   <TableHead>Cost (IDR/hour)</TableHead>
@@ -595,7 +702,7 @@ export function BillCalculationTab() {
                             isSubmitting ||
                             isDeletingConfig ||
                             isDeletingAllLogs
-                          } // NEW: Disable other buttons during operations
+                          }
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -610,7 +717,7 @@ export function BillCalculationTab() {
                             isSubmitting ||
                             isDeletingConfig ||
                             isDeletingAllLogs
-                          } // NEW: Disable other buttons during operations
+                          }
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -629,10 +736,13 @@ export function BillCalculationTab() {
                 )}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between p-4 border-t">
-          <div className="text-xs text-muted-foreground">
+          </CardContent>
+        </Card>
+
+
+      {Math.ceil(allLogs.length / LOGS_PER_PAGE) > 1 && (
+        <div className="flex items-center justify-between mt-4 px-4">
+          <div className="text-sm text-muted-foreground">
             Page {logsPage} of {Math.ceil(allLogs.length / LOGS_PER_PAGE)}
           </div>
           <div className="flex items-center gap-2">
@@ -646,29 +756,141 @@ export function BillCalculationTab() {
                 isSubmitting ||
                 isDeletingConfig ||
                 isDeletingAllLogs
-              } // NEW: Disable
+              }
             >
+              <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
+
+            {/* Page Numbers for History */}
+            {Math.ceil(allLogs.length / LOGS_PER_PAGE) <= 7 ? (
+              Array.from({ length: Math.ceil(allLogs.length / LOGS_PER_PAGE) }, (_, i) => i + 1).map((page) => (
+                <Button
+                  key={page}
+                  variant={logsPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLogsPage(page)}
+                  className="w-10 h-10 p-0"
+                  disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                >
+                  {page}
+                </Button>
+              ))
+            ) : (
+              <>
+                {logsPage <= 4 && (
+                  <>
+                    {[1, 2, 3, 4, 5].map((page) => (
+                      <Button
+                        key={page}
+                        variant={logsPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setLogsPage(page)}
+                        className="w-10 h-10 p-0"
+                        disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(Math.ceil(allLogs.length / LOGS_PER_PAGE))}
+                      className="w-10 h-10 p-0"
+                      disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                    >
+                      {Math.ceil(allLogs.length / LOGS_PER_PAGE)}
+                    </Button>
+                  </>
+                )}
+
+                {logsPage > 4 && logsPage < Math.ceil(allLogs.length / LOGS_PER_PAGE) - 3 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(1)}
+                      className="w-10 h-10 p-0"
+                      disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                    >
+                      1
+                    </Button>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    {[logsPage - 1, logsPage, logsPage + 1].map((page) => (
+                      <Button
+                        key={page}
+                        variant={logsPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setLogsPage(page)}
+                        className="w-10 h-10 p-0"
+                        disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(Math.ceil(allLogs.length / LOGS_PER_PAGE))}
+                      className="w-10 h-10 p-0"
+                      disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                    >
+                      {Math.ceil(allLogs.length / LOGS_PER_PAGE)}
+                    </Button>
+                  </>
+                )}
+
+                {logsPage >= Math.ceil(allLogs.length / LOGS_PER_PAGE) - 3 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(1)}
+                      className="w-10 h-10 p-0"
+                      disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                    >
+                      1
+                    </Button>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    {[Math.ceil(allLogs.length / LOGS_PER_PAGE) - 4, Math.ceil(allLogs.length / LOGS_PER_PAGE) - 3, Math.ceil(allLogs.length / LOGS_PER_PAGE) - 2, Math.ceil(allLogs.length / LOGS_PER_PAGE) - 1, Math.ceil(allLogs.length / LOGS_PER_PAGE)].map((page) => (
+                      <Button
+                        key={page}
+                        variant={logsPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setLogsPage(page)}
+                        className="w-10 h-10 p-0"
+                        disabled={isLoading || isSubmitting || isDeletingConfig || isDeletingAllLogs}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => setLogsPage((prev) => prev + 1)}
               disabled={
-                logsPage >= Math.ceil(allLogs.length / LOGS_PER_PAGE) ||
+                logsPage === Math.ceil(allLogs.length / LOGS_PER_PAGE) ||
                 isLoading ||
                 isSubmitting ||
                 isDeletingConfig ||
                 isDeletingAllLogs
-              } // NEW: Disable
+              }
             >
               Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      )}
 
-      {/* Tabel Log */}
+      {/* History Table */}
       <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
         <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -960,7 +1182,7 @@ export function BillCalculationTab() {
             <AlertDialogAction
               onClick={handleDeleteAllLogs}
               className="bg-red-600 hover:bg-red-700"
-              disabled={isDeletingConfig || isDeletingAllLogs} // NEW: Disable delete all logs button during its own operation
+              disabled={isDeletingConfig || isDeletingAllLogs}
             >
               {isDeletingAllLogs ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -970,6 +1192,7 @@ export function BillCalculationTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

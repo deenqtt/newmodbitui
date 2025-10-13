@@ -1,29 +1,14 @@
-// File: app/(dashboard)/zigbee/page.tsx - Modern Clean Layout
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Swal from "sweetalert2";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
@@ -40,35 +25,51 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import {
+  HardDrive,
+  Plus,
+  Wifi,
+  WifiOff,
+  Package,
+  Router,
+  Activity,
   Lightbulb,
   Thermometer,
   Droplets,
   DoorOpen,
   Eye,
-  Wifi,
-  WifiOff,
-  RefreshCcw,
   Settings,
-  Package,
-  Plus,
   Edit,
   Trash2,
   MoreHorizontal,
+  RefreshCw,
   Zap,
-  Activity,
   AlertTriangle,
   Power,
   Battery,
   Signal,
-  Router,
   Search,
-  HardDrive,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
+  Loader2,
   Network,
 } from "lucide-react";
 
@@ -108,14 +109,18 @@ export default function ZigbeePage() {
   const [pairingMode, setPairingMode] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pairingCountdown, setPairingCountdown] = useState<number>(0);
-  const [pairingInterval, setPairingInterval] = useState<NodeJS.Timer | null>(
+  const [pairingInterval, setPairingInterval] = useState<NodeJS.Timeout | null>(
     null
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedDevice, setSelectedDevice] = useState<ZigbeeDevice | null>(
     null
   );
   const [isControlsOpen, setIsControlsOpen] = useState(false);
+
+  const { toast } = useToast();
 
   // Filter devices based on search term
   const filteredDevices = devices.filter(
@@ -125,6 +130,19 @@ export default function ZigbeePage() {
       device.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       device.modelId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedDevices, sortKey, sortDirection, handleSort } = useSortableTable(filteredDevices);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedDevices = sortedDevices.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection]);
 
   // Custom SweetAlert2 configuration
   const Toast = Swal.mixin({
@@ -867,7 +885,7 @@ export default function ZigbeePage() {
     if (pairingCountdown === -1) {
       return (
         <Button disabled className="opacity-60">
-          <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
+          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
           Stopping...
         </Button>
       );
@@ -894,6 +912,7 @@ export default function ZigbeePage() {
         Pair Device
       </Button>
     );
+
   };
 
   // Render pairing status card
@@ -902,7 +921,7 @@ export default function ZigbeePage() {
       return (
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-3 min-w-fit">
           <div className="flex items-center gap-3">
-            <RefreshCcw className="h-3 w-3 animate-spin text-yellow-600" />
+            <RefreshCw className="h-3 w-3 animate-spin text-yellow-600" />
             <div>
               <div className="text-sm font-medium text-yellow-700">
                 Stopping Pairing
@@ -1122,7 +1141,7 @@ export default function ZigbeePage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         <div className="container mx-auto p-4 md:p-8">
           <div className="flex flex-col items-center justify-center h-96 space-y-4">
-            <RefreshCcw className="h-8 w-8 animate-spin text-primary" />
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Loading Zigbee devices...</p>
           </div>
         </div>
@@ -1132,7 +1151,7 @@ export default function ZigbeePage() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen bg-background">
         <div className="p-4 md:p-6 space-y-8">
           {/* Header Section */}
           <div className="space-y-2">
@@ -1153,68 +1172,55 @@ export default function ZigbeePage() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card className=" shadow-md bg-card backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Total Devices
-                    </p>
+                <div className="flex items-center">
+                  <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Total Devices</p>
                     <p className="text-3xl font-bold">{devices.length}</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
-                    <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card className="shadow-md bg-card backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Online
-                    </p>
-                    <p className="text-3xl font-bold text-green-600">
+                <div className="flex items-center">
+                  <Wifi className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Online</p>
+                    <p className="text-3xl font-bold text-emerald-600">
                       {devices.filter((d) => d.isOnline).length}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
-                    <Wifi className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card className="hadow-md bg-card backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Offline
-                    </p>
+                <div className="flex items-center">
+                  <WifiOff className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Offline</p>
                     <p className="text-3xl font-bold text-red-600">
                       {devices.filter((d) => !d.isOnline).length}
                     </p>
                   </div>
-                  <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
-                    <WifiOff className="h-6 w-6 text-red-600 dark:text-red-400" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card
-              className={`border-0 shadow-md backdrop-blur-sm ${
-                pairingMode
-                  ? "bg-green-100/80 dark:bg-green-900/20"
-                  : "bg-white/80 dark:bg-slate-900/80"
-              }`}
-            >
+            <Card className="shadow-md bg-card backdrop-blur-sm">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
+                <div className="flex items-center">
+                  {pairingMode ? (
+                    <Activity className="h-6 w-6 text-green-600 dark:text-green-400 animate-pulse" />
+                  ) : (
+                    <Router className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  )}
+                  <div className="ml-3">
                     <p className="text-sm font-medium text-muted-foreground">
                       {pairingMode ? "Pairing Active" : "Device Types"}
                     </p>
@@ -1228,27 +1234,14 @@ export default function ZigbeePage() {
                         : new Set(devices.map((d) => d.deviceType)).size}
                     </p>
                   </div>
-                  <div
-                    className={`p-3 rounded-full ${
-                      pairingMode
-                        ? "bg-green-200 dark:bg-green-800/30"
-                        : "bg-purple-100 dark:bg-purple-900/20"
-                    }`}
-                  >
-                    {pairingMode ? (
-                      <Activity className="h-6 w-6 text-green-600 dark:text-green-400 animate-pulse" />
-                    ) : (
-                      <Router className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                    )}
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Main Content Card */}
-          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+            <CardHeader className="border-b border-border bg-card/50">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <CardTitle className="text-xl">Device Management</CardTitle>
@@ -1269,7 +1262,7 @@ export default function ZigbeePage() {
                     disabled={refreshing}
                     className="whitespace-nowrap"
                   >
-                    <RefreshCcw
+                    <RefreshCw
                       className={`mr-2 h-4 w-4 ${
                         refreshing ? "animate-spin" : ""
                       }`}
@@ -1283,7 +1276,7 @@ export default function ZigbeePage() {
               </div>
 
               {/* Search Bar */}
-              <div className="pt-4">
+              <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="relative max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1292,6 +1285,27 @@ export default function ZigbeePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 bg-background"
                   />
+                </div>
+
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2 whitespace-nowrap">
+                  <Label htmlFor="itemsPerPage" className="text-sm font-medium">
+                    Show:
+                  </Label>
+                  <select
+                    id="itemsPerPage"
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="px-3 py-2 text-sm border border-input rounded-md bg-background hover:bg-accent hover:text-accent-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span className="text-sm text-muted-foreground">
+                    per page
+                  </span>
                 </div>
               </div>
             </CardHeader>
@@ -1325,38 +1339,38 @@ export default function ZigbeePage() {
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
-                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                      <TableRow className="hover:bg-transparent border-b border-border">
+                        <TableHead className="font-semibold">
                           Device
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        <TableHead className="font-semibold">
                           Type & Model
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        <TableHead className="font-semibold">
                           Status & Activity
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        <TableHead className="font-semibold">
                           Last Seen
                         </TableHead>
-                        <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                        <TableHead className="text-right font-semibold">
                           Actions
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredDevices.map((device) => (
+                      {paginatedDevices.map((device) => (
                         <TableRow
                           key={device.deviceId}
-                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
+                          className="hover:bg-muted/50 transition-colors duration-200"
                         >
                           <TableCell className="py-4">
                             <div className="flex items-center gap-3">
                               {getDeviceIcon(device.deviceType)}
                               <div className="space-y-1">
-                                <p className="font-medium text-slate-900 dark:text-slate-100">
+                                <p className="font-medium">
                                   {device.friendlyName}
                                 </p>
-                                <code className="text-xs text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                   {device.deviceId}
                                 </code>
                               </div>
@@ -1373,7 +1387,7 @@ export default function ZigbeePage() {
                                   {device.manufacturer || "Unknown"}
                                 </p>
                                 {device.modelId && (
-                                  <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
                                     {device.modelId}
                                   </code>
                                 )}
@@ -1394,18 +1408,18 @@ export default function ZigbeePage() {
 
                               {/* Battery indicator */}
                               {device.currentState?.battery !== undefined && (
-                                <div className="flex items-center gap-1">
-                                  <Battery
-                                    className={`h-3 w-3 ${
-                                      device.currentState.battery < 20
-                                        ? "text-red-500"
-                                        : "text-green-500"
-                                    }`}
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {device.currentState.battery}%
-                                  </span>
-                                </div>
+                            <div className="flex items-center gap-1">
+                              <Battery
+                                className={`h-3 w-3 ${
+                                  (device.currentState as any).battery < 20
+                                    ? "text-red-500"
+                                    : "text-green-500"
+                                }`}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                {(device.currentState as any).battery}%
+                              </span>
+                            </div>
                               )}
                             </div>
                           </TableCell>
@@ -1488,6 +1502,59 @@ export default function ZigbeePage() {
                   </Table>
                 )}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border p-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>
+                      Showing {Math.min((currentPage - 1) * itemsPerPage + 1, sortedDevices.length)} to{" "}
+                      {Math.min(currentPage * itemsPerPage, sortedDevices.length)} of{" "}
+                      {sortedDevices.length} results
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (page > totalPages) return null;
+                        return (
+                          <Button
+                            key={page}
+                            variant={page === currentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="min-w-9"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1557,7 +1624,7 @@ export default function ZigbeePage() {
               disabled={actionLoading?.startsWith("rename-")}
             >
               {actionLoading?.startsWith("rename-") && (
-                <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               )}
               Save Changes
             </Button>

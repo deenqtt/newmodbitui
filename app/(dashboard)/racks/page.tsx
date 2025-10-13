@@ -2,12 +2,43 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { useSearchFilter } from "@/hooks/use-search-filter";
-import { useSortableTable } from "@/hooks/use-sort-table";
-import MqttStatus from "@/components/ui/mqtt-status";
-
-// UI Components
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Plus,
+  Server,
+  HardDrive,
+  Edit,
+  Trash2,
+  Search,
+  MoreVertical,
+  TrendingUp,
+  Minus,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  AlertCircle,
+  BarChart3,
+  Eye,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -26,45 +57,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Plus,
-  Server,
-  Edit,
-  Trash2,
-  HardDrive,
-  TrendingUp,
-  Minus,
-  MoreVertical,
-  Database,
-  AlertCircle,
-  Calendar,
-  Settings,
-  BarChart3,
-  Search,
-  ArrowUpDown,
-  Eye,
-} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useSearchFilter } from "@/hooks/use-search-filter";
+import { useSortableTable } from "@/hooks/use-sort-table";
+import MqttStatus from "@/components/ui/mqtt-status";
 
 interface Rack {
   id: string;
@@ -94,6 +92,8 @@ export default function RacksPage() {
   const [selectedRack, setSelectedRack] = useState<Rack | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rackToDelete, setRackToDelete] = useState<Rack | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [formData, setFormData] = useState({
     name: "",
     capacityU: 42,
@@ -110,6 +110,21 @@ export default function RacksPage() {
 
   // Sort hook - using filteredData instead of full racks
   const { sorted, handleSort } = useSortableTable(filteredData);
+
+  // Pagination logic
+  const totalPages = Math.ceil(sorted.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedRacks = sorted.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Reset to first page when sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sorted]);
 
   // Fetch racks data
   const fetchRacks = async () => {
@@ -259,32 +274,39 @@ export default function RacksPage() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Server className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Server Rack Management</h1>
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Server Rack Management
+            </h1>
+            <p className="text-muted-foreground">
+              Manage your server racks and equipment placement
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 mt-4 md:mt-0">
+            <MqttStatus />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={fetchRacks}
+              disabled={isLoading}
+            >
+              <Database className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Rack
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <MqttStatus />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={fetchRacks}
-            disabled={isLoading}
-          >
-            <Database className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Rack
-          </Button>
-        </div>
-      </div>
-        {/* Summary Cards - Following the pattern */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Racks</CardTitle>
@@ -449,175 +471,165 @@ export default function RacksPage() {
                     />
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Showing {sorted.length} of {racks.length} racks
+                    Showing {paginatedRacks.length} of {sorted.length} racks (Page {currentPage} of {totalPages})
                   </div>
                 </div>
 
-                {/* Table View */}
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">
+                {/* Items per page selector */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Items per page:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-2 py-1 text-sm border rounded"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+
+                      {/* Page Numbers */}
+                      {totalPages <= 7 ? (
+                        // Show all pages if 7 or fewer
+                        Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                           <Button
-                            variant="ghost"
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
                             size="sm"
-                            className="h-8 p-0 hover:bg-transparent font-semibold"
-                            onClick={() => handleSort("name")}
+                            onClick={() => setCurrentPage(page)}
+                            className="w-10 h-10 p-0"
                           >
-                            Rack Name
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                            {page}
                           </Button>
-                        </TableHead>
-                        <TableHead className="w-[150px]">Capacity</TableHead>
-                        <TableHead className="w-[120px]">Utilization</TableHead>
-                        <TableHead className="w-[120px]">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 p-0 hover:bg-transparent font-semibold"
-                            onClick={() => handleSort("location")}
-                          >
-                            Location
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="w-[100px]">Devices</TableHead>
-                        <TableHead className="w-[120px]">Created</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoading ? (
-                        [...Array(5)].map((_, i) => (
-                          <TableRow key={i}>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-32"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-12"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-20"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-12"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="h-4 bg-muted animate-pulse rounded w-20"></div>
-                            </TableCell>
-                          </TableRow>
                         ))
-                      ) : sorted.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
-                            <Server className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                            <h3 className="text-lg font-medium mb-2">No racks found</h3>
-                            <p className="text-muted-foreground mb-4">
-                              {searchQuery ? "Try adjusting your search criteria" : "Get started by adding your first server rack"}
-                            </p>
-                            {!searchQuery && (
-                              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Rack
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
                       ) : (
-                        sorted.map((rack) => (
-                          <TableRow key={rack.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Server className="h-4 w-4 text-primary" />
-                                {rack.name}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div className="font-medium">{rack.usedU}/{rack.capacityU} U</div>
-                                <div className="text-muted-foreground">{rack.availableU}U available</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className={`text-sm font-medium ${getUtilizationColor(rack.utilizationPercent)}`}>
-                                  {rack.utilizationPercent.toFixed(1)}%
-                                </div>
-                                <div className="w-full bg-muted rounded-full h-1.5">
-                                  <div
-                                    className={`h-1.5 rounded-full transition-all duration-500 ${
-                                      rack.utilizationPercent < 30
-                                        ? "bg-emerald-500"
-                                        : rack.utilizationPercent < 70
-                                        ? "bg-amber-500"
-                                        : rack.utilizationPercent < 90
-                                        ? "bg-orange-500"
-                                        : "bg-red-500"
-                                    }`}
-                                    style={{ width: `${Math.min(rack.utilizationPercent, 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {rack.location || <span className="text-muted-foreground">-</span>}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {rack.devices.length}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {new Date(rack.createdAt).toLocaleDateString("id-ID", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDialog(rack)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => router.push(`/racks/${rack.id}`)}
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setRackToDelete(rack);
-                                      setIsDeleteDialogOpen(true);
-                                    }}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        // Show ellipsis pattern for more pages
+                        <>
+                          {currentPage <= 4 && (
+                            <>
+                              {[1, 2, 3, 4, 5].map((page) => (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(page)}
+                                  className="w-10 h-10 p-0"
+                                >
+                                  {page}
+                                </Button>
+                              ))}
+                              <span className="px-2 text-muted-foreground">...</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(totalPages)}
+                                className="w-10 h-10 p-0"
+                              >
+                                {totalPages}
+                              </Button>
+                            </>
+                          )}
+
+                          {currentPage > 4 && currentPage < totalPages - 3 && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(1)}
+                                className="w-10 h-10 p-0"
+                              >
+                                1
+                              </Button>
+                              <span className="px-2 text-muted-foreground">...</span>
+                              {[currentPage - 1, currentPage, currentPage + 1].map((page) => (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(page)}
+                                  className="w-10 h-10 p-0"
+                                >
+                                  {page}
+                                </Button>
+                              ))}
+                              <span className="px-2 text-muted-foreground">...</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(totalPages)}
+                                className="w-10 h-10 p-0"
+                              >
+                                {totalPages}
+                              </Button>
+                            </>
+                          )}
+
+                          {currentPage >= totalPages - 3 && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(1)}
+                                className="w-10 h-10 p-0"
+                              >
+                                1
+                              </Button>
+                              <span className="px-2 text-muted-foreground">...</span>
+                              {[totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages].map((page) => (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(page)}
+                                  className="w-10 h-10 p-0"
+                                >
+                                  {page}
+                                </Button>
+                              ))}
+                            </>
+                          )}
+                        </>
                       )}
-                    </TableBody>
-                  </Table>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Table View */}
+                <div className="rounded-md border mt-4">
                 </div>
               </div>
             )}
@@ -781,6 +793,7 @@ export default function RacksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div>  
+    </div> 
   );
 }

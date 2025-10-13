@@ -1029,18 +1029,29 @@ export default function StaticPayloadPage() {
     setPreviewOpen(true);
   };
 
-  const { searchQuery, setSearchQuery, filteredData } = useSearchFilter(items, [
-    "topic",
-  ]);
-  const { sorted, sortDirection, handleSort } =
-    useSortableTable(filteredData);
+  // Search and filtering
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-  const totalPages = Math.ceil(sorted.length / pageSize);
-  const paginatedData = sorted.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+  const [itemsPerPage] = useState(10);
+
+  // Filter items based on search term
+  const filteredItems = items.filter(item =>
+    item.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    JSON.stringify(item.data).toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedItems, sortKey, sortDirection, handleSort } = useSortableTable(filteredItems);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedItems.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedItems = sortedItems.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection]);
 
   return (
     <SidebarInset>
@@ -1160,67 +1171,91 @@ export default function StaticPayloadPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {items.map((item, index) => (
-                          <TableRow key={item.topic}>
-                            <TableCell className="font-mono text-sm">{index + 1}</TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className="font-medium">{item.topic}</div>
-                                <div className="flex items-center gap-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    ID: {item.id}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {Object.keys(item.data).length} field(s)
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-xs space-y-1">
-                                <div>QoS: {item.qos} | Interval: {item.interval}s</div>
-                                <div className="flex gap-2">
-                                  <Badge variant={item.lwt ? "default" : "secondary"} className="text-xs">
-                                    LWT: {item.lwt ? "ON" : "OFF"}
-                                  </Badge>
-                                  <Badge variant={item.retain ? "default" : "secondary"} className="text-xs">
-                                    Retain: {item.retain ? "ON" : "OFF"}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openPreviewModal(item.data)}
-                                  title="Preview"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openUpdateModal(index)}
-                                  title="Edit"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleDelete(index)}
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                        {isLoading ? (
+                          [...Array(5)].map((_, i) => (
+                            <TableRow key={i}>
+                              <TableCell><div className="h-4 bg-muted rounded animate-pulse w-8"></div></TableCell>
+                              <TableCell><div className="h-4 bg-muted rounded animate-pulse w-24"></div></TableCell>
+                              <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                              <TableCell><div className="h-4 bg-muted rounded animate-pulse w-20"></div></TableCell>
+                              <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-8 ml-auto"></div></TableCell>
+                            </TableRow>
+                          ))
+                        ) : paginatedItems.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-12">
+                              <div className="flex flex-col items-center">
+                                <Database className="h-12 w-12 text-muted-foreground mb-4" />
+                                <h3 className="text-lg font-medium text-foreground mb-2">No Payloads Found</h3>
+                                <p className="text-muted-foreground">
+                                  {searchTerm ? "No payloads match your search criteria" : "No MQTT payloads configured yet"}
+                                </p>
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : (
+                          paginatedItems.map((item, index) => (
+                            <TableRow key={item.topic}>
+                              <TableCell className="font-mono text-sm">{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium">{item.topic}</div>
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      ID: {item.id}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">
+                                  {Object.keys(item.data).length} field(s)
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-xs space-y-1">
+                                  <div>QoS: {item.qos} | Interval: {item.interval}s</div>
+                                  <div className="flex gap-2">
+                                    <Badge variant={item.lwt ? "default" : "secondary"} className="text-xs">
+                                      LWT: {item.lwt ? "ON" : "OFF"}
+                                    </Badge>
+                                    <Badge variant={item.retain ? "default" : "secondary"} className="text-xs">
+                                      Retain: {item.retain ? "ON" : "OFF"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openPreviewModal(item.data)}
+                                    title="Preview"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openUpdateModal(index)}
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleDelete(index)}
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </div>

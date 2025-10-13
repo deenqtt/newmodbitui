@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useMqtt } from "@/contexts/MqttContext";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +112,42 @@ export default function UnifiedDashboard() {
   >([]);
   const [isAttendanceRefreshing, setIsAttendanceRefreshing] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentUsersPage, setCurrentUsersPage] = useState(1);
+  const [usersItemsPerPage, setUsersItemsPerPage] = useState(10);
+  const [currentDevicesPage, setCurrentDevicesPage] = useState(1);
+  const [devicesItemsPerPage, setDevicesItemsPerPage] = useState(10);
+  const [currentAttendancePage, setCurrentAttendancePage] = useState(1);
+  const [attendanceItemsPerPage, setAttendanceItemsPerPage] = useState(10);
+
+  // Sorting hook for users table
+  const { sorted: sortedUsers, sortKey, sortDirection, handleSort } = useSortableTable(
+    useMemo(() => users.filter(user =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.uid.toString().includes(searchTerm) ||
+      user.user_id.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [users, searchTerm])
+  );
+
+  // Pagination calculations for users
+  const { filteredUsers, totalUsersPages, paginatedUsers } = useMemo(() => {
+    const filtered = sortedUsers;
+    const total = Math.ceil(filtered.length / usersItemsPerPage);
+    const startIndex = (currentUsersPage - 1) * usersItemsPerPage;
+    const paginated = filtered.slice(startIndex, startIndex + usersItemsPerPage);
+    return {
+      filteredUsers: filtered,
+      totalUsersPages: total,
+      paginatedUsers: paginated,
+    };
+  }, [sortedUsers, currentUsersPage, usersItemsPerPage]);
+
+  // Reset user page when filters change
+  useEffect(() => {
+    setCurrentUsersPage(1);
+  }, [searchTerm, sortKey, sortDirection, usersItemsPerPage]);
 
   const handleFetchUsers = useCallback(async () => {
     if (!isConnected) return;
@@ -172,7 +209,7 @@ export default function UnifiedDashboard() {
 
   return (
     <SidebarInset>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen bg-background">
         <div className="p-4 md:p-6 space-y-8">
           {/* Enhanced Navigation Card */}
           <Card>
@@ -287,74 +324,59 @@ export default function UnifiedDashboard() {
 
           {/* Device Status Summary Section */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="border shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Online Devices
-                </CardTitle>
-                <div className="p-2 bg-green-100 text-green-500 rounded-full">
-                  <Wifi className="h-4 w-4" />
+            <Card className="shadow-md bg-card backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Wifi className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Online Devices</p>
+                    <p className="text-3xl font-bold">
+                      {deviceSummary.online_devices}
+                    </p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold mb-1">
-                  {deviceSummary.online_devices}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {deviceSummary.success_rate.toFixed(1)}% Success Rate
-                </p>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Offline Devices
-                </CardTitle>
-                <div className="p-2 bg-red-100 text-red-500 rounded-full">
-                  <XCircle className="h-4 w-4" />
+            <Card className="shadow-md bg-card backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Offline Devices</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {deviceSummary.offline_devices}
+                    </p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold mb-1">
-                  {deviceSummary.offline_devices}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {deviceSummary.total_devices - deviceSummary.online_devices}{" "}
-                  Failed
-                </p>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Users
-                </CardTitle>
-                <div className="p-2 bg-muted rounded-full">
-                  <Users className="h-4 w-4" />
+            <Card className="shadow-md bg-card backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+                    <p className="text-3xl font-bold">
+                      {users.length}
+                    </p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold mb-1">{users.length}</div>
-                <p className="text-xs text-muted-foreground">Unique Records</p>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Access Logs
-                </CardTitle>
-                <div className="p-2 bg-blue-100 text-blue-500 rounded-full">
-                  <Clock4 className="h-4 w-4" />
+            <Card className="shadow-md bg-card backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Clock4 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Access Logs</p>
+                    <p className="text-3xl font-bold">
+                      {attendanceRecords.length}
+                    </p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold mb-1">
-                  {attendanceRecords.length}
-                </div>
-                <p className="text-xs text-muted-foreground">Recent Records</p>
               </CardContent>
             </Card>
           </div>
@@ -396,66 +418,191 @@ export default function UnifiedDashboard() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                <div className="relative max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search users by name, UID, or user ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 text-sm border border-input rounded-md leading-5 bg-background placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    Items per page:
+                  </span>
+                  <select
+                    value={usersItemsPerPage}
+                    onChange={(e) => setUsersItemsPerPage(Number(e.target.value))}
+                    className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
               {isUsersRefreshing ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto" />
                   <p>Loading users...</p>
                 </div>
               ) : users.length > 0 ? (
-                <div className="overflow-auto max-h-[500px] rounded-md border">
-                  <UITable>
-                    <TableHeader className="sticky top-0 z-10">
-                      <TableRow>
-                        <TableHead>UID</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>User ID</TableHead>
-                        <TableHead>Privilege</TableHead>
-                        <TableHead>Devices</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user, index) => (
-                        <TableRow key={index} className="hover:bg-muted/50">
-                          <TableCell className="font-mono font-medium">
-                            {user.uid}
-                          </TableCell>
-                          <TableCell className="font-medium">
+                <div className="overflow-hidden">
+                  <div className="border rounded-lg">
+                    <UITable>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="w-20 cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleSort('uid')}>
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-                                {user.name.charAt(0).toUpperCase()}
-                              </div>
-                              {user.name}
+                              <span>UID</span>
+                              {!sortKey || sortKey !== 'uid' ? (
+                                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                </svg>
+                              ) : sortDirection === 'asc' ? (
+                                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
+                                </svg>
+                              )}
                             </div>
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            <div className="bg-muted p-2 rounded-full">
-                              {user.user_id}
+                          </TableHead>
+                          <TableHead className="cursor-pointer hover:bg-muted/70 select-none" onClick={() => handleSort('name')}>
+                            <div className="flex items-center gap-2">
+                              <span>Name</span>
+                              {!sortKey || sortKey !== 'name' ? (
+                                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                </svg>
+                              ) : sortDirection === 'asc' ? (
+                                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 17l-4 4m0 0l-4-4m4 4V3" />
+                                </svg>
+                              )}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {getPrivilegeLabel(user.privilege)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {user.devices.map((device, idx) => (
-                                <Badge key={idx} variant="secondary">
-                                  <HardDrive className="h-3 w-3 mr-1" />
-                                  {device}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
+                          </TableHead>
+                          <TableHead>User ID</TableHead>
+                          <TableHead>Privilege</TableHead>
+                          <TableHead>Devices</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </UITable>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedUsers.map((user, index) => (
+                          <TableRow key={index} className="hover:bg-muted/50">
+                            <TableCell className="font-mono font-medium">
+                              {user.uid}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                                  {user.name.charAt(0).toUpperCase()}
+                                </div>
+                                {user.name}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              <div className="bg-muted p-2 rounded-full">
+                                {user.user_id}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {getPrivilegeLabel(user.privilege)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {user.devices.map((device, idx) => (
+                                  <Badge key={idx} variant="secondary">
+                                    <HardDrive className="h-3 w-3 mr-1" />
+                                    {device}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </UITable>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No users found.</p>
+                </div>
+              )}
+
+              {/* Pagination for Users */}
+              {totalUsersPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border p-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>
+                      Showing {Math.min((currentUsersPage - 1) * usersItemsPerPage + 1, filteredUsers.length)} to{" "}
+                      {Math.min(currentUsersPage * usersItemsPerPage, filteredUsers.length)} of{" "}
+                      {filteredUsers.length} results
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentUsersPage(currentUsersPage - 1)}
+                      disabled={currentUsersPage === 1}
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Previous
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalUsersPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(totalUsersPages - 4, currentUsersPage - 2)) + i;
+                        if (page > totalUsersPages) return null;
+                        return (
+                          <Button
+                            key={page}
+                            variant={page === currentUsersPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentUsersPage(page)}
+                            className="min-w-9"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentUsersPage(currentUsersPage + 1)}
+                      disabled={currentUsersPage === totalUsersPages}
+                    >
+                      Next
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

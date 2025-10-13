@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import React, { useState, useEffect, useCallback, FormEvent } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { Role, MaintenanceTarget } from "@prisma/client";
+import { MaintenanceTarget, Role } from "@prisma/client";
+import { useSortableTable } from "@/hooks/use-sort-table";
 import Swal from "sweetalert2";
 import {
   format,
@@ -142,6 +143,23 @@ function MaintenanceManagementContent() {
   const [maintenanceToDelete, setMaintenanceToDelete] =
     useState<MaintenanceData | null>(null);
 
+  // State untuk pagination dan sorting
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedMaintenances, sortKey, sortDirection, handleSort } = useSortableTable(maintenances);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedMaintenances.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedMaintenances = sortedMaintenances.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when page size changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage, sortKey, sortDirection]);
+
   // State untuk kalender
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -207,7 +225,7 @@ function MaintenanceManagementContent() {
 
   useEffect(() => {
     if (!isAuthLoading) {
-      if (isAuthenticated && user?.role === Role.ADMIN) {
+      if (isAuthenticated && user?.role?.name === "ADMIN") {
         fetchMaintenances();
         fetchUsers();
         fetchDevices();
@@ -418,13 +436,13 @@ function MaintenanceManagementContent() {
     );
   }
 
-  if (!user || user.role !== Role.ADMIN) {
+  if (!user || user.role?.name !== "ADMIN") {
     return (
-      <div className="flex flex-col items-center justify-center h-screen text-center bg-gray-100">
+      <div className="flex flex-col items-center justify-center h-screen text-center">
         <Shield className="h-16 w-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold">Akses Ditolak</h1>
+        <h1 className="text-2xl font-bold">Access Denied</h1>
         <p className="text-gray-600">
-          Anda tidak memiliki izin untuk melihat halaman ini.
+          You do not have permission to view this page.
         </p>
       </div>
     );

@@ -33,6 +33,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Plus,
   HardDrive,
   Server,
@@ -43,6 +51,11 @@ import {
   MoreVertical,
   Wifi,
   Power,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,6 +64,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { useSortableTable } from "@/hooks/use-sort-table";
 
 interface InternalDevice {
   id: string;
@@ -84,7 +98,7 @@ const STATUS_COLORS: Record<string, string> = {
   online: "bg-emerald-500",
   offline: "bg-red-500",
   maintenance: "bg-amber-500",
-  unknown: "bg-gray-500 default"
+  unknown: "bg-gray-500"
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -104,6 +118,8 @@ export default function DevicesInternalPage() {
   const [deviceToDelete, setDeviceToDelete] = useState<InternalDevice | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [deviceForm, setDeviceForm] = useState({
     name: "",
     deviceType: "",
@@ -163,6 +179,19 @@ export default function DevicesInternalPage() {
     const matchesType = typeFilter === "all" || device.deviceType === typeFilter;
     return matchesSearch && matchesType;
   });
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedDevices, sortKey, sortDirection, handleSort } = useSortableTable(filteredDevices);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedDevices = sortedDevices.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, sortKey, sortDirection]);
 
   // Create/update device
   const handleDeviceSubmit = async () => {
@@ -318,40 +347,7 @@ export default function DevicesInternalPage() {
           </Button>
         </div>
 
-        {/* Search and Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Search devices by name, type, or manufacturer..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="w-full md:w-48">
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {DEVICE_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -409,137 +405,377 @@ export default function DevicesInternalPage() {
             </CardContent>
           </Card>
         </div>
+        {/* Search and Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-4 mt-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search devices by name, type, or manufacturer..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
 
-        {/* Devices List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading ? (
-            // Loading skeletons
-            [...Array(6)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="h-4 bg-muted rounded w-3/4"></div>
-                  <div className="h-3 bg-muted rounded w-1/2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-muted rounded w-full"></div>
-                    <div className="h-3 bg-muted rounded w-2/3"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : filteredDevices.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <HardDrive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No Devices Found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || typeFilter !== "all"
-                  ? "No devices match your current filters"
-                  : "Get started by adding your first internal device"}
-              </p>
-              <Button onClick={() => openDeviceForm()}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Device
+              <div className="w-full md:w-48">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {DEVICE_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+        {/* Table/List Toggle */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Showing {paginatedDevices.length} of {sortedDevices.length} devices
+            </span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="items-per-page" className="text-sm">Items per page:</label>
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Devices Table */}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-64">
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleSort('name')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Device Name
+                      {sortKey === 'name' ? (
+                        sortDirection === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : sortDirection === 'desc' ? (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleSort('deviceType')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Type
+                      {sortKey === 'deviceType' ? (
+                        sortDirection === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : sortDirection === 'desc' ? (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleSort('manufacturer')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Manufacturer
+                      {sortKey === 'manufacturer' ? (
+                        sortDirection === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : sortDirection === 'desc' ? (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Rack Position</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleSort('powerWatt')}
+                      className="h-auto p-0 font-semibold hover:bg-transparent"
+                    >
+                      Power
+                      {sortKey === 'powerWatt' ? (
+                        sortDirection === 'asc' ? (
+                          <ArrowUp className="ml-2 h-4 w-4" />
+                        ) : sortDirection === 'desc' ? (
+                          <ArrowDown className="ml-2 h-4 w-4" />
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  [...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-32"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-20"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-14"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-12"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                      <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-8 ml-auto"></div></TableCell>
+                    </TableRow>
+                  ))
+                ) : paginatedDevices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="flex flex-col items-center">
+                        <HardDrive className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">No Devices Found</h3>
+                        <p className="text-muted-foreground">
+                          {searchTerm || typeFilter !== "all"
+                            ? "No devices match your current filters"
+                            : "Get started by adding your first internal device"}
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedDevices.map((device) => (
+                    <TableRow key={device.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{device.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{device.deviceType}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {device.manufacturer || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`inline-flex items-center rounded-full h-2 w-2 ${STATUS_COLORS[device.status] || STATUS_COLORS.unknown}`}
+                          />
+                          <span className="text-sm">
+                            {STATUS_LABELS[device.status] || 'Unknown'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {device.positionU ? (
+                          <Badge variant="outline">U{device.positionU}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {device.powerWatt ? (
+                          <span className="text-sm text-muted-foreground">{device.powerWatt}W</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openDeviceForm(device)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Device
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setDeviceToDelete(device);
+                                setIsDeleteDeviceDialogOpen(true);
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Device
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+
+              {/* Page Numbers */}
+              {totalPages <= 7 ? (
+                // Show all pages if 7 or fewer
+                Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className="w-10 h-10 p-0"
+                  >
+                    {page}
+                  </Button>
+                ))
+              ) : (
+                // Show ellipsis pattern for more pages
+                <>
+                  {currentPage <= 4 && (
+                    <>
+                      {[1, 2, 3, 4, 5].map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                      <span className="px-2 text-muted-foreground">...</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-10 h-10 p-0"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+
+                  {currentPage > 4 && currentPage < totalPages - 3 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="w-10 h-10 p-0"
+                      >
+                        1
+                      </Button>
+                      <span className="px-2 text-muted-foreground">...</span>
+                      {[currentPage - 1, currentPage, currentPage + 1].map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                      <span className="px-2 text-muted-foreground">...</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-10 h-10 p-0"
+                      >
+                        {totalPages}
+                      </Button>
+                    </>
+                  )}
+
+                  {currentPage >= totalPages - 3 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="w-10 h-10 p-0"
+                      >
+                        1
+                      </Button>
+                      <span className="px-2 text-muted-foreground">...</span>
+                      {[totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages].map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-          ) : (
-            filteredDevices.map((device) => (
-              <Card key={device.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{device.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{device.deviceType}</p>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openDeviceForm(device)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Device
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDeviceToDelete(device);
-                            setIsDeleteDeviceDialogOpen(true);
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Device
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-3">
-                  {/* Status and Rack Position */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`inline-flex items-center rounded-full h-2 w-2 ${STATUS_COLORS[device.status] || STATUS_COLORS.unknown}`}
-                      />
-                      <span className="text-sm font-medium">
-                        {STATUS_LABELS[device.status] || 'Unknown'}
-                      </span>
-                    </div>
-                    {device.positionU && (
-                      <Badge variant="outline">
-                        U{device.positionU}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Device Info */}
-                  <div className="space-y-2">
-                    {device.manufacturer && (
-                      <p className="text-sm text-muted-foreground">
-                        <strong>Make:</strong> {device.manufacturer}
-                        {device.modelId && ` • ${device.modelId}`}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm"><strong>Rack:</strong></span>
-                        <span className="text-sm text-muted-foreground">
-                          {device.rack ? device.rack.name : 'Not Assigned'}
-                        </span>
-                      </div>
-
-                      {device.powerWatt && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Power className="h-3 w-3 mr-1" />
-                          {device.powerWatt}W
-                        </div>
-                      )}
-                    </div>
-
-                    {device.ipAddress && (
-                      <p className="text-sm text-muted-foreground">
-                        <strong>IP:</strong> {device.ipAddress}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Notes */}
-                  {device.notes && (
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {device.notes}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Device Form Dialog */}
         <Dialog open={isDeviceDialogOpen} onOpenChange={setIsDeviceDialogOpen}>
@@ -705,9 +941,9 @@ export default function DevicesInternalPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Device</AlertDialogTitle>
-              <DialogDescription>
+              <AlertDialogDescription>
                 Are you sure you want to delete "{deviceToDelete?.name}"? This action cannot be undone.
-              </DialogDescription>
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setIsDeleteDeviceDialogOpen(false)}>

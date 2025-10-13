@@ -32,10 +32,21 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/menu');
+      // Add AbortController for request cancellation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch('/api/menu', {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache', // Prevent browser caching
+        },
+      });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch menu');
+        throw new Error(`Menu API returned ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -51,8 +62,13 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       setIsDeveloper(data.isDeveloper || false);
 
     } catch (err: any) {
-      setError(err.message);
-      console.error('Menu fetch error:', err);
+      if (err.name === 'AbortError') {
+        console.error('Menu fetch aborted due to timeout');
+        setError('Menu loading timeout. Please refresh.');
+      } else {
+        console.error('Menu fetch error:', err);
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }

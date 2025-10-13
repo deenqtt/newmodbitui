@@ -10,8 +10,16 @@ function getNestedValue(obj: any, path: string) {
   }, obj);
 }
 
+// Define return type for the hook
+export interface UseSortableTableReturn<T> {
+  sorted: T[];
+  sortField: string | null;
+  sortDirection: 'asc' | 'desc';
+  handleSort: (field: string) => void;
+}
+
 // Define a more flexible type for the sortField to allow string paths
-export function useSortableTable<T extends Record<string, any>>(data: T[]) { // T must be an object type
+export function useSortableTable<T extends Record<string, any>>(data: T[]): UseSortableTableReturn<T> { // T must be an object type
   // sortField can now be a string representing a path or a direct key
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

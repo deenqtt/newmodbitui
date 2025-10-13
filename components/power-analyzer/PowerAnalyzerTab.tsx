@@ -2,8 +2,25 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
-import Swal from "sweetalert2"; // <-- 1. Import SweetAlert2
-import { Plus, Edit, Trash2, MoreVertical, Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
+import { useSortableTable } from "@/hooks/use-sort-table";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  MoreVertical,
+  Loader2,
+  HardDrive,
+  Zap,
+  Gauge,
+  Calculator,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 
 // Shadcn/UI & Custom Components
 import { Button } from "@/components/ui/button";
@@ -105,7 +122,8 @@ export function PowerAnalyzerTab() {
     key: string | null;
   }>({ uniqId: null, key: null });
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // ... (Semua logika MQTT, data fetching, kalkulasi, dan helper lainnya tidak berubah)
   const { subscribe, unsubscribe } = useMqtt();
@@ -242,14 +260,26 @@ export function PowerAnalyzerTab() {
     },
     []
   );
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return configs.slice(start, start + itemsPerPage);
-  }, [configs, currentPage]);
-  const totalPages = useMemo(
-    () => Math.ceil(configs.length / itemsPerPage),
-    [configs]
-  );
+  // Filter devices based on search
+  const filteredConfigs = useMemo(() => {
+    return configs.filter(config =>
+      config.customName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [configs, searchTerm]);
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedConfigs, sortKey, sortDirection, handleSort } = useSortableTable(filteredConfigs);
+
+  // Paginate the sorted results
+  const totalPages = Math.ceil(sortedConfigs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedConfigs = sortedConfigs.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection]);
   const resetForm = () => {
     setCustomName("");
     setPduList([{ uniqId: null, keys: [] }]);
@@ -422,40 +452,186 @@ export function PowerAnalyzerTab() {
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Power Analyzer</CardTitle>
-          <Button onClick={() => handleOpenModal()}>
-            <Plus className="mr-2 h-4 w-4" /> Add Data
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">#</TableHead>
-                <TableHead>Custom Name</TableHead>
-                <TableHead>Total PDU/Rack</TableHead>
-                <TableHead>PUE (IT / Main)</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                Power Analyzer
+              </h1>
+              <p className="text-muted-foreground">
+                Monitor and analyze power usage efficiency across your infrastructure
+              </p>
+            </div>
+
+            <Button onClick={() => handleOpenModal()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Configuration
+            </Button>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Calculator className="h-6 w-6 text-primary" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Total Configurations</p>
+                    <p className="text-2xl font-bold">{configs.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <HardDrive className="h-6 w-6 text-emerald-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Active Racks</p>
+                    <p className="text-2xl font-bold">
+                      {configs.reduce((sum, config) => sum + config.pduList.length, 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Zap className="h-6 w-6 text-blue-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Live Data</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {Object.keys(liveData).length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Gauge className="h-6 w-6 text-amber-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Avg PUE</p>
+                    <p className="text-2xl font-bold">
+                      {configs.length > 0
+                        ? (
+                          configs.reduce((sum, config) => {
+                            const pue = calculateTotalPUE(config);
+                            return sum + (pue !== 'N/A' ? parseFloat(pue.replace('%', '')) : 0);
+                          }, 0) / configs.filter(config => calculateTotalPUE(config) !== 'N/A').length
+                        ).toFixed(1) + '%'
+                        : 'N/A'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search configurations by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="w-full md:w-48">
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Items per page" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 per page</SelectItem>
+                  <SelectItem value="10">10 per page</SelectItem>
+                  <SelectItem value="20">20 per page</SelectItem>
+                  <SelectItem value="50">50 per page</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Results info */}
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-muted-foreground">
+              Showing {paginatedConfigs.length} of {sortedConfigs.length} configurations
+            </span>
+          </div>
+
+          {/* Table */}
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">#</TableHead>
+                    <TableHead className="w-[250px]">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('customName')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Custom Name
+                        {sortKey === 'customName' ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="ml-2 h-4 w-4" />
+                          ) : sortDirection === 'desc' ? (
+                            <ArrowDown className="ml-2 h-4 w-4" />
+                          ) : (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>Total PDU/Rack</TableHead>
+                    <TableHead>PUE (IT / Main)</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {isLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-8"></div></TableCell>
+                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-24"></div></TableCell>
+                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-20"></div></TableCell>
+                    <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-8 ml-auto"></div></TableCell>
+                  </TableRow>
+                ))
+              ) : paginatedConfigs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    Memuat data...
-                  </TableCell>
-                </TableRow>
-              ) : paginatedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    Tidak ada data.
+                    <div className="flex flex-col items-center">
+                      <Calculator className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-2">No Power Analyzer Configurations Found</h3>
+                      <p className="text-muted-foreground">
+                        {searchTerm
+                          ? "No configurations match your search"
+                          : "Get started by adding your first power analyzer configuration"}
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedData.map((config, index) => (
-                  <TableRow key={config.id}>
+                paginatedConfigs.map((config, index) => (
+                  <TableRow key={config.id} className="hover:bg-muted/50">
                     <TableCell>
                       {index + 1 + (currentPage - 1) * itemsPerPage}
                     </TableCell>
@@ -479,7 +655,7 @@ export function PowerAnalyzerTab() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Buka menu</span>
+                            <span className="sr-only">Open menu</span>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -491,9 +667,9 @@ export function PowerAnalyzerTab() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleDelete(config.id)}
-                            className="text-red-600 focus:text-red-600"
+                            className="text-destructive focus:text-destructive"
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -504,30 +680,142 @@ export function PowerAnalyzerTab() {
             </TableBody>
           </Table>
         </CardContent>
-        {totalPages > 1 && (
-          <CardFooter className="flex justify-center items-center gap-2">
+      </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
             >
-              Sebelumnya
+              <ChevronLeft className="h-4 w-4" />
+              Previous
             </Button>
-            <span className="text-sm text-muted-foreground">
-              Halaman {currentPage} dari {totalPages}
-            </span>
+
+            {/* Page Numbers */}
+            {totalPages <= 7 ? (
+              // Show all pages if 7 or fewer
+              Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                  className="w-10 h-10 p-0"
+                >
+                  {page}
+                </Button>
+              ))
+            ) : (
+              // Show ellipsis pattern for more pages
+              <>
+                {currentPage <= 4 && (
+                  <>
+                    {[1, 2, 3, 4, 5].map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-10 h-10 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="w-10 h-10 p-0"
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+
+                {currentPage > 4 && currentPage < totalPages - 3 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      className="w-10 h-10 p-0"
+                    >
+                      1
+                    </Button>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    {[currentPage - 1, currentPage, currentPage + 1].map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-10 h-10 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="w-10 h-10 p-0"
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+
+                {currentPage >= totalPages - 3 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      className="w-10 h-10 p-0"
+                    >
+                      1
+                    </Button>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    {[totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages].map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-10 h-10 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
             >
-              Berikutnya
+              Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
-          </CardFooter>
-        )}
-      </Card>
+          </div>
+        </div>
+      )}
+        </div>
+      </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl">

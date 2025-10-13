@@ -1,57 +1,111 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  PlusCircle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { useSortableTable } from "@/hooks/use-sort-table";
+import {
+  HardDrive,
+  Plus,
   Wifi,
   WifiOff,
-  Users, // Digunakan untuk 'Manage'
+  Users,
   History,
+  Edit,
   Trash2,
+  Search,
   RefreshCw,
-  Pencil, // <-- Ikon baru untuk 'Edit'
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
-import { Modal } from "@/components/ui/modal";
-import { EditControllerForm } from "@/components/devices/edit-controller-form";
-import { Toast } from "@/lib/toast";
-import Swal from "sweetalert2";
 
-// ... (Type definitions dan state lainnya tidak berubah, jadi saya singkat di sini)
-type AccessController = {
+interface AccessController {
   id: string;
   name: string;
   ipAddress: string;
   status: string;
   lockCount: number;
-};
-type ActivityLog = {
+}
+
+interface ActivityLog {
   id: string;
   timestamp: string;
   message: string;
-};
+}
 
-export default function AccessControllersPage() {
+const DevicesExternalContent = () => {
   const router = useRouter();
   const [controllers, setControllers] = useState<AccessController[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newIpAddress, setNewIpAddress] = useState("");
-  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false);
+  const [selectedController, setSelectedController] = useState<AccessController | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false);
-  const [selectedController, setSelectedController] =
-    useState<AccessController | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLogLoading, setIsLogLoading] = useState(false);
   const [logSyncStatus, setLogSyncStatus] = useState("");
 
-  // ... (Semua fungsi handler seperti fetchControllers, handleAddDevice, handleDelete, dll. tidak berubah)
+  const [controllerForm, setControllerForm] = useState({
+    name: "",
+    ipAddress: "",
+  });
+
+  const { toast } = useToast();
+
+  // Fetch controllers
   const fetchControllers = async () => {
     try {
+      setIsLoading(true);
       const response = await fetch("/api/devices/access-controllers");
-      if (!response.ok) throw new Error("Failed to fetch data from server");
+      if (!response.ok) throw new Error("Failed to fetch controllers");
       const data: AccessController[] = await response.json();
       setControllers(data);
       setError(null);
@@ -59,193 +113,238 @@ export default function AccessControllersPage() {
       setError(err.message);
       console.error(err);
     } finally {
-      if (isLoading) setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
+  // Filter controllers based on search term
+  const filteredControllers = controllers.filter(controller => {
+    const matchesSearch = controller.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         controller.ipAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         controller.status.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedControllers, sortKey, sortDirection, handleSort } = useSortableTable(filteredControllers);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedControllers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedControllers = sortedControllers.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection]);
+
+  // Initialize
   useEffect(() => {
     fetchControllers();
-    const refreshInterval = setInterval(fetchControllers, 5000);
+    const refreshInterval = setInterval(fetchControllers, 30000); // Changed to 30s to be less frequent
     return () => clearInterval(refreshInterval);
   }, []);
 
-  const handleAddDevice = async (e: FormEvent) => {
-    e.preventDefault();
+  // Form submission for adding controller
+  const handleDeviceSubmit = async () => {
+    if (!controllerForm.name.trim() || !controllerForm.ipAddress.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const response = await fetch("/api/devices/access-controllers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, ipAddress: newIpAddress }),
+        body: JSON.stringify({ name: controllerForm.name, ipAddress: controllerForm.ipAddress }),
       });
-      if (!response.ok) throw new Error("Failed to add device");
-      setNewName("");
-      setNewIpAddress("");
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to add controller");
+      }
+
+      toast({
+        title: "Success",
+        description: "Controller added successfully",
+      });
+
+      setIsDeviceDialogOpen(false);
+      resetControllerForm();
       fetchControllers();
-      Toast.fire({
-        icon: "success",
-        title: "Device added successfully!",
-      });
-    } catch (err: any) {
-      Toast.fire({
-        icon: "error",
-        title: `Error: ${err.message}`,
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add controller",
+        variant: "destructive",
       });
     }
   };
 
+  // Edit controller
   const handleEdit = (controller: AccessController) => {
     setSelectedController(controller);
+    setControllerForm({
+      name: controller.name,
+      ipAddress: controller.ipAddress,
+    });
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    const result = await Swal.fire({
-      title: `Delete "${name}"?`,
-      text: "This action cannot be undone.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: "Yes, delete it!",
-    });
+  const handleSaveEdit = async () => {
+    if (!selectedController) return;
 
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(`/api/devices/access-controllers/${id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) throw new Error("Failed to delete device");
-        fetchControllers();
-        Toast.fire({
-          icon: "success",
-          title: "Device deleted successfully!",
-        });
-      } catch (err: any) {
-        Toast.fire({
-          icon: "error",
-          title: `Error: ${err.message}`,
-        });
-      }
-    }
-  };
-
-  const handleSaveEdit = async (
-    id: string,
-    name: string,
-    ipAddress: string
-  ) => {
     try {
-      const response = await fetch(`/api/devices/access-controllers/${id}`, {
+      const response = await fetch(`/api/devices/access-controllers/${selectedController.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, ipAddress }),
+        body: JSON.stringify(controllerForm),
       });
-      if (!response.ok) throw new Error("Failed to save changes");
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save changes");
+      }
+
+      toast({
+        title: "Success",
+        description: "Controller updated successfully",
+      });
+
       setIsEditModalOpen(false);
+      setSelectedController(null);
+      resetControllerForm();
       fetchControllers();
-      Toast.fire({
-        icon: "success",
-        title: "Changes saved successfully!",
-      });
-    } catch (err: any) {
-      Toast.fire({
-        icon: "error",
-        title: `Error: ${err.message}`,
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save changes",
+        variant: "destructive",
       });
     }
   };
 
+  // Delete controller
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      const response = await fetch(`/api/devices/access-controllers/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete controller");
+      }
+
+      toast({
+        title: "Success",
+        description: "Controller deleted successfully",
+      });
+
+      fetchControllers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete controller",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Manage users navigation
   const handleManageUsers = (controller: AccessController) => {
     router.push(`/devices/access-controllers/${controller.id}/users`);
   };
 
-  const handleViewLogs = async (
-    controller: AccessController,
-    forceSync = false
-  ) => {
-    if (!isLogModalOpen || forceSync) {
-      setSelectedController(controller);
-      setIsLogModalOpen(true);
-      setIsLogLoading(true);
-      setActivityLogs([]);
-      setLogSyncStatus("Fetching logs from database...");
-      const fetchDbLogs = fetch(
-        `/api/devices/access-controllers/${controller.id}/logs`
-      ).then((res) => res.json());
-      setLogSyncStatus("Syncing with device, please wait...");
-      const fetchDeviceLogs = fetch(
-        `/api/devices/access-controllers/${controller.id}/sync-logs`,
-        { method: "POST" }
-      ).then((res) => res.json());
+  // View and sync logs
+  const handleViewLogs = async (controller: AccessController, forceSync = false) => {
+    setSelectedController(controller);
+    setIsLogModalOpen(true);
+    setIsLogLoading(true);
+    setActivityLogs([]);
+    setLogSyncStatus("Fetching logs from database...");
 
-      try {
-        const [dbLogs, deviceLogs] = await Promise.all([
-          fetchDbLogs,
-          fetchDeviceLogs,
-        ]);
-        setLogSyncStatus("Merging and sorting logs...");
-        const combinedLogs = [...dbLogs, ...deviceLogs];
-        const uniqueLogsMap = new Map<string, ActivityLog>();
-        combinedLogs.forEach((log) => {
-          if (!log.message) {
-            log.message = `Lock ${log.lockAddress} event by ${log.method} (Card: ${log.cardNumber})`;
-          }
-          const key = `${log.timestamp}-${log.message}`;
-          if (!uniqueLogsMap.has(key)) {
-            uniqueLogsMap.set(key, log);
-          }
-        });
-        const sortedLogs = Array.from(uniqueLogsMap.values()).sort(
-          (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setActivityLogs(sortedLogs);
-        setLogSyncStatus(
-          deviceLogs.length > 0
-            ? "Sync complete!"
-            : "Sync complete (no new logs from device)."
-        );
-      } catch (err: any) {
-        Toast.fire({ icon: "error", title: "Failed to fetch or sync logs." });
-        setLogSyncStatus("Error during sync.");
-      } finally {
-        setIsLogLoading(false);
-      }
+    try {
+      const [dbLogs, deviceLogs] = await Promise.all([
+        fetch(`/api/devices/access-controllers/${controller.id}/logs`).then(res => res.json()),
+        forceSync
+          ? fetch(`/api/devices/access-controllers/${controller.id}/sync-logs`, { method: "POST" }).then(res => res.json())
+          : Promise.resolve([])
+      ]);
+
+      // Process and merge logs
+      const combinedLogs = [...dbLogs, ...deviceLogs];
+      const uniqueLogsMap = new Map<string, ActivityLog>();
+      combinedLogs.forEach((log: any) => {
+        if (!log.message) {
+          log.message = `Lock ${log.lockAddress} event by ${log.method} (Card: ${log.cardNumber})`;
+        }
+        const key = `${log.timestamp}-${log.message}`;
+        if (!uniqueLogsMap.has(key)) {
+          uniqueLogsMap.set(key, log);
+        }
+      });
+
+      const sortedLogs = Array.from(uniqueLogsMap.values()).sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+      setActivityLogs(sortedLogs);
+      setLogSyncStatus(
+        deviceLogs.length > 0
+          ? "Sync complete!"
+          : "Sync complete (no new logs from device)."
+      );
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch or sync logs",
+        variant: "destructive",
+      });
+      setLogSyncStatus("Error during sync.");
+    } finally {
+      setIsLogLoading(false);
     }
   };
 
+  // Clear logs
   const handleDeleteLogs = async (controllerId: string) => {
-    const result = await Swal.fire({
-      title: "Clear all logs for this device?",
-      text: "This action is permanent and cannot be undone.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      confirmButtonText: "Yes, clear all!",
-    });
+    try {
+      const response = await fetch(`/api/devices/access-controllers/${controllerId}/logs`, {
+        method: "DELETE",
+      });
 
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(
-          `/api/devices/access-controllers/${controllerId}/logs`,
-          {
-            method: "DELETE",
-          }
-        );
-        const resData = await response.json();
-        if (!response.ok)
-          throw new Error(resData.error || "Failed to delete logs.");
-        Toast.fire({
-          icon: "success",
-          title: "All logs cleared successfully!",
-        });
-        setActivityLogs([]);
-      } catch (err: any) {
-        Toast.fire({ icon: "error", title: err.message });
-      }
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || "Failed to delete logs.");
+
+      toast({
+        title: "Success",
+        description: "All logs cleared successfully",
+      });
+
+      setActivityLogs([]);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
+  // Reset form
+  const resetControllerForm = () => {
+    setControllerForm({
+      name: "",
+      ipAddress: "",
+    });
+  };
+
+  // Format timestamp
   const formatTimestamp = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleString("id-ID", {
@@ -256,299 +355,706 @@ export default function AccessControllersPage() {
   };
 
   return (
-    <>
-      <div className="p-6 space-y-6 bg-background">
-        {/* Form Add New Controller tidak berubah */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-3 text-foreground">Add New Controller</h2>
-          <form
-            onSubmit={handleAddDevice}
-            className="flex flex-wrap md:flex-nowrap items-end gap-4"
-          >
-            <div className="flex-grow w-full md:w-auto">
-              <label
-                htmlFor="deviceName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Device Name
-              </label>
-              <input
-                id="deviceName"
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g., Controller Pintu Lobby"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
+    <TooltipProvider>
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                Access Controllers
+              </h1>
+              <p className="text-muted-foreground">
+                Manage and monitor your access control systems
+              </p>
             </div>
-            <div className="flex-grow w-full md:w-auto">
-              <label
-                htmlFor="deviceIp"
-                className="block text-sm font-medium text-gray-700"
-              >
-                IP Address
-              </label>
-              <input
-                id="deviceIp"
-                type="text"
-                value={newIpAddress}
-                onChange={(e) => setNewIpAddress(e.target.value)}
-                placeholder="e.g., 192.168.0.144"
-                required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <button
-              type="submit"
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-indigo-700 flex items-center gap-2 w-full md:w-auto justify-center"
-            >
-              <PlusCircle size={18} />
-              Add Device
-            </button>
-          </form>
-        </div>
 
-        {/* Tabel Daftar Controller */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Device Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Locks
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4">
-                      Loading devices...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4 text-red-500">
-                      Error: {error}
-                    </td>
-                  </tr>
-                ) : controllers.length > 0 ? (
-                  controllers.map((controller) => (
-                    <tr key={controller.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="flex items-center gap-2">
-                          {controller.status === "online" ? (
-                            <Wifi size={20} className="text-green-500" />
+            <Button onClick={() => setIsDeviceDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Controller
+            </Button>
+          </div>
+
+          {/* Search and Controls */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search controllers by name, IP, or status..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={fetchControllers} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <HardDrive className="h-6 w-6 text-primary" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Total Controllers</p>
+                    <p className="text-2xl font-bold">{controllers.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Wifi className="h-6 w-6 text-emerald-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Online</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {controllers.filter(c => c.status === 'online').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <WifiOff className="h-6 w-6 text-red-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Offline</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {controllers.filter(c => c.status === 'offline').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Users className="h-6 w-6 text-purple-600" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-muted-foreground">Total Locks</p>
+                    <p className="text-2xl font-bold">
+                      {controllers.reduce((sum, c) => sum + (c.lockCount || 0), 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Items per page control */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                Showing {paginatedControllers.length} of {sortedControllers.length} controllers
+              </span>
+              <div className="flex items-center gap-2">
+                <label htmlFor="items-per-page" className="text-sm">Items per page:</label>
+                <select
+                  value={itemsPerPage.toString()}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="w-20 px-3 py-2 border border-input bg-background rounded-md text-sm"
+                >
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Controllers Table */}
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-32">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('name')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Name
+                        {sortKey === 'name' ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="ml-2 h-4 w-4" />
+                          ) : sortDirection === 'desc' ? (
+                            <ArrowDown className="ml-2 h-4 w-4" />
                           ) : (
-                            <WifiOff size={20} className="text-red-500" />
-                          )}
-                          <span
-                            className={`capitalize font-medium ${
-                              controller.status === "online"
-                                ? "text-green-800"
-                                : "text-red-800"
-                            }`}
-                          >
-                            {controller.status}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        {controller.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                        {controller.ipAddress}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                        {controller.lockCount}
-                      </td>
-                      {/* ======================================================================== */}
-                      {/* === PERUBAHAN UTAMA DI SINI: Kolom Actions yang Diperbarui === */}
-                      {/* ======================================================================== */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          {/* Tombol Manage Users */}
-                          <button
-                            onClick={() => handleManageUsers(controller)}
-                            title="Manage Users & Devices"
-                            className="p-2 rounded-full text-sky-600 hover:bg-sky-100 transition-colors"
-                          >
-                            <Users size={18} />
-                          </button>
-                          {/* Tombol View Logs */}
-                          <button
-                            onClick={() => handleViewLogs(controller)}
-                            title="View Activity Logs"
-                            className="p-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors"
-                          >
-                            <History size={18} />
-                          </button>
-                          {/* Tombol Edit */}
-                          <button
-                            onClick={() => handleEdit(controller)}
-                            title="Edit Controller"
-                            className="p-2 rounded-full text-amber-600 hover:bg-amber-100 transition-colors"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          {/* Tombol Delete */}
-                          <button
-                            onClick={() =>
-                              handleDelete(controller.id, controller.name)
-                            }
-                            title="Delete Controller"
-                            className="p-2 rounded-full text-red-600 hover:bg-red-100 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('ipAddress')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        IP Address
+                        {sortKey === 'ipAddress' ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="ml-2 h-4 w-4" />
+                          ) : sortDirection === 'desc' ? (
+                            <ArrowDown className="ml-2 h-4 w-4" />
+                          ) : (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('status')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Status
+                        {sortKey === 'status' ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="ml-2 h-4 w-4" />
+                          ) : sortDirection === 'desc' ? (
+                            <ArrowDown className="ml-2 h-4 w-4" />
+                          ) : (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('lockCount')}
+                        className="h-auto p-0 font-semibold hover:bg-transparent"
+                      >
+                        Locks
+                        {sortKey === 'lockCount' ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="ml-2 h-4 w-4" />
+                          ) : sortDirection === 'desc' ? (
+                            <ArrowDown className="ml-2 h-4 w-4" />
+                          ) : (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><div className="h-4 bg-muted rounded animate-pulse w-32"></div></TableCell>
+                        <TableCell><div className="h-4 bg-muted rounded animate-pulse w-32"></div></TableCell>
+                        <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                        <TableCell><div className="h-4 bg-muted rounded animate-pulse w-12"></div></TableCell>
+                        <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-32 ml-auto"></div></TableCell>
+                      </TableRow>
+                    ))
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12">
+                        <div className="flex flex-col items-center">
+                          <WifiOff className="h-12 w-12 text-red-500 mb-4" />
+                          <h3 className="text-lg font-medium text-foreground mb-2">Error Loading Controllers</h3>
+                          <p className="text-muted-foreground">{error}</p>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedControllers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12">
+                        <div className="flex flex-col items-center">
+                          <HardDrive className="h-12 w-12 text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-medium text-foreground mb-2">No Controllers Found</h3>
+                          <p className="text-muted-foreground">
+                            {searchTerm ? "No controllers match your search" : "Get started by adding your first access controller"}
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedControllers.map((controller) => (
+                      <TableRow key={controller.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{controller.name}</TableCell>
+                        <TableCell className="font-mono text-sm">{controller.ipAddress}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`inline-flex items-center rounded-full h-2 w-2 ${
+                                controller.status === 'online' ? "bg-green-500" : "bg-red-500"
+                              }`}
+                            />
+                            <Badge variant={controller.status === 'online' ? "default" : "secondary"}>
+                              {controller.status === 'online' ? 'Online' : 'Offline'}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{controller.lockCount} locks</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleManageUsers(controller)}
+                                >
+                                  <Users className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Manage Users</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewLogs(controller)}
+                                >
+                                  <History className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View Logs</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(controller)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit Controller</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(controller.id, controller.name)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete Controller</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+
+                {/* Page Numbers */}
+                {totalPages <= 7 ? (
+                  Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="w-10 h-10 p-0"
+                    >
+                      {page}
+                    </Button>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4 text-gray-500">
-                      No access controllers found. Add one to get started.
-                    </td>
-                  </tr>
+                  <>
+                    {currentPage <= 4 && (
+                      <>
+                        {[1, 2, 3, 4, 5].map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-10 h-10 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                        <span className="px-2 text-muted-foreground">...</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+
+                    {currentPage > 4 && currentPage < totalPages - 3 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          className="w-10 h-10 p-0"
+                        >
+                          1
+                        </Button>
+                        <span className="px-2 text-muted-foreground">...</span>
+                        {[currentPage - 1, currentPage, currentPage + 1].map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-10 h-10 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                        <span className="px-2 text-muted-foreground">...</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+
+                    {currentPage >= totalPages - 3 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          className="w-10 h-10 p-0"
+                        >
+                          1
+                        </Button>
+                        <span className="px-2 text-muted-foreground">...</span>
+                        {[totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages].map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-10 h-10 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </>
+                    )}
+                  </>
                 )}
-              </tbody>
-            </table>
-          </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Add Controller Dialog */}
+          <Dialog open={isDeviceDialogOpen} onOpenChange={setIsDeviceDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  Add New Access Controller
+                </DialogTitle>
+                <DialogDescription>
+                  Configure a new access control system
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="controller-name">Controller Name *</Label>
+                  <Input
+                    id="controller-name"
+                    placeholder="e.g., Lobby Access Controller"
+                    value={controllerForm.name}
+                    onChange={(e) => setControllerForm({ ...controllerForm, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="controller-ip">IP Address *</Label>
+                  <Input
+                    id="controller-ip"
+                    placeholder="e.g., 192.168.1.100"
+                    value={controllerForm.ipAddress}
+                    onChange={(e) => setControllerForm({ ...controllerForm, ipAddress: e.target.value })}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDeviceDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleDeviceSubmit}
+                  disabled={!controllerForm.name.trim() || !controllerForm.ipAddress.trim()}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Controller
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Controller Dialog */}
+          <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  Edit Access Controller
+                </DialogTitle>
+                <DialogDescription>
+                  Modify controller information
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-controller-name">Controller Name *</Label>
+                  <Input
+                    id="edit-controller-name"
+                    placeholder="e.g., Lobby Access Controller"
+                    value={controllerForm.name}
+                    onChange={(e) => setControllerForm({ ...controllerForm, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-controller-ip">IP Address *</Label>
+                  <Input
+                    id="edit-controller-ip"
+                    placeholder="e.g., 192.168.1.100"
+                    value={controllerForm.ipAddress}
+                    onChange={(e) => setControllerForm({ ...controllerForm, ipAddress: e.target.value })}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={!controllerForm.name.trim() || !controllerForm.ipAddress.trim()}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Update Controller
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Controller Dialog */}
+          <AlertDialog>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Access Controller</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this controller? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Controller
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Activity Logs Dialog */}
+          <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
+            <DialogContent className="max-w-4xl max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Activity Logs - {selectedController?.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Recent access control activity and system events
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {isLogLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>{logSyncStatus}</span>
+                  </div>
+                ) : activityLogs.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {activityLogs.map((log, index) => (
+                      <div key={`${log.timestamp}-${index}`} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div className="mt-0.5">
+                          <History className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{log.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatTimestamp(log.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <History className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No activity logs found</p>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewLogs(selectedController!, true)}
+                    disabled={isLogLoading}
+                    className="flex-1"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLogLoading ? "animate-spin" : ""}`} />
+                    Force Sync
+                  </Button>
+
+                  {activityLogs.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteLogs(selectedController!.id)}
+                      className="flex-1"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Logs
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button onClick={() => setIsLogModalOpen(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Instructions Dialog */}
+          <Dialog open={isInstructionModalOpen} onOpenChange={setIsInstructionModalOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>How to Access Device UI</DialogTitle>
+                <DialogDescription>
+                  Instructions for accessing the device interface
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {selectedController && (
+                  <>
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Option 1: Connect via LAN</h4>
+                      <p className="text-sm text-muted-foreground">
+                        If the device is connected to your main network via Ethernet, open this address in your browser:
+                      </p>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <code className="text-sm font-mono">
+                          http://{selectedController.ipAddress}
+                        </code>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Option 2: Connect via Device Wi-Fi AP</h4>
+                      <p className="text-sm text-muted-foreground">
+                        You can also connect directly to the Wi-Fi hotspot created by the device:
+                      </p>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <code className="text-sm font-mono">http://10.10.0.1</code>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button onClick={() => setIsInstructionModalOpen(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
-
-      {/* ... (Semua Modal tidak berubah) ... */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title="Edit Access Controller"
-      >
-        <EditControllerForm
-          controller={selectedController}
-          onSave={handleSaveEdit}
-          onCancel={() => setIsEditModalOpen(false)}
-        />
-      </Modal>
-      <Modal
-        isOpen={isInstructionModalOpen}
-        onClose={() => setIsInstructionModalOpen(false)}
-        title="How to Access Device UI"
-      >
-        {selectedController && (
-          <div className="text-gray-700 space-y-4">
-            <p>
-              To access this device's web interface, your computer must be on
-              the same network as the controller.
-            </p>
-            <div>
-              <p className="font-semibold">Option 1: Connect via LAN</p>
-              <p className="text-sm">
-                If the device is connected to your main network via Ethernet,
-                open this address in your browser:
-              </p>
-              <div className="mt-2">
-                <a
-                  href={`http://${selectedController.ipAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 font-mono bg-indigo-50 p-2 rounded-md block text-center break-all"
-                >
-                  http://{selectedController.ipAddress}
-                </a>
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold">
-                Option 2: Connect via Device's Wi-Fi AP
-              </p>
-              <p className="text-sm">
-                You can also connect directly to the Wi-Fi hotspot created by
-                the device. After connecting, open this address in your browser:{" "}
-              </p>
-              <div className="mt-2">
-                <span className="text-indigo-600 font-mono bg-indigo-50 p-2 rounded-md block text-center">
-                  http://10.10.0.1
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-      <Modal
-        isOpen={isLogModalOpen}
-        onClose={() => setIsLogModalOpen(false)}
-        title={`Activity Log for "${selectedController?.name || ""}"`}
-      >
-        <div className="max-h-[60vh] flex flex-col">
-          <div className="flex-grow overflow-y-auto pr-2">
-            {isLogLoading ? (
-              <div className="text-center text-gray-500 py-8">
-                <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2" />
-                <p>{logSyncStatus}</p>
-              </div>
-            ) : activityLogs.length > 0 ? (
-              <ul className="space-y-3">
-                {activityLogs.map((log, index) => (
-                  <li
-                    key={`${log.timestamp}-${index}`}
-                    className="flex items-start space-x-3 p-2 rounded-md bg-gray-50"
-                  >
-                    <div className="flex-shrink-0 mt-1">
-                      <History size={16} className="text-gray-400" />
-                    </div>
-                    <div className="flex-grow">
-                      <p className="text-sm text-gray-800">{log.message}</p>
-                      <p className="text-xs text-gray-500">
-                        {formatTimestamp(log.timestamp)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-center text-gray-500 py-8">
-                No activity logs found.
-              </p>
-            )}
-          </div>
-          <div className="border-t pt-4 mt-4 flex justify-between items-center">
-            <button
-              onClick={() => handleViewLogs(selectedController!, true)}
-              disabled={isLogLoading}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 disabled:opacity-50"
-            >
-              <RefreshCw
-                size={14}
-                className={isLogLoading ? "animate-spin" : ""}
-              />
-              Force Sync
-            </button>
-            {activityLogs.length > 0 && !isLogLoading && (
-              <button
-                onClick={() => handleDeleteLogs(selectedController!.id)}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200"
-              >
-                <Trash2 size={14} />
-                Clear DB Logs
-              </button>
-            )}
-          </div>
-        </div>
-      </Modal>
-    </>
+    </TooltipProvider>
   );
-}
+};
+
+export default DevicesExternalContent;

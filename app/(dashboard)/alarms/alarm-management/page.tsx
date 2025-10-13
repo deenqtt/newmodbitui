@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Swal from "sweetalert2";
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext"; // <-- IMPORT MQTT
+import { useSortableTable } from "@/hooks/use-sort-table";
 
 // --- UI Components & Icons ---
 import { Button } from "@/components/ui/button";
@@ -602,7 +603,20 @@ function AlarmManagementPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAlarm, setSelectedAlarm] = useState<AlarmConfig | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Apply sorting using useSortableTable hook
+  const { sorted: sortedAlarms, sortKey, sortDirection, handleSort } = useSortableTable(alarms);
+
+  // Paginate sorted results
+  const totalPages = Math.ceil(sortedAlarms.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedAlarms = sortedAlarms.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage, sortKey, sortDirection]);
 
   const fetchAlarms = useCallback(async () => {
     setIsLoading(true);
@@ -660,38 +674,121 @@ function AlarmManagementPage() {
     });
   };
 
-  const paginatedAlarms = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return alarms.slice(startIndex, startIndex + itemsPerPage);
-  }, [alarms, currentPage]);
-
-  const totalPages = Math.ceil(alarms.length / itemsPerPage);
-
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Alarm Management
-          </h1>
-          <p className="text-muted-foreground">
-            Define, view, and manage all system alarm configurations.
-          </p>
-        </div>
-        <Button onClick={handleAdd} className="w-full sm:w-auto">
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Alarm
-        </Button>
-      </div>
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Alarm Management
+            </h1>
+            <p className="text-muted-foreground">
+              Define, view, and manage all system alarm configurations.
+            </p>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Alarm Configurations</CardTitle>
-          <CardDescription>
-            A list of all configured alarms in the system.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
+          <Button onClick={handleAdd}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add Alarm
+          </Button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <PlusCircle className="h-6 w-6 text-primary" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Total Alarms</p>
+                  <p className="text-2xl font-bold">{alarms.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Badge className="h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">C</Badge>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Critical</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {alarms.filter(a => a.alarmType === 'CRITICAL').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Badge className="h-6 w-6 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xs font-bold">M</Badge>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Major</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {alarms.filter(a => a.alarmType === 'MAJOR').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Badge className="h-6 w-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">m</Badge>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Minor</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {alarms.filter(a => a.alarmType === 'MINOR').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Input
+                placeholder="Search alarms by name..."
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="w-full md:w-48">
+            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Items per page" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 per page</SelectItem>
+                <SelectItem value="10">10 per page</SelectItem>
+                <SelectItem value="20">20 per page</SelectItem>
+                <SelectItem value="50">50 per page</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Table/List Toggle */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Showing {paginatedAlarms.length} of {sortedAlarms.length} alarms
+            </span>
+          </div>
+        </div>
+
+        {/* Devices Table */}
+        <Card>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -702,31 +799,33 @@ function AlarmManagementPage() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
+                  [...Array(5)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-5 w-32" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-48" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-24 rounded-full" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-24 rounded-full" />
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Skeleton className="h-8 w-8 inline-block" />
-                        <Skeleton className="h-8 w-8 inline-block" />
-                      </TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-32"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-48"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
+                      <TableCell><div className="h-4 bg-muted rounded animate-pulse w-20"></div></TableCell>
+                      <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-8 ml-auto"></div></TableCell>
                     </TableRow>
                   ))
-                ) : paginatedAlarms.length > 0 ? (
+                ) : paginatedAlarms.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="flex flex-col items-center">
+                        <PlusCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">No Alarms Found</h3>
+                        <p className="text-muted-foreground">
+                          Get started by adding your first alarm configuration
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
                   paginatedAlarms.map((alarm) => (
-                    <TableRow key={alarm.id}>
+                    <TableRow key={alarm.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
                         {alarm.device?.name || "N/A"}
                       </TableCell>
@@ -765,48 +864,49 @@ function AlarmManagementPage() {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      No alarms configured yet.
-                    </TableCell>
-                  </TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages || 1}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" /> Next
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
+          </CardContent>
 
-      <AlarmDialog
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSave={fetchAlarms}
-        initialData={selectedAlarm}
-      />
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between p-4">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <AlarmDialog
+          isOpen={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          onSave={fetchAlarms}
+          initialData={selectedAlarm}
+        />
+      </div>
     </div>
   );
 }
