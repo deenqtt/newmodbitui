@@ -45,7 +45,6 @@ export function LoadingPage({
         className="flex items-center justify-center gap-3 py-6"
       >
         <motion.div
-          animate={{ rotate: 360 }}
           transition={{
             duration: 1.5,
             repeat: Infinity,
@@ -68,7 +67,6 @@ export function LoadingPage({
         className="flex items-center justify-center p-8"
       >
         <motion.div
-          animate={{ rotate: 360 }}
           transition={{
             duration: 1,
             repeat: Infinity,
@@ -198,7 +196,6 @@ export function LoadingPage({
             transition={{ type: "spring", stiffness: 300 }}
           >
             <motion.div
-              animate={{ rotate: 360 }}
               transition={{
                 duration: 2.5,
                 repeat: Infinity,

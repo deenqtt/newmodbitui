@@ -1,9 +1,9 @@
 // File: components/notification-bell.tsx
 // Deskripsi: Komponen React untuk menampilkan ikon lonceng dan daftar notifikasi.
+// DISABLED: Polling dihentikan sementara untuk menghindari ERR_TOO_MANY_REDIRECTS
 "use client";
 
 import { useState, useEffect } from "react";
-// --- TAMBAHKAN IMPORT 'Trash2' ---
 import { Bell, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/contexts/AuthContext";
 
-// Definisikan tipe data untuk notifikasi agar sesuai dengan data dari API
+// DISABLED: Polling notification sementara untuk menghindari error console
+ // const { isAuthenticated, isLoading } = useAuth();
+
 interface Notification {
   id: string;
   message: string;
@@ -28,25 +31,27 @@ interface Notification {
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { isAuthenticated, isLoading } = useAuth();
 
   // Fungsi untuk mengambil notifikasi dari API
   const fetchNotifications = async () => {
+    // Don't fetch if not authenticated or still loading
+    if (!isAuthenticated || isLoading) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     try {
       const response = await axios.get<Notification[]>("/api/notifications");
       setNotifications(response.data);
       const newUnreadCount = response.data.filter((n) => !n.isRead).length;
       setUnreadCount(newUnreadCount);
     } catch (error) {
-      // Only log error if it's not a redirect/too many redirects error
-      if (error instanceof AxiosError) {
-        if (error.code !== 'ERR_TOO_MANY_REDIRECTS' && error.code !== 'ERR_NETWORK') {
-          console.error("Failed to fetch notifications:", error);
-        }
-      } else {
-        // Handle non-AxiosError cases (rare but defensive)
-        // Silenced as per request
-      }
-      // Don't print/log ERR_TOO_MANY_REDIRECTS errors as requested
+      // Reset on any error (like 401, redirects, etc.)
+      setNotifications([]);
+      setUnreadCount(0);
+      // No console logging as requested
     }
   };
 
@@ -58,31 +63,30 @@ export function NotificationBell() {
       setUnreadCount(0);
       setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
     } catch (error) {
-      // Silenced as per request
+      // Silenced
     }
   };
 
-  // --- FUNGSI BARU ---
   // Fungsi untuk menghapus semua notifikasi secara permanen
   const clearAllNotifications = async () => {
     if (notifications.length === 0) return;
     try {
-      // Kirim request DELETE ke API
       await axios.delete("/api/notifications");
-      // Perbarui tampilan secara langsung dengan mengosongkan daftar
       setNotifications([]);
       setUnreadCount(0);
     } catch (error) {
-      // Silenced as per request
+      // Silenced
     }
   };
 
-  // Ambil notifikasi saat komponen pertama kali dimuat, dan atur polling
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // DISABLED: Ambil notifikasi saat komponen pertama kali dimuat, dan atur polling
+  // NOTE: Polling disabled sementara untuk menghindari ERR_TOO_MANY_REDIRECTS di console
+  // Uncomment jika notification system sudah diperbaiki
+  // useEffect(() => {
+  //   fetchNotifications();
+  //   const interval = setInterval(fetchNotifications, 10000);
+  //   return () => clearInterval(interval);
+  // }, [isAuthenticated, isLoading]);
 
   return (
     <DropdownMenu

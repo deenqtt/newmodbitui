@@ -1,6 +1,7 @@
+// prisma/schema.prisma - SQLite version
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"] // untuk RPi
 }
 
 datasource db {
@@ -12,7 +13,8 @@ model User {
   id                   String            @id @default(cuid())
   email                String            @unique
   password             String
-  roleId               String?           // Nullable untuk backward compatibility
+  roleId               String
+  role_data            Role              @relation(fields: [roleId], references: [id])
   fingerprintId        String?           @unique
   cardUid              String?           @unique
   createdAt            DateTime          @default(now())
@@ -21,31 +23,83 @@ model User {
   dashboards           DashboardLayout[]
   assignedMaintenances Maintenance[]     @relation("AssignedToUser")
   notifications        Notification[]
-  role                 Role?             @relation(fields: [roleId], references: [id])
 }
 
 model Role {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  description String?
-  isSystem    Boolean     @default(false) // Untuk prevent deletion system roles
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  users       User[]
-  permissions RolePermission[]
-  menus       RoleMenuPermission[]
+  id              String               @id @default(cuid())
+  name            String               @unique
+  description     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  users           User[]
+  rolePermissions RolePermission[]     @relation("RolePermissions")
+  permissions     Permission[]         @relation("RolePermissions")
+  menuPermissions RoleMenuPermission[]
+
+  @@map("roles")
 }
 
 model Permission {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  description String?
-  resource    String      // e.g., 'menu', 'user', 'device'
-  action      String      // e.g., 'create', 'read', 'update', 'delete'
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  roles       RolePermission[]
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  resource        String
+  action          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rolePermissions RolePermission[] @relation("RolePermissions")
+  roles           Role[]           @relation("RolePermissions")
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model MenuGroup {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  label       String
+  icon        String?
+  order       Int
+  isDeveloper Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  items       MenuItem[]
+
+  @@map("menu_groups")
+}
+
+model MenuItem {
+  id          String               @id @default(cuid())
+  menuGroupId String
+  name        String               @unique
+  label       String
+  path        String
+  icon        String?
+  order       Int
+  isDeveloper Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  menuGroup   MenuGroup            @relation(fields: [menuGroupId], references: [id])
+  permissions RoleMenuPermission[]
+
+  @@map("menu_items")
+}
+
+model RoleMenuPermission {
+  id         String   @id @default(cuid())
+  roleId     String
+  menuItemId String
+  canView    Boolean  @default(true)
+  canCreate  Boolean  @default(false)
+  canUpdate  Boolean  @default(false)
+  canDelete  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  role       Role     @relation(fields: [roleId], references: [id])
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@unique([roleId, menuItemId])
+  @@map("role_menu_permissions")
 }
 
 model RolePermission {
@@ -54,71 +108,11 @@ model RolePermission {
   permissionId String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation("RolePermissions", fields: [roleId], references: [id])
+  permission   Permission @relation("RolePermissions", fields: [permissionId], references: [id])
 
   @@unique([roleId, permissionId])
-}
-
-model MenuGroup {
-  id          String     @id @default(cuid())
-  name        String     @unique
-  label       String
-  icon        String?    // Icon name
-  order       Int        @default(0)
-  isActive    Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  menuItems   MenuItem[]
-}
-
-model MenuItem {
-  id           String             @id @default(cuid())
-  menuGroupId  String
-  name         String             @unique
-  label        String
-  path         String
-  icon         String?
-  component    String?            // Component name for lazy loading
-  order        Int                @default(0)
-  isActive     Boolean            @default(true)
-  isDeveloper  Boolean            @default(false) // Advanced features flag
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  menuGroup    MenuGroup          @relation(fields: [menuGroupId], references: [id], onDelete: Cascade)
-  permissions  RoleMenuPermission[]
-}
-
-model RoleMenuPermission {
-  id          String   @id @default(cuid())
-  roleId      String
-  menuItemId  String
-  canView     Boolean  @default(true)
-  canCreate   Boolean  @default(false)
-  canUpdate   Boolean  @default(false)
-  canDelete   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-
-  @@unique([roleId, menuItemId])
-}
-
-// Tambah ke schema.prisma
-model ZigbeeDevice {
-  id           String    @id @default(cuid())
-  deviceId     String    @unique // 0x00158d0004851829
-  friendlyName String
-  deviceType   String // sensor, switch, bulb, etc
-  manufacturer String?
-  modelId      String?
-  capabilities Json // attributes yang supported
-  lastSeen     DateTime?
-  isOnline     Boolean   @default(false)
-  currentState Json? // current device state
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  @@map("role_permissions")
 }
 
 model Maintenance {
@@ -151,74 +145,17 @@ model DeviceExternal {
   address                     String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime                    @updatedAt
-  lastPayload                 String?
+  lastPayload                 Json?
   lastUpdatedByMqtt           DateTime?
   alarmConfigs                AlarmConfiguration[]
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
   sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
   loggingConfigs              LoggingConfiguration[]
-  layout2DDataPoints          Layout2DDataPoint[]
-  layout2DFlowIndicators      Layout2DFlowIndicator[]
-  maintenanceTasks            Maintenance[] // Ubah dari required ke optional
+  maintenanceTasks            Maintenance[]
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
- 
-  // NEW: Thermal data relation
-  thermalData                 ThermalData[]
 }
 
-// Schema Update - Remove rawData field
-model ThermalData {
-  id        Int      @id @default(autoincrement())
-  deviceId  String
-  timestamp DateTime @default(now())
-  minTemp   Float?
-  maxTemp   Float?
-  avgTemp   Float?
-  // rawData   String?  // REMOVED - tidak perlu disimpan
-  frameCount Int?     // Optional: untuk tracking frame number
-
-  device    DeviceExternal @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-
-  @@index([deviceId, timestamp])
-}
-
-model Rack {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  capacityU Int        @default(42) // Typical rack size
-  location  String?    // Data center room/location
-  notes     String?    // Additional notes
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  devices DeviceInternal[]
-}
-
-model DeviceInternal {
-  id            String            @id @default(cuid())
-  name          String
-  deviceType    String            // Server, Sensor, Switch, Router, NAS, etc
-  manufacturer  String?
-  modelId       String?
-  firmware      String?
-  rackId        String?
-  positionU     Int?              // U position in rack (1-42 for 42U rack)
-  sizeU         Int               @default(1)  // How many U spaces it occupies
-  powerWatt     Int?              // Power consumption
-  notes         String?
-  status        String            @default("offline") // online, offline, maintenance
-  ipAddress     String?
-  lastSeen      DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-
-  // Relations
-  rack          Rack?             @relation(fields: [rackId], references: [id], onDelete: SetNull)
-
-  // Ensure unique position per rack
-  @@unique([rackId, positionU])
-}
 model LoggingConfiguration {
   id           String         @id @default(cuid())
   customName   String
@@ -272,8 +209,8 @@ model PueConfiguration {
   customName     String          @unique
   type           String          @default("pue")
   apiTopicUniqId String?         @unique
-  pduList        String?
-  mainPower      String?
+  pduList        Json?
+  mainPower      Json?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   apiTopic       DeviceExternal? @relation("PueApiTopic", fields: [apiTopicUniqId], references: [uniqId])
@@ -285,11 +222,17 @@ model PowerAnalyzerConfiguration {
   apiTopicUniqId String?         @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  mainPower      String?
-  pduList        String?
+  mainPower      Json?
+  pduList        Json?
   apiTopic       DeviceExternal? @relation("PowerAnalyzerApiTopic", fields: [apiTopicUniqId], references: [uniqId])
 }
 
+model MenuConfiguration {
+  id        String   @id @default(cuid())
+  structure Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
 model AlarmConfiguration {
   id           String                  @id @default(cuid())
@@ -354,7 +297,7 @@ model ZkTecoUser {
   name           String
   password       String?
   card           String?
-  fingerprints   String?
+  fingerprints   Json?
   zkTecoDeviceId String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -383,7 +326,7 @@ model Cctv {
 model DashboardLayout {
   id        String   @id @default(cuid())
   name      String
-  layout    String
+  layout    Json
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -398,7 +341,7 @@ model EnergyTarget {
   id              String   @id @default(cuid())
   loggingConfigId String   @unique
   year            Int
-  monthlyTargets  String
+  monthlyTargets  Json
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -449,13 +392,13 @@ model DeviceData {
   id        String     @id @default(cuid())
   timestamp DateTime   @default(now())
   deviceId  String
-  data      String
+  data      Json
   device    LoraDevice @relation(fields: [deviceId], references: [id])
 }
 
 model LoraGateway {
   id          String         @id @default(cuid())
-  gatewayId   String         @unique
+  gatewayId   String         @unique // Gateway ID dari topic MQTT
   name        String
   description String?
   lastSeen    DateTime?
@@ -470,6 +413,7 @@ model GatewayStats {
   gatewayId String
   timestamp DateTime
 
+  // Upstream Statistics
   rfPacketsReceived     Int   @default(0)
   rfPacketsOk           Int   @default(0)
   rfPacketsBad          Int   @default(0)
@@ -483,6 +427,7 @@ model GatewayStats {
   crcFailRatio          Float @default(0)
   noCrcRatio            Float @default(0)
 
+  // Downstream Statistics
   pullDataSent                Int   @default(0)
   pullAckReceived             Int   @default(0)
   downstreamDatagramsReceived Int   @default(0)
@@ -492,9 +437,11 @@ model GatewayStats {
   txErrors                    Int   @default(0)
   downstreamAckRatio          Float @default(0)
 
+  // SX1302 Status
   counterInst String @default("0")
   counterPps  String @default("0")
 
+  // Beacon Status
   beaconQueued   Int @default(0)
   beaconSent     Int @default(0)
   beaconRejected Int @default(0)
@@ -503,93 +450,155 @@ model GatewayStats {
   gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
 }
 
-model Layout2D {
-  id             String                  @id @default(cuid())
-  name           String                  @unique
-  isUse          Boolean                 @default(false)
-  image          String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  dataPoints     Layout2DDataPoint[]
-  flowIndicators Layout2DFlowIndicator[]
-}
+model EC25Modem {
+  id           String  @id @default(cuid())
+  imei         String  @unique
+  manufacturer String?
+  model        String?
+  revision     String?
 
-model Layout2DDataPoint {
-  id            String   @id @default(cuid())
-  layoutId      String
-  deviceUniqId  String
-  // Legacy single-key format (for backward compatibility)
-  selectedKey   String?
-  // New multi-key format
-  selectedKeys  String? // JSON string containing array of KeyConfig
-  units         String?
-  multiply      Float?   @default(1)
-  customName    String
-  positionX     Float
-  positionY     Float
-  fontSize      Int?     @default(14)
-  color         String?  @default("#000000")
-  iconName      String?
-  iconColor     String?  @default("#666666")
-  showIcon      Boolean? @default(false)
-  displayLayout String?  @default("vertical") // "vertical", "horizontal", "grid"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // Connection status
+  connected Boolean  @default(false)
+  lastSeen  DateTime @default(now())
 
-  layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
-  device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+  // Current network status (latest data, bukan log)
+  currentOperator           String?
+  currentRegistrationStatus String?
+  currentNetworkType        String?
+  currentSignalStrength     Int?
+  currentSignalQuality      Int?
 
-  // Update unique constraint to allow multiple keys per device
-  @@unique([layoutId, deviceUniqId, customName])
-}
+  // Detailed signal info
+  currentRsrp   Float?
+  currentRsrq   Float?
+  currentSinr   Float?
+  currentCellId String?
 
-model Layout2DFlowIndicator {
-  id             String @id @default(cuid())
-  layoutId       String
-  deviceUniqId   String
-  selectedKey    String
-  customName     String
-  positionX      Float
-  positionY      Float
-  arrowDirection String @default("right") // "right", "left", "up", "down"
+  // Current GPS position (latest data, bukan log)
+  currentLatitude     Float?
+  currentLongitude    Float?
+  currentAltitude     Float?
+  currentSpeed        Float?
+  currentSatellites   Int?
+  currentGpsFixStatus String?
 
-  // Logic conditions (Legacy - kept for backward compatibility)
-  logicOperator String // ">", "<", ">=", "<=", "==", "!="
-  compareValue  String // Value to compare (supports number, string, boolean)
-  valueType     String @default("number") // "number", "string", "boolean"
+  // Configuration
+  configApn      String?
+  configUsername String?
+  configPin      String?
 
-  // Visual states based on condition result (Legacy)
-  // When condition is TRUE
-  trueColor     String  @default("#22c55e") // green
-  trueAnimation Boolean @default(true)
-
-  // When condition is FALSE
-  falseColor     String  @default("#ef4444") // red
-  falseAnimation Boolean @default(false)
-
-  // Warning state (optional for range conditions) (Legacy)
-  warningColor     String  @default("#f59e0b") // orange
-  warningAnimation Boolean @default(true)
-  warningEnabled   Boolean @default(false)
-  warningOperator  String? // Secondary condition for warning
-  warningValue     String?
-
-  // NEW: Flexible Multi-Logic Configuration (JSON format)
-  // This allows unlimited conditions and states
-  multiLogicConfig String? // JSON: { conditions: [...], states: [...], defaultState: "..." }
-  useMultiLogic    Boolean @default(false) // Switch between legacy and new system
+  // Relations to historical data
+  networkHistory EC25NetworkData[]
+  gpsHistory     EC25GpsData[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
-  device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
-
-  @@unique([layoutId, deviceUniqId, selectedKey, positionX, positionY])
+  @@map("ec25_modems")
 }
 
+// Historical network data - hanya disimpan saat ada perubahan signifikan
+model EC25NetworkData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
 
+  operator           String?
+  registrationStatus String?
+  networkType        String?
+  signalStrength     Int?
+  signalQuality      Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@map("ec25_network_data")
+}
+
+// Historical GPS data - hanya disimpan saat ada perubahan lokasi signifikan
+model EC25GpsData {
+  id      String    @id @default(cuid())
+  modemId String
+  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
+
+  fixStatus  String?
+  latitude   Float?
+  longitude  Float?
+  altitude   Float?
+  speed      Float?
+  satellites Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([modemId, createdAt])
+  @@index([latitude, longitude])
+  @@map("ec25_gps_data")
+}
+
+// Service health monitoring
+model EC25ServiceHealth {
+  id            String    @id @default(cuid())
+  serviceId     String    @unique
+  status        String
+  lastSeen      DateTime
+  lastHeartbeat DateTime?
+  uptime        Float?
+  memoryUsage   String? // JSON string
+  data          String? // JSON string for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ec25_service_health")
+}
+
+// Service status logs - untuk audit trail
+model EC25ServiceLog {
+  id        String  @id @default(cuid())
+  serviceId String
+  status    String
+  uptime    Float?
+  data      String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceId, createdAt])
+  @@map("ec25_service_logs")
+}
+
+// Alerts dari modem service
+model EC25Alert {
+  id             String    @id @default(cuid())
+  type           String
+  message        String
+  severity       String // info, warning, error, critical
+  requiresAction Boolean   @default(false)
+  details        String? // JSON string
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resolved, createdAt])
+  @@index([severity, createdAt])
+  @@map("ec25_alerts")
+}
+
+// Command logs - untuk audit trail commands
+model EC25CommandLog {
+  id      String  @id @default(cuid())
+  command String
+  status  String
+  message String?
+  data    String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@index([command, createdAt])
+  @@map("ec25_command_logs")
+}
 
 enum AlarmType {
   CRITICAL

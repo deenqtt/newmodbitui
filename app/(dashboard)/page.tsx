@@ -2,11 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LayoutGrid, AlertCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -27,9 +29,6 @@ interface WidgetLayout {
   config: any;
 }
 
-// Remove duplicate interface definition since we import it now
-// interface WidgetLayout { ... }
-
 interface DashboardData {
   id: string;
   name: string;
@@ -45,7 +44,6 @@ const parseLayoutSafely = (layoutData: any): WidgetLayout[] => {
       const parsed = JSON.parse(layoutData);
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      console.error("Failed to parse layout string:", e);
       return [];
     }
   }
@@ -58,18 +56,42 @@ const parseLayoutSafely = (layoutData: any): WidgetLayout[] => {
 };
 
 export default function MainDashboardPage() {
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noDashboardsFound, setNoDashboardsFound] = useState(false);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    // Debounce dashboard fetch to prevent rapid re-renders
+    // 🔧 FIXED: Improved auth state propagation delay handling
+    if (authLoading) {
+      // If auth is loading, wait for it to complete
+      return;
+    }
+
+    if (!isAuthenticated) {
+      // Add debounce to handle authentication state propagation
+      const authCheckTimer = setTimeout(() => {
+        // Double check if still not authenticated after delay
+        if (!isAuthenticated) {
+          setIsLoading(false);
+          setNoDashboardsFound(false);
+          setError(null);
+          setDashboardData(null);
+          router.push('/login'); // Force redirect if auth fails
+        }
+      }, 300); // Reduced to 300ms for faster recovery
+
+      return () => clearTimeout(authCheckTimer);
+    }
+
+    // Auth is confirmed, load dashboard immediately
     const timeoutId = setTimeout(async () => {
       await fetchActiveDashboard();
-    }, 100); // Small delay to allow state propagation
+    }, 100);
 
     async function fetchActiveDashboard() {
       setIsLoading(true);
@@ -77,17 +99,13 @@ export default function MainDashboardPage() {
       setNoDashboardsFound(false);
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
         const response = await fetch(`${API_BASE_URL}/api/dashboards/active`, {
-          signal: controller.signal,
+          method: 'GET',
           headers: {
-            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json',
           },
+          credentials: 'include',
         });
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -108,20 +126,21 @@ export default function MainDashboardPage() {
           setDashboardData(processedData);
         }
       } catch (err: any) {
+        // Handle errors silently to prevent console spam
         if (err.name === 'AbortError') {
-          console.error('Dashboard fetch aborted due to timeout');
           setError('Dashboard loading timeout. Please try again.');
         } else {
-          console.error('Dashboard fetch error:', err);
           setError(err.message || 'Failed to load dashboard');
         }
+        setDashboardData(null);
+        setNoDashboardsFound(false);
       } finally {
         setIsLoading(false);
       }
     }
 
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [isAuthenticated, authLoading]); // ✅ Now depends on authentication state
 
   if (isLoading) {
     return (

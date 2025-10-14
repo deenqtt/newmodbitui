@@ -125,7 +125,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider defaultOpen={!isLayout2DPage}>
       <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900/50">
-        <NavigationSidebar />
+        <NavigationSidebar collapsible={true} />
         <div className="flex flex-col flex-1 min-h-0">
           <MainHeader />
           <div className="flex-1 min-h-0">

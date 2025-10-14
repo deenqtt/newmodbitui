@@ -5,36 +5,46 @@ import { getServerSession } from "@/lib/auth";
 const prisma = new PrismaClient();
 
 // GET /api/menu-groups - Get all menu groups
+// GET /api/menu-groups - Get all menu groups
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Menu Groups API] Getting session...');
     const session = await getServerSession(request);
+    console.log('[Menu Groups API] Session:', session);
 
     if (!session) {
+      console.log('[Menu Groups API] No session, returning 401');
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const menuGroups = await prisma.menuGroup.findMany({
-      include: {
-        menuItems: {
-          where: { isActive: true },
-          orderBy: { order: "asc" },
-        },
-        _count: {
-          select: {
-            menuItems: true,
+    console.log('[Menu Groups API] Fetching menu groups...');
+    try {
+      const menuGroups = await prisma.menuGroup.findMany({
+        include: {
+          items: true,
+          _count: {
+            select: {
+              items: true,
+            },
           },
         },
-      },
-      orderBy: { order: "asc" },
-    });
+        orderBy: { order: "asc" },
+      });
+      console.log('[Menu Groups API] Found menu groups:', menuGroups.length);
 
-    return NextResponse.json({
-      success: true,
-      data: menuGroups,
-    });
+      return NextResponse.json({
+        success: true,
+        data: menuGroups,
+      });
+    } catch (dbError: any) {
+      console.error('[Menu Groups API] DB Error:', dbError.message);
+      console.error('[Menu Groups API] DB Error Code:', dbError.code);
+      console.error('[Menu Groups API] DB Error Details:', dbError);
+      throw dbError;
+    }
 
   } catch (error) {
     console.error("Error fetching menu groups:", error);

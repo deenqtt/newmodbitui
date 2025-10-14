@@ -54,7 +54,9 @@ export function PermissionManagement() {
 
   const fetchRoles = async () => {
     try {
-      const response = await fetch("/api/roles");
+      const response = await fetch("/api/roles", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -67,7 +69,9 @@ export function PermissionManagement() {
 
   const fetchMenuItems = async () => {
     try {
-      const response = await fetch("/api/menu-items");
+      const response = await fetch("/api/menu-items", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -80,7 +84,9 @@ export function PermissionManagement() {
 
   const fetchRolePermissions = async () => {
     try {
-      const response = await fetch("/api/role-menu-permissions");
+      const response = await fetch("/api/role-menu-permissions", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -114,6 +120,7 @@ export function PermissionManagement() {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: 'include',
           body: JSON.stringify({
             [permissionType]: checked,
           }),
@@ -142,6 +149,7 @@ export function PermissionManagement() {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: 'include',
           body: JSON.stringify({
             roleId,
             menuItemId,

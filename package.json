@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "seed:users": "node scripts/seed-users.js",
+    "seed:menu": "node scripts/seed-menu.js",
+    "seed:init": "node scripts/seed-init.js",
     "seed:devices": "node scripts/seed-devices.js",
-    "db:seed": "npm run seed:users && npm run seed:devices"
+    "db:seed": "npm run seed:init"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -44,6 +46,7 @@
     "@supabase/supabase-js": "^2.52.0",
     "@tanstack/react-table": "^8.21.3",
     "axios": "^1.11.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -67,6 +70,7 @@
     "next-themes": "^0.4.6",
     "nipplejs": "^0.10.2",
     "node-cron": "^4.2.1",
+    "node-fetch": "^2.7.0",
     "node-rtsp-stream": "^0.0.9",
     "paho-mqtt": "^1.1.0",
     "postgres": "^3.4.7",

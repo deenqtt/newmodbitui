@@ -40,7 +40,9 @@ export function RoleManagement() {
 
   const fetchRoles = async () => {
     try {
-      const response = await fetch("/api/roles");
+      const response = await fetch("/api/roles", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -85,6 +87,7 @@ export function RoleManagement() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -142,6 +145,7 @@ export function RoleManagement() {
     try {
       const response = await fetch(`/api/roles/${role.id}`, {
         method: "DELETE",
+        credentials: 'include',
       });
 
       const result = await response.json();
@@ -175,6 +179,7 @@ export function RoleManagement() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: role.name,
           description: role.description,

@@ -11,7 +11,8 @@ interface WidgetLayout {
   config: any;
 }
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
-
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 

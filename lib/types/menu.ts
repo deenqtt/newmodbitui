@@ -34,8 +34,10 @@ export interface MenuGroupWithItems {
   label: string;
   icon?: string;
   order: number;
-  isActive: boolean;
+  isActive?: boolean;
+  isDeveloper?: boolean;
   menuItems: MenuItemWithPermissions[];
+  items?: MenuItemWithPermissions[]; // Added for compatibility with Prisma schema
   createdAt: Date;
   updatedAt: Date;
 }

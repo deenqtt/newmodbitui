@@ -184,13 +184,13 @@ function UserManagementContent() {
 
   useEffect(() => {
     if (!isAuthLoading) {
-      if (isAuthenticated && user?.role?.name === "ADMIN") {
+      if (isAuthenticated) {
         fetchUsers();
       } else {
         setIsLoading(false);
       }
     }
-  }, [isAuthenticated, user, isAuthLoading, fetchUsers]);
+  }, [isAuthenticated, isAuthLoading, fetchUsers]);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery) {
@@ -352,25 +352,7 @@ function UserManagementContent() {
     );
   }
 
-    if (!user || !user.role || user.role.name !== "ADMIN") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="container mx-auto p-4 md:p-8">
-          <div className="flex flex-col items-center justify-center h-96 space-y-4">
-            <div className="p-4 bg-red-100 dark:bg-red-900/20 rounded-full">
-              <Shield className="h-12 w-12 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="text-center space-y-2">
-              <h1 className="text-2xl font-bold">Access Denied</h1>
-              <p className="text-muted-foreground">
-                You do not have permission to view this page.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Removed admin-only access protection
 
   return (
     <TooltipProvider>

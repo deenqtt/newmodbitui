@@ -285,10 +285,8 @@ export function PueTab() {
   const formTopicSubscriptionRef = useRef<Map<string, string>>(new Map());
 
   const getAuthHeaders = useCallback(() => {
-    const authToken = localStorage.getItem("authToken");
     return {
       "Content-Type": "application/json",
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     };
   }, []);
 

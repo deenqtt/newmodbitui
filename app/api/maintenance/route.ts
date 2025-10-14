@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  // Removed admin-only role protection - all authenticated users can view maintenance schedules
+
   try {
     const maintenances = await prisma.maintenance.findMany({
       include: {
@@ -48,9 +50,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+
+  // Removed admin-only role protection - all authenticated users can create maintenance schedules
 
   try {
     const body = await request.json();
@@ -193,9 +197,11 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+
+  // Removed admin-only role protection - all authenticated users can update maintenance schedules
 
   try {
     const body = await request.json();
@@ -290,9 +296,11 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+
+  // Removed admin-only role protection - all authenticated users can delete maintenance schedules
 
   try {
     const { searchParams } = new URL(request.url);

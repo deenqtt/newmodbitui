@@ -1,7 +1,3 @@
-// ========================================================
-
-// File BARU: app/api/auth/logout/route.ts
-// BUAT FILE BARU INI DAN ISI DENGAN KODE DI BAWAH:
 import { serialize } from "cookie";
 import { NextResponse } from "next/server";
 
@@ -15,7 +11,10 @@ export async function POST() {
     path: "/",
   });
 
-  return new Response(JSON.stringify({ message: "Logout successful" }), {
+  return new Response(JSON.stringify({
+    message: "Logout successful",
+    success: true
+  }), {
     status: 200,
     headers: { "Set-Cookie": serializedCookie },
   });

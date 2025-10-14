@@ -5,7 +5,7 @@ import { jwtVerify } from "jose";
 
 interface AuthPayload {
   userId: string;
-  roleId: string;
+  role: string;
   email: string;
   iat: number;
   exp: number;
@@ -50,5 +50,5 @@ export async function getAuthFromCookie(
 // Fungsi untuk server-side session
 export async function getServerSession(request?: NextRequest) {
   const auth = await getAuthFromCookie(request as Request);
-  return auth ? { userId: auth.userId, roleId: auth.roleId, email: auth.email } : null;
+  return auth ? { userId: auth.userId, role: auth.role, email: auth.email } : null;
 }

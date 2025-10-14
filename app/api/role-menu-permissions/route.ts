@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "@/lib/auth";
+import { getAuthFromCookie } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 // GET /api/role-menu-permissions - Get all role menu permissions
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(request);
+    const auth = await getAuthFromCookie(request);
 
-    if (!session) {
+    if (!auth) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
@@ -49,9 +49,9 @@ export async function GET(request: NextRequest) {
 // POST /api/role-menu-permissions - Create role menu permission
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(request);
+    const auth = await getAuthFromCookie(request);
 
-    if (!session) {
+    if (!auth) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }

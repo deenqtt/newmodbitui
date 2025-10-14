@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Eye, EyeOff, Menu } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import IconSelector from "@/components/layout2d/IconSelector";
+import { getIconWithFallback } from "@/lib/icon-library";
 
 interface MenuItem {
   id: string;
@@ -61,7 +63,9 @@ export function MenuItemManagement() {
 
   const fetchMenuItems = async () => {
     try {
-      const response = await fetch("/api/menu-items");
+      const response = await fetch("/api/menu-items", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -86,7 +90,9 @@ export function MenuItemManagement() {
 
   const fetchMenuGroups = async () => {
     try {
-      const response = await fetch("/api/menu-groups");
+      const response = await fetch("/api/menu-groups", {
+        credentials: 'include'
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -131,6 +137,7 @@ export function MenuItemManagement() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -196,6 +203,7 @@ export function MenuItemManagement() {
     try {
       const response = await fetch(`/api/menu-items/${item.id}`, {
         method: "DELETE",
+        credentials: 'include',
       });
 
       const result = await response.json();
@@ -266,6 +274,54 @@ export function MenuItemManagement() {
     }
   };
 
+  const handleToggleActiveDirect = async (itemId: string, checked: boolean) => {
+    try {
+      const item = menuItems.find(i => i.id === itemId);
+      if (!item) return;
+
+      const response = await fetch(`/api/menu-items/${itemId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          menuGroupId: item.menuGroupId,
+          name: item.name,
+          label: item.label,
+          path: item.path,
+          icon: item.icon,
+          component: item.component,
+          order: item.order,
+          isActive: checked,
+          isDeveloper: item.isDeveloper,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Menu item ${checked ? "activated" : "deactivated"}`,
+        });
+        fetchMenuItems();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update menu item status",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -314,14 +370,31 @@ export function MenuItemManagement() {
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Menu Item Name</Label>
+                  <Input
+                    value={formData.label}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      name: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+                      label: e.target.value
+                    })}
+                    placeholder="e.g., Dashboard Overview"
+                    required
+                  />
+                  {formData.name && (
+                    <p className="text-xs text-muted-foreground">
+                      Path name: <code>{formData.name}</code>
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="menuGroupId" className="text-right">
-                      Menu Group
-                    </Label>
+                    <Label>Menu Group</Label>
                     <Select value={formData.menuGroupId} onValueChange={(value) => setFormData({ ...formData, menuGroupId: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select menu group" />
+                        <SelectValue placeholder="Select group" />
                       </SelectTrigger>
                       <SelectContent>
                         {menuGroups.map((group) => (
@@ -332,67 +405,31 @@ export function MenuItemManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Order</Label>
+                    <Input
+                      type="number"
+                      value={formData.order}
+                      onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
+                    <Label>Path/URL</Label>
                     <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="unique-name"
-                      required
+                      value={formData.path}
+                      onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                      placeholder="/dashboard"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="label">Label</Label>
-                    <Input
-                      id="label"
-                      value={formData.label}
-                      onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                      placeholder="Display Label"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="path">Path</Label>
-                  <Input
-                    id="path"
-                    value={formData.path}
-                    onChange={(e) => setFormData({ ...formData, path: e.target.value })}
-                    placeholder="/dashboard/overview"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="icon">Icon</Label>
-                    <Input
-                      id="icon"
+                    <Label>Icon</Label>
+                    <IconSelector
                       value={formData.icon}
-                      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                      placeholder="BarChart3"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="component">Component</Label>
-                    <Input
-                      id="component"
-                      value={formData.component}
-                      onChange={(e) => setFormData({ ...formData, component: e.target.value })}
-                      placeholder="Dashboard"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="order">Order</Label>
-                    <Input
-                      id="order"
-                      type="number"
-                      value={formData.order}
-                      onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                      onChange={(iconName: string) => setFormData({ ...formData, icon: iconName })}
+                      placeholder="Select icon"
                     />
                   </div>
                 </div>
@@ -436,6 +473,7 @@ export function MenuItemManagement() {
               <TableHead>Group</TableHead>
               <TableHead>Order</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Permissions</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -443,18 +481,38 @@ export function MenuItemManagement() {
             {menuItems.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell>{item.label}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {getIconWithFallback(item.icon || 'Menu')}
+                    <span>{item.label}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono text-sm">{item.path || "-"}</TableCell>
                 <TableCell>{item.menuGroup.label}</TableCell>
                 <TableCell>{item.order}</TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={item.isActive}
+                      onCheckedChange={(checked) => handleToggleActiveDirect(item.id, checked)}
+                    />
                     <Badge variant={item.isActive ? "default" : "secondary"}>
                       {item.isActive ? "Active" : "Inactive"}
                     </Badge>
                     {item.isDeveloper && (
                       <Badge variant="outline">Dev</Badge>
                     )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <Badge variant="outline" className="text-xs">ADM V</Badge>
+                      <Badge variant="outline" className="text-xs">USR V</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      View permissions set per role
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>

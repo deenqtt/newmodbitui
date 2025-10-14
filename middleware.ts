@@ -1,63 +1,116 @@
-// File: middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose"; // Gunakan jose untuk verifikasi di edge
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import * as jose from 'jose'
 
-// Fungsi untuk mendapatkan secret key
-const getJwtSecretKey = () => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET is not set in environment variables");
-  }
-  return new TextEncoder().encode(secret);
-};
+// Define public routes that don't require authentication
+const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/setup-admin',
+  '/api/auth/me',
+  '/favicon.ico',
+  '/api/health'
+]
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const tokenCookie = request.cookies.get("authToken");
+// Helper function to get auth token from cookies
+function getAuthToken(request: NextRequest) {
+  const token = request.cookies.get('authToken')?.value
+  return token
+}
 
-  // Skip middleware untuk API routes (penting untuk mencegah redirect loop)
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-
-  // Halaman publik yang bisa diakses tanpa login
-  const publicPaths = ["/login", "/register"];
-
-  // Jika mencoba mengakses halaman publik
-  if (publicPaths.includes(pathname)) {
-    // Jika sudah login, arahkan ke dasbor
-    if (tokenCookie) {
-      try {
-        await jwtVerify(tokenCookie.value, getJwtSecretKey());
-        return NextResponse.redirect(new URL("/", request.url));
-      } catch (error) {
-        // Token tidak valid, biarkan akses ke halaman publik
-      }
-    }
-    return NextResponse.next();
-  }
-
-  // Jika mencoba mengakses halaman yang dilindungi
-  if (!tokenCookie) {
-    // Jika tidak ada token, arahkan ke login
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
+// Helper function to verify JWT token
+async function verifyToken(token: string) {
   try {
-    // Verifikasi token
-    await jwtVerify(tokenCookie.value, getJwtSecretKey());
-    // Jika token valid, biarkan akses
-    return NextResponse.next();
+    const secret = process.env.JWT_SECRET
+    if (!secret) {
+      console.error('JWT_SECRET not configured')
+      return null
+    }
+
+    const secretKey = new TextEncoder().encode(secret)
+    const { payload } = await jose.jwtVerify(token, secretKey)
+    return payload
   } catch (error) {
-    // Jika token tidak valid, arahkan ke login dan hapus cookie yang salah
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    response.cookies.delete("authToken");
-    return response;
+    console.error('Token verification failed:', error)
+    return null
+  }
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Skip middleware for public routes and static assets
+  if (
+    publicRoutes.some(route => pathname.startsWith(route)) ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/public/') ||
+    pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js)$/)
+  ) {
+    return NextResponse.next()
+  }
+
+  // Check authentication for protected routes
+  const token = getAuthToken(request)
+
+  if (!token) {
+    console.log(`[Middleware] No token found for protected route: ${pathname}`)
+    // No token found, redirect to login
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // For API routes, let them handle authentication themselves
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
+  // Verify token for page routes
+  try {
+    const payload = verifyToken(token)
+
+    if (!payload) {
+      console.log(`[Middleware] Invalid token for route: ${pathname}`)
+      // Token invalid, redirect to login
+      const loginUrl = new URL('/login', request.url)
+      const response = NextResponse.redirect(loginUrl)
+
+      // Clear invalid cookie
+      response.cookies.delete('authToken')
+
+      return response
+    }
+
+    // Token valid, continue to protected route
+    return NextResponse.next()
+
+  } catch (error) {
+    console.log(`[Middleware] Token verification error for route: ${pathname}`)
+    // Error verifying token, redirect to login
+    console.error('Middleware token verification error:', error)
+    const loginUrl = new URL('/login', request.url)
+    const response = NextResponse.redirect(loginUrl)
+
+    // Clear invalid cookie
+    response.cookies.delete('authToken')
+
+    return response
   }
 }
 
 export const config = {
-  // Jalankan middleware di semua rute kecuali file statis dan API
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images/).*)"],
-};
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/auth/ (handled separately for login/register)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!api/auth/|_next/static|_next/image|favicon.ico|public/).*)',
+  ],
+}

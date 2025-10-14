@@ -10,6 +10,7 @@ interface MenuContextType {
   error: string | null;
   refreshMenu: () => Promise<void>;
   isDeveloper: boolean;
+  retryMenuLoad: () => void;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
@@ -32,21 +33,14 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      // Add AbortController for request cancellation
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
       const response = await fetch('/api/menu', {
-        signal: controller.signal,
-        headers: {
-          'Cache-Control': 'no-cache', // Prevent browser caching
-        },
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
-        throw new Error(`Menu API returned ${response.status}: ${response.statusText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -62,13 +56,8 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       setIsDeveloper(data.isDeveloper || false);
 
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.error('Menu fetch aborted due to timeout');
-        setError('Menu loading timeout. Please refresh.');
-      } else {
-        console.error('Menu fetch error:', err);
-        setError(err.message);
-      }
+      setError(err.message);
+      setMenuData(null);
     } finally {
       setLoading(false);
     }
@@ -76,6 +65,13 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
   const refreshMenu = async () => {
     await fetchMenu();
+  };
+
+  const retryMenuLoad = () => {
+    if (isAuthenticated) {
+      setError(null);
+      fetchMenu();
+    }
   };
 
   // Fetch menu immediately when user becomes authenticated
@@ -108,6 +104,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     error,
     refreshMenu,
     isDeveloper,
+    retryMenuLoad,
   };
 
   return (

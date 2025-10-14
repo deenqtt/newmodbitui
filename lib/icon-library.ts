@@ -1,47 +1,28 @@
-// File: lib/icon-library.ts
-import {
-  type LucideIcon,
-  Zap,
-  Thermometer,
-  Wind,
-  Server,
-  Database,
-  Gauge,
-  Activity,
-  ShieldCheck,
-  Power,
-  Clock,
-  BatteryCharging,
-  BarChart,
-  Droplets,
-  Fan,
-} from "lucide-react";
+// Icon library helper for Lucide React icons
+import * as Icons from 'lucide-react';
+import React, { ComponentType } from 'react';
 
-export interface SelectableIcon {
-  name: string;
-  icon: LucideIcon;
+export function getIcon(iconName: string): ComponentType<any> | null {
+  const icons: Record<string, any> = Icons;
+  return icons[iconName] || null;
 }
 
-// Daftar ikon yang bisa dipilih oleh pengguna
-export const iconLibrary: SelectableIcon[] = [
-  { name: "Zap", icon: Zap },
-  { name: "Thermometer", icon: Thermometer },
-  { name: "Wind", icon: Wind },
-  { name: "Server", icon: Server },
-  { name: "Database", icon: Database },
-  { name: "Gauge", icon: Gauge },
-  { name: "Activity", icon: Activity },
-  { name: "ShieldCheck", icon: ShieldCheck },
-  { name: "Power", icon: Power },
-  { name: "Clock", icon: Clock },
-  { name: "BatteryCharging", icon: BatteryCharging },
-  { name: "BarChart", icon: BarChart },
-  { name: "Droplets", icon: Droplets },
-  { name: "Fan", icon: Fan },
-];
+export function renderMenuIcon(iconName: string, className = "h-4 w-4"): React.ReactElement | null {
+  const Icon = getIcon(iconName);
+  return Icon ? React.createElement(Icon, { className }) : null;
+}
 
-// Fungsi helper untuk mendapatkan komponen ikon berdasarkan namanya
-export const getIconComponent = (name: string): LucideIcon | null => {
-  const found = iconLibrary.find((i) => i.name === name);
-  return found ? found.icon : null;
-};
+export function getIconWithFallback(iconName: string | undefined, className = "h-4 w-4"): React.ReactElement {
+  const safeIconName = iconName || 'Menu';
+  const Icon = getIcon(safeIconName);
+  if (Icon) {
+    return React.createElement(Icon, { className });
+  }
+  // Fallback to default icon (Menu is commonly available)
+  return React.createElement(Icons.Menu, { className });
+}
+
+// Alias for compatibility with existing imports
+export function getIconComponent(iconName: string): ComponentType<any> | null {
+  return getIcon(iconName);
+}

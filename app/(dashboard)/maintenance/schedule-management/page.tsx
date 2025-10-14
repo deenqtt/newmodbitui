@@ -225,7 +225,7 @@ function MaintenanceManagementContent() {
 
   useEffect(() => {
     if (!isAuthLoading) {
-      if (isAuthenticated && user?.role?.name === "ADMIN") {
+      if (isAuthenticated) {
         fetchMaintenances();
         fetchUsers();
         fetchDevices();
@@ -233,7 +233,7 @@ function MaintenanceManagementContent() {
         setIsLoading(false);
       }
     }
-  }, [isAuthenticated, user, isAuthLoading, fetchMaintenances, fetchUsers]);
+  }, [isAuthenticated, isAuthLoading, fetchMaintenances, fetchUsers]);
 
   // --- LOGIKA KALENDER ---
   const generateCalendarDays = () => {
@@ -436,17 +436,7 @@ function MaintenanceManagementContent() {
     );
   }
 
-  if (!user || user.role?.name !== "ADMIN") {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen text-center">
-        <Shield className="h-16 w-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold">Access Denied</h1>
-        <p className="text-gray-600">
-          You do not have permission to view this page.
-        </p>
-      </div>
-    );
-  }
+  // Removed admin-only access protection
 
   return (
     <TooltipProvider>

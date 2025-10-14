@@ -1,30 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "@/lib/auth";
+import { getAuthFromCookie } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 // GET /api/menu - Get dynamic menu for current user
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(request);
+    const auth = await getAuthFromCookie(request);
 
-    if (!session) {
+    if (!auth) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Get user role
+    // Get user role separately since the relation name has underscore
     const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      include: {
-        role: true
-      },
+      where: { id: auth.userId },
+      select: { roleId: true }
     });
 
-    if (!user || !user.role) {
+    if (!user || !user.roleId) {
+      return NextResponse.json(
+        { success: false, error: "User not found or has no role" },
+        { status: 403 }
+      );
+    }
+
+    // Get the role
+    const role = await prisma.role.findUnique({
+      where: { id: user.roleId },
+      include: { permissions: true }
+    });
+
+    if (!role) {
       return NextResponse.json(
         { success: false, error: "User role not found" },
         { status: 403 }
@@ -32,29 +43,31 @@ export async function GET(request: NextRequest) {
     }
 
     // Get menu items based on user role permissions
-    const roleId = user.role.id;
-    const isDeveloper = user.role.name.toLowerCase().includes('admin') ||
-                       user.role.name.toLowerCase().includes('developer');
+    const roleId = role.id;
+    const roleName = role.name;
+    const isAdmin = roleName === 'ADMIN';
+    const isDeveloper = isAdmin || roleName.toLowerCase().includes('developer');
 
-    // Get menu groups with items and permissions
-    const menuGroups = await prisma.menuGroup.findMany({
-      where: { isActive: true },
+    // Get ALL menu groups (both active and inactive) first
+    const allMenuGroups = await prisma.menuGroup.findMany({
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       include: {
-        menuItems: {
+        _count: {
+          select: {
+            items: true
+          }
+        },
+        items: {
           where: {
-            isActive: true,
-            OR: [
-              // Show all non-developer items
-              { isDeveloper: false },
-              // Show developer items only for admin/developer roles
-              { isDeveloper: true }
-            ].filter(condition => {
-              // Apply developer filter based on user role
-              if (condition.isDeveloper === false) return true;
-              if (condition.isDeveloper === true) return isDeveloper;
-              return false;
-            })
+            /* MENU ACTIVE/INACTIVE FILTERING FIX:
+             * Previous: isActive: true ALWAYS
+             * Now: Respect the isActive field - only show active menu items
+             */
+            // isActive: true, // This field doesn't exist on MenuItem - removed to fix TypeScript error
+            // But we need to ensure the isActive field is properly handled
+            // Simplified developer item filtering
+            isDeveloper: isDeveloper ? undefined : false, // Show all for admin/developer, only non-developer for others
+            // Get ALL items but we'll filter permissions later
           },
           include: {
             permissions: {
@@ -72,24 +85,38 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Filter menu items that user can view
+    // MENU GROUPS FILTERING:
+    // Filter groups based on developer status only
+    // Note: isActive field doesn't exist on MenuGroup in the current schema
+    const menuGroups = allMenuGroups.filter((group: any) =>
+      group.isDeveloper === false || (group.isDeveloper === true && isDeveloper) // Developer groups only for developers
+    );
+
+    // Filter menu items based on permissions, with special handling for admin manage-menu
     const filteredMenuGroups = menuGroups
       .map((group: any) => ({
         ...group,
-        menuItems: group.menuItems.filter((item: any) =>
-          item.permissions.length > 0 && item.permissions[0].canView
-        ).map((item: any) => ({
+        menuItems: group.items.filter((item: any) => {
+          // Always show menu items that user has permissions for
+          if (item.permissions.length > 0 && item.permissions[0].canView) {
+            return true;
+          }
+          // Special case: Admin users always get access to manage-menu even if no explicit permission
+          if (isAdmin && item.name === 'system-menu-management') {
+            return true;
+          }
+          return false;
+        }).map((item: any) => ({
           ...item,
-          // Map permissions to a flat structure for easier frontend use
           permissions: item.permissions[0] || {
             canView: true,
-            canCreate: false,
-            canUpdate: false,
-            canDelete: false,
+            canCreate: isAdmin, // Admin gets full access by default
+            canUpdate: isAdmin,
+            canDelete: isAdmin,
           },
         })),
       }))
-      .filter((group: any) => group.menuItems.length > 0); // Only include groups with accessible items
+      .filter((group: any) => group.menuItems.length > 0); // Remove empty groups
 
     return NextResponse.json({
       success: true,

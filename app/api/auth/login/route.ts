@@ -10,7 +10,9 @@ const prisma = new PrismaClient();
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return NextResponse.json(
@@ -19,8 +21,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const role = await prisma.role.findUnique({
+      where: { id: user.roleId! }
+    });
+    const roleName = role?.name || 'user';
     const token = jwt.sign(
-      { userId: user.id, role: user.role, email: user.email },
+      { userId: user.id, role: roleName, email: user.email },
       process.env.JWT_SECRET!,
       { expiresIn: "1d" }
     );

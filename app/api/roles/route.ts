@@ -21,8 +21,6 @@ export async function GET(request: NextRequest) {
         _count: {
           select: {
             users: true,
-            permissions: true,
-            menus: true,
           },
         },
       },
