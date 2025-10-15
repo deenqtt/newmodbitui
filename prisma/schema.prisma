@@ -152,6 +152,8 @@ model DeviceExternal {
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
   sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
   loggingConfigs              LoggingConfiguration[]
+  layout2DDataPoints          Layout2DDataPoint[]
+  layout2DFlowIndicators      Layout2DFlowIndicator[]
   maintenanceTasks            Maintenance[]
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
@@ -629,4 +631,85 @@ enum AlarmLogStatus {
   ACTIVE
   ACKNOWLEDGED
   CLEARED
+}
+
+model Layout2D {
+  id             String                  @id @default(cuid())
+  name           String                  @unique
+  isUse          Boolean                 @default(false)
+  image          String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  dataPoints     Layout2DDataPoint[]
+  flowIndicators Layout2DFlowIndicator[]
+}
+
+model Layout2DDataPoint {
+  id            String   @id @default(cuid())
+  layoutId      String
+  deviceUniqId  String
+  // Legacy single-key format (for backward compatibility)
+  selectedKey   String?
+  // New multi-key format
+  selectedKeys  String? // JSON string containing array of KeyConfig
+  units         String?
+  multiply      Float?   @default(1)
+  customName    String
+  positionX     Float
+  positionY     Float
+  fontSize      Int?     @default(14)
+  color         String?  @default("#000000")
+  iconName      String?
+  iconColor     String?  @default("#666666")
+  showIcon      Boolean? @default(false)
+  displayLayout String?  @default("vertical") // "vertical", "horizontal", "grid"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+
+  // Update unique constraint to allow multiple keys per device
+  @@unique([layoutId, deviceUniqId, customName])
+}
+
+model Layout2DFlowIndicator {
+  id             String @id @default(cuid())
+  layoutId       String
+  deviceUniqId   String
+  selectedKey    String
+  customName     String
+  positionX      Float
+  positionY      Float
+  arrowDirection String @default("right") // "right", "left", "up", "down"
+
+  // Logic conditions
+  logicOperator String // ">", "<", ">=", "<=", "==", "!="
+  compareValue  String // Value to compare (supports number, string, boolean)
+  valueType     String @default("number") // "number", "string", "boolean"
+
+  // Visual states based on condition result
+  // When condition is TRUE
+  trueColor     String  @default("#22c55e") // green
+  trueAnimation Boolean @default(true)
+
+  // When condition is FALSE
+  falseColor     String  @default("#ef4444") // red
+  falseAnimation Boolean @default(false)
+
+  // Warning state (optional for range conditions)
+  warningColor     String  @default("#f59e0b") // orange
+  warningAnimation Boolean @default(true)
+  warningEnabled   Boolean @default(false)
+  warningOperator  String? // Secondary condition for warning
+  warningValue     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
+
+  @@unique([layoutId, deviceUniqId, selectedKey, positionX, positionY])
 }

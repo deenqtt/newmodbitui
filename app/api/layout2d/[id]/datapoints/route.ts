@@ -52,8 +52,6 @@ export async function POST(
 
   try {
     const body = await request.json();
-    console.log("Received body:", JSON.stringify(body, null, 2));
-
     const {
       deviceUniqId,
       selectedKeys, // New multi-key format
@@ -68,11 +66,10 @@ export async function POST(
       iconName,
       iconColor,
       showIcon,
-      displayLayout,
+      layout,
     } = body;
 
     if (!deviceUniqId || !customName) {
-      console.error("Missing required fields:", { deviceUniqId, customName });
       return new NextResponse("Missing required fields", { status: 400 });
     }
 
@@ -81,33 +78,15 @@ export async function POST(
       selectedKeys && Array.isArray(selectedKeys) && selectedKeys.length > 0;
 
     if (!isMultiKey && !selectedKey) {
-      console.error("No keys provided:", { selectedKeys, selectedKey });
       return new NextResponse(
         "Either selectedKeys or selectedKey must be provided",
         { status: 400 }
       );
     }
 
-    // Validate and sanitize position values
-    const sanitizedPositionX = typeof positionX === 'number' ? Math.max(0, Math.min(100, positionX)) : 50;
-    const sanitizedPositionY = typeof positionY === 'number' ? Math.max(0, Math.min(100, positionY)) : 50;
-
-    console.log("Creating datapoint with LAYOUT CONNECT data:", {
-      layoutId: params.id,
-      deviceUniqId,
-      selectedKeys: isMultiKey ? JSON.stringify(selectedKeys) : null,
-      selectedKey: !isMultiKey ? selectedKey : null,
-      positionX: sanitizedPositionX,
-      positionY: sanitizedPositionY,
-      customName,
-      displayLayout: displayLayout || "vertical"
-    });
-
     const dataPoint = await prisma.layout2DDataPoint.create({
       data: {
-        layout: {
-          connect: { id: params.id }
-        },
+        layoutId: params.id,
         device: {
           connect: { uniqId: deviceUniqId }
         },
@@ -118,14 +97,14 @@ export async function POST(
         units: units || null,
         multiply: multiply || 1,
         customName,
-        positionX: sanitizedPositionX,
-        positionY: sanitizedPositionY,
+        positionX: positionX || 50,
+        positionY: positionY || 50,
         fontSize: fontSize || 14,
         color: color || "#000000",
         iconName: iconName || null,
         iconColor: iconColor || "#666666",
         showIcon: showIcon || false,
-        displayLayout: displayLayout || "vertical",
+        displayLayout: layout || "vertical",
       },
       include: {
         device: {
@@ -150,41 +129,18 @@ export async function POST(
 
     return NextResponse.json(responseData, { status: 201 });
   } catch (error) {
-    console.error("[LAYOUT2D_DATAPOINTS_POST] Full error:", error);
-
+    console.error("[LAYOUT2D_DATAPOINTS_POST]", error);
     if (
       error &&
       typeof error === "object" &&
       "code" in error &&
       error.code === "P2002"
     ) {
-      console.error("Unique constraint violation:", error);
       return new NextResponse(
-        "Data point already exists for this device and custom name in this layout",
+        "Data point already exists for this device and name",
         { status: 400 }
       );
     }
-
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2025"
-    ) {
-      console.error("Record not found:", error);
-      return new NextResponse(
-        "Device not found",
-        { status: 404 }
-      );
-    }
-
-    // Log the full error for debugging
-    console.error("Unexpected error details:", {
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-      error
-    });
-
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

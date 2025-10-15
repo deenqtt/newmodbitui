@@ -65,25 +65,15 @@ export async function POST(
       warningEnabled,
       warningOperator,
       warningValue,
-      // NEW: Multi-logic fields
-      useMultiLogic,
-      multiLogicConfig,
     } = body;
 
-    if (!deviceUniqId || !selectedKey || !customName || !logicOperator) {
+    if (!deviceUniqId || !selectedKey || !customName || !logicOperator || compareValue === undefined) {
       return new NextResponse("Missing required fields", { status: 400 });
-    }
-
-    // Allow empty string for compareValue but not null/undefined
-    if (compareValue === null || compareValue === undefined) {
-      return new NextResponse("Compare value is required", { status: 400 });
     }
 
     const flowIndicator = await prisma.layout2DFlowIndicator.create({
       data: {
-        layout: {
-          connect: { id: params.id }
-        },
+        layoutId: params.id,
         device: {
           connect: { uniqId: deviceUniqId }
         },
@@ -104,9 +94,6 @@ export async function POST(
         warningEnabled: warningEnabled || false,
         warningOperator: warningOperator || null,
         warningValue: warningValue || null,
-        // NEW: Multi-logic fields
-        useMultiLogic: useMultiLogic || false,
-        multiLogicConfig: multiLogicConfig ? JSON.stringify(multiLogicConfig) : null,
       },
       include: {
         device: {
@@ -123,7 +110,7 @@ export async function POST(
 
     return NextResponse.json(flowIndicator, { status: 201 });
   } catch (error) {
-    console.error("[LAYOUT2D_FLOWINDICATORS_POST] FIXED LAYOUT CONNECTION:", error);
+    console.error("[LAYOUT2D_FLOWINDICATORS_POST]", error);
     if (
       error &&
       typeof error === "object" &&

@@ -337,7 +337,7 @@ export default function Layout2DList({
   };
 
   return (
-    <div className="space-y-4 max-w-full">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Process Flow Layouts</h2>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -400,8 +400,8 @@ export default function Layout2DList({
       </div>
 
       {/* Table View */}
-      <div className="border rounded-lg overflow-hidden w-full">
-        <table className="w-full table-auto">
+      <div className="border rounded-lg overflow-hidden">
+        <table className="w-full">
           <thead className="bg-muted/50">
             <tr>
               <th className="text-left p-2 font-medium">Active</th>
@@ -412,106 +412,90 @@ export default function Layout2DList({
             </tr>
           </thead>
           <tbody>
-            {layouts.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <Plus className="w-6 h-6" />
+            {layouts.map((layout) => (
+              <tr key={layout.id} className="hover:bg-muted/30">
+                <td className="p-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={layout.isUse}
+                      onChange={() => handleSetActive(layout.id)}
+                      className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    />
+                    {layout.isUse && (
+                      <span className="text-xs text-green-600 font-medium">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td
+                  className="p-2 cursor-pointer"
+                  onClick={() => handleLayoutClick(layout)}
+                >
+                  {layout.image ? (
+                    <div className="w-16 h-12 rounded-md overflow-hidden bg-gray-100">
+                      <img
+                        src={layout.image}
+                        alt={layout.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <div>
-                      <p className="font-medium">No Process Flow Layouts</p>
-                      <p className="text-sm">Create your first process flow layout to get started</p>
+                  ) : (
+                    <div className="w-16 h-12 rounded-md bg-gray-100 flex items-center justify-center">
+                      <span className="text-xs text-gray-500">No Image</span>
                     </div>
+                  )}
+                </td>
+                <td
+                  className="p-2 cursor-pointer"
+                  onClick={() => handleLayoutClick(layout)}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">{layout.name}</span>
+                    {layout.isUse && (
+                      <Badge variant="default" className="text-xs">
+                        Active
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td
+                  className="p-2 text-sm text-muted-foreground cursor-pointer"
+                  onClick={() => handleLayoutClick(layout)}
+                >
+                  {new Date(layout.createdAt).toLocaleDateString()}
+                </td>
+                <td className="p-2">
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditDialog(layout);
+                      }}
+                      className="px-2"
+                      title="Edit Process Flow Name/Image"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteLayoutId(layout.id);
+                      }}
+                      className="px-2"
+                      title="Delete Process Flow"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>
-            ) : (
-              layouts.map((layout) => (
-                <tr key={layout.id} className="hover:bg-muted/30 border-b border-border/50">
-                  <td className="p-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={layout.isUse}
-                        onChange={() => handleSetActive(layout.id)}
-                        className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      {layout.isUse && (
-                        <span className="text-xs text-green-600 font-medium">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className="p-2 cursor-pointer"
-                    onClick={() => handleLayoutClick(layout)}
-                  >
-                    {layout.image ? (
-                      <div className="w-16 h-12 rounded-md overflow-hidden bg-gray-100">
-                        <img
-                          src={layout.image}
-                          alt={layout.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-16 h-12 rounded-md bg-gray-100 flex items-center justify-center">
-                        <span className="text-xs text-gray-500">No Image</span>
-                      </div>
-                    )}
-                  </td>
-                  <td
-                    className="p-2 cursor-pointer"
-                    onClick={() => handleLayoutClick(layout)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">{layout.name}</span>
-                      {layout.isUse && (
-                        <Badge variant="default" className="text-xs">
-                          Active
-                        </Badge>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className="p-2 text-sm text-muted-foreground cursor-pointer"
-                    onClick={() => handleLayoutClick(layout)}
-                  >
-                    {new Date(layout.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="p-2">
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditDialog(layout);
-                        }}
-                        className="px-2"
-                        title="Edit Process Flow Name/Image"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteLayoutId(layout.id);
-                        }}
-                        className="px-2"
-                        title="Delete Process Flow"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
