@@ -77,10 +77,8 @@ export function MenuProvider({ children }: { children: ReactNode }) {
   // Fetch menu immediately when user becomes authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      console.log("[MenuContext] User authenticated, fetching menu...");
       fetchMenu();
     } else {
-      console.log("[MenuContext] User not authenticated, clearing menu data");
       setMenuData(null);
       setLoading(false);
       setError(null);

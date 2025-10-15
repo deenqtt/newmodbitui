@@ -63,46 +63,46 @@ export function LoginSuccessLoader() {
   const currentStepData = loadingSteps[step];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
         <div className="text-center space-y-6">
           {/* Animated Icon */}
           <div className="relative">
-            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-              <currentStepData.icon className={`w-10 h-10 text-white animate-pulse`} />
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center shadow-lg">
+              <currentStepData.icon className="w-10 h-10 text-primary-foreground animate-pulse" />
             </div>
 
             {/* Outer rotating ring */}
-            <div className="absolute inset-0 w-20 h-20 mx-auto border-4 border-blue-200 dark:border-blue-800 rounded-full animate-spin border-t-blue-500"></div>
+            <div className="absolute inset-0 w-20 h-20 mx-auto border-4 border-muted rounded-full animate-spin border-t-primary"></div>
           </div>
 
           {/* Progress Text */}
           <div className="space-y-2">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-xl font-semibold text-foreground">
               {currentStepData.title}
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-muted-foreground">
               {currentStepData.description}
             </p>
           </div>
 
           {/* Progress Bar */}
           <div className="space-y-2">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-muted rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500 ease-out"
+                className="bg-gradient-to-r from-primary to-primary/80 h-2 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               {Math.round(progress)}% complete
             </p>
           </div>
 
           {/* Loading Message */}
-          <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+          <div className="text-sm bg-muted text-muted-foreground rounded-lg p-3 border border-border">
             <p className="flex items-center justify-center gap-2">
-              <Zap className="w-4 h-4 text-yellow-500" />
+              <Zap className="w-4 h-4 text-primary" />
               Preparing your IoT Dashboard experience...
             </p>
           </div>

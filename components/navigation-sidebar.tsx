@@ -1,9 +1,7 @@
 "use client";
 
-"use client";
-
 import { memo, useState, useRef, useEffect } from "react";
-import { LogOut, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
+import { LogOut, BarChart3, ChevronDown, ChevronRight, LogIn, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -96,17 +94,15 @@ export const NavigationSidebar = memo(function NavigationSidebar({
         className="bg-background overflow-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {!isAuthenticated ? (
-          <div className="flex items-center justify-center p-4">
-            <div className="text-sm text-sidebar-foreground/70">Please log in</div>
-          </div>
-        ) : loading ? (
-          <div className="flex items-center justify-center p-4">
-            <div className="text-sm text-sidebar-foreground/70">Loading menu...</div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-4 space-y-3">
+            <Loader2 className="w-8 h-8 animate-spin text-sidebar-foreground/50" />
+            <div className="text-sm text-sidebar-foreground/70 text-center">Loading menu...</div>
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center p-4">
-            <div className="text-sm text-red-400">Error loading menu</div>
+          <div className="flex flex-col items-center justify-center p-4 space-y-3">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+            <div className="text-sm text-red-400 text-center">Error loading menu</div>
           </div>
         ) : menuData?.menuGroups && menuData.menuGroups.length > 0 ? (
           menuData.menuGroups.map((group, groupIndex) => {
@@ -135,12 +131,12 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                           {(group.menuItems || group.items || []).map((item, itemIndex) => {
                             const IconComponent = getIconComponent(item.icon || 'BarChart3');
                             return (
-                              <SidebarMenuItem key={item.id || itemIndex} className="relative">
-                                <SidebarMenuButton
-                                  asChild
-                                  isActive={pathname === item.path}
-                                  className="group flex items-center gap-2 px-3 py-2 rounded-md w-full transition-colors text-sidebar-foreground hover:bg-muted/50 hover:text-sidebar-accent-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-medium data-[active=true]:border-l-2 data-[active=true]:border-l-primary"
-                                >
+                            <SidebarMenuItem key={item.id || itemIndex} className="relative">
+                              <SidebarMenuButton
+                                asChild
+                                isActive={pathname === item.path}
+                                className="group flex items-center gap-2 px-3 py-2 rounded-md w-full transition-colors text-sidebar-foreground hover:bg-muted/50 hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:font-medium data-[active=true]:shadow-md"
+                              >
                                   <Link
                                     href={item.path}
                                     prefetch={true}
@@ -152,8 +148,8 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                                       }
                                     }}
                                   >
-                                    <IconComponent className="h-4 w-4 text-sidebar-foreground/50 group-hover:text-sidebar-accent-foreground ml-4" />
-                                    <span>{item.label}</span>
+                                    {/* <IconComponent className="h-4 w-4 text-sidebar-foreground/50 group-hover:text-sidebar-accent-foreground ml-4" /> */}
+                                    <span className="ml-5">{item.label}</span>
                                   </Link>
                                 </SidebarMenuButton>
                               </SidebarMenuItem>

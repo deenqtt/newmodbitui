@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MenuProvider } from "@/contexts/MenuContext";
 import { ThemeProvider } from "@/components/theme-provider";
+import { RootRedirectHandler } from "@/components/root-redirect-handler";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -29,7 +30,10 @@ export default function RootLayout({
           {/* AuthProvider membungkus semua halaman agar status login bisa diakses di mana saja */}
           <AuthProvider>
             <MenuProvider>
-              {children}
+              {/* Handle root path redirection for authenticated users */}
+              {/* <RootRedirectHandler> */}
+                {children}
+              {/* </RootRedirectHandler> */}
             </MenuProvider>
           </AuthProvider>
         </ThemeProvider>

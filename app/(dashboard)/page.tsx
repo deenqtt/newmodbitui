@@ -66,26 +66,17 @@ export default function MainDashboardPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    // 🔧 FIXED: Improved auth state propagation delay handling
-    if (authLoading) {
-      // If auth is loading, wait for it to complete
+    // 🔧 FIXED: Remove authentication redirect logic from dashboard page
+    // Authentication is handled by AuthContext and middleware
+    // Let AuthContext handle redirects to avoid race conditions
+
+    // Only load dashboard data when authenticated and auth is loaded
+    if (authLoading || !isAuthenticated) {
+      if (!authLoading && !isAuthenticated) {
+        // Auth finished loading but user is not authenticated - let middleware redirect
+        setIsLoading(false);
+      }
       return;
-    }
-
-    if (!isAuthenticated) {
-      // Add debounce to handle authentication state propagation
-      const authCheckTimer = setTimeout(() => {
-        // Double check if still not authenticated after delay
-        if (!isAuthenticated) {
-          setIsLoading(false);
-          setNoDashboardsFound(false);
-          setError(null);
-          setDashboardData(null);
-          router.push('/login'); // Force redirect if auth fails
-        }
-      }, 300); // Reduced to 300ms for faster recovery
-
-      return () => clearTimeout(authCheckTimer);
     }
 
     // Auth is confirmed, load dashboard immediately

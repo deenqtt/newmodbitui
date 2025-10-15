@@ -1,6 +1,43 @@
-hanya error ini saja dan errornyahanya ini terus menerus menu-group-management.tsx:50 
- GET http://localhost:3000/api/menu-groups 500 (Internal Server Error)
-use-toast.ts:32 ❌ Error Internal server error
-menu-group-management.tsx:50 
- GET http://localhost:3000/api/menu-groups 500 (Internal Server Error)
-use-toast.ts:32 ❌ Error Internal server error, padahal didatabase itu ada. coba analisa api lain apa perbedaannya
+ini hasil setelah saya baru logout, berhasil login tapi gagal untuk masuk halaman dashboard /
+
+[AuthContext] No existing session found
+AuthContext.tsx:94 [AuthContext] Attempting login...
+AuthContext.tsx:108 [AuthContext] Login successful, verifying session...
+AuthContext.tsx:127 [AuthContext] User data loaded: admin@gmail.com
+AuthContext.tsx:145 [AuthContext] Replacing route with root (dashboard)...
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+root-redirect-handler.tsx:31 [RootRedirectHandler] State changed: {from: {…}, to: {…}, hasUser: false}
+root-redirect-handler.tsx:51 [RootRedirectHandler] User not authenticated on root, redirecting to login
+AuthContext.tsx:280 [AuthContext] Unauthorized access to /, redirecting to login
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+root-redirect-handler.tsx:31 [RootRedirectHandler] State changed: {from: {…}, to: {…}, hasUser: false}
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+AuthContext.tsx:245 [AuthContext] Found existing session for: admin@gmail.com
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+AuthContext.tsx:245 [AuthContext] Found existing session for: admin@gmail.com
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+AuthContext.tsx:179 [AuthContext] Login process timed out
+
+dan ini hasil setelah saya refresh dulu browsernya berhasil login dan berhasil loading untuk masuk halaman dashboard
+
+[MenuContext] User not authenticated, clearing menu data
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+MenuContext.tsx:83 [MenuContext] User not authenticated, clearing menu data
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+AuthContext.tsx:234 [AuthContext] Checking existing session...
+AuthContext.tsx:245 [AuthContext] Found existing session for: admin@gmail.com
+root-redirect-handler.tsx:31 [RootRedirectHandler] State changed: {from: {…}, to: {…}, hasUser: true}
+MenuContext.tsx:80 [MenuContext] User authenticated, fetching menu...
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+3AuthContext.tsx:245 [AuthContext] Found existing session for: admin@gmail.com
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+AuthContext.tsx:94 [AuthContext] Attempting login...
+AuthContext.tsx:108 [AuthContext] Login successful, verifying session...
+AuthContext.tsx:127 [AuthContext] User data loaded: admin@gmail.com
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+AuthContext.tsx:145 [AuthContext] Replacing route with root (dashboard)...
+AuthContext.tsx:87 [AuthContext] Session check setup for 28800s
+root-redirect-handler.tsx:31 [RootRedirectHandler] State changed: {from: {…}, to: {…}, hasUser: true}from: isAuthenticated: trueisLoading: falsepathname: "/login"[[Prototype]]: ObjecthasUser: trueto: {isAuthenticated: true, isLoading: false, pathname: '/'}[[Prototype]]: Object
+root-redirect-handler.tsx:44 [RootRedirectHandler] User authenticated on root, showing dashboard

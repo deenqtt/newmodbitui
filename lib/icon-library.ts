@@ -26,3 +26,6 @@ export function getIconWithFallback(iconName: string | undefined, className = "h
 export function getIconComponent(iconName: string): ComponentType<any> | null {
   return getIcon(iconName);
 }
+
+// Icon library object for components that need the full collection
+export const iconLibrary = Icons;

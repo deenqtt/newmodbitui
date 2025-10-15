@@ -48,12 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false); // ✅ Tambah state untuk logout loading
   const [sessionTimeoutRef, setSessionTimeoutRef] = useState<NodeJS.Timeout | null>(null);
+  const [hasRedirectedAfterLogin, setHasRedirectedAfterLogin] = useState(false);
+  const [isLoginRedirecting, setIsLoginRedirecting] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   // Auto logout function for session expiration
   const performAutoLogout = useCallback(() => {
-    console.log("[AuthContext] Session expired, performing auto logout...");
     clearSessionCheck();
     setUser(null);
     setIsLoading(false);
@@ -84,14 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, jwtExpiration);
 
     setSessionTimeoutRef(timeout);
-    console.log(`[AuthContext] Session check setup for ${jwtExpiration / 1000}s`);
   }, [user, clearSessionCheck, performAutoLogout]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
-
-      console.log("[AuthContext] Attempting login...");
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -105,10 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.message || "Login failed");
       }
 
-      console.log("[AuthContext] Login successful, checking session...");
+      // Retry mechanism for session verification with exponential backoff
+      let retries = 0;
+      const maxRetries = 5;
+      const baseDelay = 200; // Increased base delay
 
-      // Wait a bit for cookie to be set server-side, then check auth status
-      setTimeout(async () => {
+      const verifySession = async (): Promise<void> => {
         try {
           const meResponse = await fetch("/api/auth/me", {
             method: 'GET',
@@ -120,8 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const userData = await meResponse.json();
 
             if (userData.userId && userData.email) {
-              console.log("[AuthContext] User data loaded:", userData.email);
-
+              // Set user state - React state updates are synchronous within the same render cycle
               setUser({
                 userId: userData.userId,
                 email: userData.email,
@@ -130,10 +129,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
               // Setup session expiration check
               setupSessionCheck();
+
               showToast("success", "Login successful!");
 
-              console.log("[AuthContext] Redirecting to dashboard...");
-              router.push("/");
+              return;
             } else {
               throw new Error("Invalid user data received");
             }
@@ -141,54 +140,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error("Failed to get user session");
           }
         } catch (err) {
-          console.error("[AuthContext] Session check failed after login:", err);
-          showToast("error", "Login succeeded but session failed. Please try again.");
-          setUser(null);
-          router.push("/login");
-        } finally {
-          setIsLoading(false);
+          if (retries < maxRetries - 1) {
+            retries++;
+            const delay = baseDelay * Math.pow(2, retries); // Exponential backoff
+            setTimeout(verifySession, delay);
+          } else {
+            showToast("error", "Login succeeded but session verification failed. Please refresh and try again.");
+            setUser(null);
+            setIsLoading(false);
+          }
         }
-      }, 100); // Small delay to ensure cookie synchronization
+      };
+
+      // Start initial verification attempt after base delay
+      setTimeout(verifySession, baseDelay);
+
+        // Clear loading state after verification starts
+        setTimeout(() => {
+          setIsLoading(false);
+        }, baseDelay + 100); // Clear loading shortly after verification starts
 
     } catch (error: any) {
-      console.error("[AuthContext] Login failed:", error);
       showToast("error", error.message || "An error occurred");
       setIsLoading(false);
       throw error;
     }
   }, [router, setupSessionCheck]);
 
-    const logout = useCallback(async () => {
-      console.log("[Auth] Logout initiated with loading screen");
+      const logout = useCallback(async () => {
+        // 🔄 Set loading state BEFORE any operations
+        setIsLoggingOut(true);
 
-      // 🔄 Set loading state BEFORE any operations
-      setIsLoggingOut(true);
+        try {
+          // First clear the server-side session
+          const logoutResponse = await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: { 'Cache-Control': 'no-cache' },
+            credentials: "include"
+          });
 
-      // Add small delay for better UX (like login has)
-      await new Promise(resolve => setTimeout(resolve, 800));
+          if (!logoutResponse.ok) {
+            console.warn("[Auth] Logout API call failed, but proceeding with client-side cleanup");
+          }
 
-      // Clear state immediately for instant UI feedback
-      clearSessionCheck();
+          // Wait a brief moment to ensure cookie is cleared server-side
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.warn("[Auth] Logout API error, proceeding with client-side cleanup:", error);
+        }
+
+        // Clear state immediately for instant UI feedback
+        clearSessionCheck();
       setUser(null);
       setIsLoading(false);
       setIsLoggingOut(false); // 🔄 Clear logout loading
-
-      // Silent server logout - cookies will be cleared server-side
-      fetch("/api/auth/logout", {
-        method: "POST",
-        headers: { 'Cache-Control': 'no-cache' },
-        credentials: "include"
-      }).catch(() => {}); // Ignore errors
+      setHasRedirectedAfterLogin(false); // Reset login redirect flag
+      setIsLoginRedirecting(false); // Reset login redirecting flag
 
       showToast("success", "Logged out");
+
+      // Navigate to login page
       router.push("/login");
-    }, [clearSessionCheck, router]);
+      }, [clearSessionCheck, router]);
 
   // Load user from existing session on app start
   const loadUserFromCookie = useCallback(async () => {
     try {
-      console.log("[AuthContext] Checking existing session...");
-
       const res = await fetch("/api/auth/me", {
         headers: { 'Cache-Control': 'no-cache' },
         credentials: 'include'
@@ -198,8 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await res.json();
 
         if (userData.userId && userData.email) {
-          console.log("[AuthContext] Found existing session for:", userData.email);
-
           setUser({
             userId: userData.userId,
             email: userData.email,
@@ -207,17 +222,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
           // Setup session check for existing session
-          setTimeout(() => setupSessionCheck(), 100); // Small delay to ensure state is set
+          // setTimeout(() => setupSessionCheck(), 100); // Small delay to ensure state is set
         } else {
-          console.log("[AuthContext] Invalid session data");
           setUser(null);
         }
       } else {
-        console.log("[AuthContext] No existing session found");
         setUser(null);
       }
     } catch (error) {
-      console.error("[AuthContext] Session check failed:", error);
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -229,13 +241,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUserFromCookie();
   }, []);
 
-  // Handle unauthorized access
+  // Disable unauthorized access checks during login flow
+  // This prevents conflicts between login redirects and auth checks
   useEffect(() => {
-    if (!isLoading) {
-      if (!user && pathname !== '/login' && pathname !== '/register' && !pathname.startsWith('/api/')) {
-        console.log(`[AuthContext] Unauthorized access to ${pathname}, redirecting to login`);
-        router.push('/login');
-      }
+    if (!user && !isLoading && pathname !== '/login' && pathname !== '/register' && !pathname.startsWith('/api/') && pathname !== '/') {
+      router.push('/login');
+    }
+  }, [user, isLoading, pathname, router]);
+
+  // Handle navigation after user state is set - SIMPLIFIED APPROACH
+  useEffect(() => {
+    // Only redirect if user is authenticated AND we're on login page
+    // Don't use complex flags - the pathname check handles the race condition
+    if (user && !isLoading && pathname === '/login') {
+      // No delay - make it instant
+      router.replace("/");
     }
   }, [user, isLoading, pathname, router]);
 

@@ -25,11 +25,23 @@ const getJwtSecretKey = () => {
  * @returns Promise yang berisi payload otentikasi jika token valid, atau null jika tidak.
  */
 export async function getAuthFromCookie(
-  request: Request
+  request: Request | NextRequest
 ): Promise<AuthPayload | null> {
   // Ambil cookie 'authToken' dari header 'cookie'
-  const cookieHeader = request.headers.get("cookie");
-  const tokenCookie = cookieHeader?.match(/authToken=([^;]+)/);
+  let cookieHeader = "";
+
+  // Handle both Request and NextRequest objects
+  if (request instanceof Request) {
+    cookieHeader = request.headers.get("cookie") || "";
+  } else {
+    // NextRequest has a cookies property - cast to any to bypass type checking
+    const tokenCookie = (request as any).cookies?.get("authToken")?.value;
+    if (tokenCookie) {
+      cookieHeader = `authToken=${tokenCookie}`;
+    }
+  }
+
+  const tokenCookie = cookieHeader.match(/authToken=([^;]+)/);
 
   if (!tokenCookie || !tokenCookie[1]) {
     return null;
@@ -48,7 +60,7 @@ export async function getAuthFromCookie(
 }
 
 // Fungsi untuk server-side session
-export async function getServerSession(request?: NextRequest) {
-  const auth = await getAuthFromCookie(request as Request);
+export async function getServerSession(request: NextRequest) {
+  const auth = await getAuthFromCookie(request);
   return auth ? { userId: auth.userId, role: auth.role, email: auth.email } : null;
 }
