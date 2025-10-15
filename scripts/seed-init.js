@@ -3,6 +3,7 @@ const { execSync } = require('child_process');
 const { seedUsers } = require('./seed-users');
 const { seedMenu } = require('./seed-menu');
 const { seedDashboard } = require('./seed-dashboard');
+const { seedDevices } = require('./seed-devices');
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,7 @@ const SEED_CONFIG = {
   ENABLE_USERS: process.env.SEED_USERS !== 'false', // Default: true
   ENABLE_MENU: process.env.SEED_MENU !== 'false',  // Default: true
   ENABLE_DASHBOARD: process.env.SEED_DASHBOARD !== 'false', // Default: true
+  ENABLE_DEVICES: process.env.SEED_DEVICES !== 'false', // Default: true
   RESET_DATABASE: process.env.RESET_DB !== 'false', // Default: true
   FORCE_PRISMA_GENERATE: process.env.FORCE_GENERATE !== 'false', // Default: true
 };
@@ -34,6 +36,7 @@ async function seedInit() {
   console.log(`   - Users: ${SEED_CONFIG.ENABLE_USERS ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Menu: ${SEED_CONFIG.ENABLE_MENU ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Dashboard: ${SEED_CONFIG.ENABLE_DASHBOARD ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`   - Devices: ${SEED_CONFIG.ENABLE_DEVICES ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Reset DB: ${SEED_CONFIG.RESET_DATABASE ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Force Generate: ${SEED_CONFIG.FORCE_PRISMA_GENERATE ? 'ENABLED' : 'DISABLED'}\n`);
 
@@ -69,6 +72,16 @@ async function seedInit() {
       console.log('📋 Starting menu seeding...');
       await seedMenu();
       console.log('✅ Menu seeding completed');
+      return true;
+    });
+  }
+
+  // Seed Devices (optional)
+  if (SEED_CONFIG.ENABLE_DEVICES) {
+    steps.push(async () => {
+      console.log('📱 Starting device seeding...');
+      await seedDevices();
+      console.log('✅ Device seeding completed');
       return true;
     });
   }
@@ -121,7 +134,18 @@ async function seedInit() {
     console.log('   ⚪ Dashboard seeding skipped (disabled)');
   }
 
-  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD) {
+  if (SEED_CONFIG.ENABLE_DEVICES) {
+    console.log('   ✅ IoT Devices seeded (11 devices)');
+    console.log('      - 3 pH Sensors (addresses 1, 2, 5)');
+    console.log('      - 2 Water Flow meters');
+    console.log('      - 2 Air Quality stations');
+    console.log('      - 2 Temp/Humidity sensors');
+    console.log('      - 2 Vibration sensors');
+  } else {
+    console.log('   ⚪ Device seeding skipped (disabled)');
+  }
+
+  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD && !SEED_CONFIG.ENABLE_DEVICES) {
     console.log('   ⚠️  No seeding modules were enabled');
   }
 
@@ -129,6 +153,7 @@ async function seedInit() {
   console.log('   SEED_USERS=false       # Disable user seeding');
   console.log('   SEED_MENU=false        # Disable menu seeding');
   console.log('   SEED_DASHBOARD=false   # Disable dashboard seeding');
+  console.log('   SEED_DEVICES=false     # Disable device seeding');
   console.log('   RESET_DB=false         # Disable database reset');
   console.log('   FORCE_GENERATE=false   # Skip Prisma generation');
 }
@@ -142,6 +167,7 @@ module.exports = {
   seedUsers,
   seedMenu,
   seedDashboard,
+  seedDevices,
 
   // Export config
   SEED_CONFIG

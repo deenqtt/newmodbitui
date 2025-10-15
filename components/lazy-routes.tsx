@@ -1,5 +1,15 @@
-// Simplified lazy loading approach for navigation optimization
+// Enhanced lazy loading approach with code splitting for navigation optimization
+import { lazy } from 'react';
+
 export { LoadingPage } from './loading-page';
+
+// Lazy load large page components with code splitting (will be implemented as files are verified)
+// TODO: Add when files exist:
+// export const DeviceTable = lazy(() => import('@/components/devices/DeviceTable'));
+// export const DeviceForm = lazy(() => import('@/components/devices/DeviceForm'));
+// export const DeviceManagementPage = lazy(() => import('@/app/(dashboard)/devices/devices-internal/page'));
+// export const Layout2DPage = lazy(() => import('@/app/(dashboard)/monitoring/layout-2d/page'));
+// export const AlarmManagementPage = lazy(() => import('@/app/(dashboard)/alarms/alarm-management/page'));
 
 // Utility function untuk get page loading message berdasarkan path
 export function getLoadingMessage(pathname: string): string {

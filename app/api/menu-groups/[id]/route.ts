@@ -24,12 +24,12 @@ export async function GET(
     const menuGroup = await prisma.menuGroup.findUnique({
       where: { id },
       include: {
-        menuItems: {
+        items: {
           orderBy: { order: "asc" },
         },
         _count: {
           select: {
-            menuItems: true,
+            items: true,
           },
         },
       },
@@ -73,7 +73,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { name, label, icon, order, isActive } = body;
+    const { name, label, icon, order, isActive, isDeveloper } = body;
 
     // Check if menu group exists
     const existingMenuGroup = await prisma.menuGroup.findUnique({
@@ -104,11 +104,12 @@ export async function PUT(
     const menuGroup = await prisma.menuGroup.update({
       where: { id },
       data: {
-        ...(name && { name }),
+        ...(name !== undefined && { name }),
         ...(label !== undefined && { label }),
         ...(icon !== undefined && { icon }),
         ...(order !== undefined && { order }),
         ...(isActive !== undefined && { isActive }),
+        ...(isDeveloper !== undefined && { isDeveloper }),
       },
     });
 
@@ -149,7 +150,7 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-            menuItems: true,
+            items: true,
           },
         },
       },
@@ -163,7 +164,7 @@ export async function DELETE(
     }
 
     // Prevent deleting menu groups that have menu items
-    if (existingMenuGroup._count.menuItems > 0) {
+    if (existingMenuGroup._count.items > 0) {
       return NextResponse.json(
         { success: false, error: "Cannot delete menu group with menu items" },
         { status: 409 }

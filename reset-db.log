@@ -1,0 +1,11 @@
+[0;34m[2025-10-15 13:36:33][0m Starting Nexus IoT Database Reset & Re-seeding
+[0;34m[2025-10-15 13:36:34][0m Timestamp: Wed 15 Oct 2025 01:36:33 PM WIB
+[0;34m[2025-10-15 13:36:34][0m Project: /home/ubuntu/Alfi/RnD/Development/newmodbitui
+[0;36m[STEP][0m Checking prerequisites...
+[0;32m[SUCCESS][0m Prerequisites check passed
+[0;36m[STEP][0m Skipping database reset (--no-reset specified)
+[0;36m[STEP][0m Generating Prisma client...
+[0;32m[SUCCESS][0m Prisma client generated successfully
+[0;36m[STEP][0m Running configured seeders...
+[0;34m[2025-10-15 13:36:36][0m Running seed command with environment: 
+[0;31m[ERROR][0m Seeding failed

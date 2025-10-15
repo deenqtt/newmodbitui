@@ -11,7 +11,7 @@ import {
 import { Role } from "@prisma/client";
 import { MenuItemWithPermissions, MenuGroupWithItems } from "@/lib/types/menu";
 import { useRouter, usePathname } from "next/navigation";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 
 interface User {
   userId: string;
@@ -32,17 +32,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const showToast = (icon: "success" | "error", title: string) => {
-  const Toast = Swal.mixin({
-    toast: true,
-    position: "top-end",
-    showConfirmButton: false,
-    timer: 3000,
-    timerProgressBar: true,
-  });
-  Toast.fire({ icon, title });
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsLoading(false);
 
-    showToast("error", "Session expired. Please login again.");
+    showToast.error("Session Expired", "Please login again.");
     router.push("/login");
   }, [router]);
 
@@ -130,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // Setup session expiration check
               setupSessionCheck();
 
-              showToast("success", "Login successful!");
+              showToast.success("Login Successful", "Welcome back!");
 
               return;
             } else {
@@ -145,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const delay = baseDelay * Math.pow(2, retries); // Exponential backoff
             setTimeout(verifySession, delay);
           } else {
-            showToast("error", "Login succeeded but session verification failed. Please refresh and try again.");
+            showToast.error("Session Verification Failed", "Please try again or refresh the page.");
             setUser(null);
             setIsLoading(false);
           }
@@ -161,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, baseDelay + 100); // Clear loading shortly after verification starts
 
     } catch (error: any) {
-      showToast("error", error.message || "An error occurred");
+      showToast.error("Login Failed", error.message || "Please check your credentials.");
       setIsLoading(false);
       throw error;
     }
@@ -197,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setHasRedirectedAfterLogin(false); // Reset login redirect flag
       setIsLoginRedirecting(false); // Reset login redirecting flag
 
-      showToast("success", "Logged out");
+      showToast.success("Logged Out", "You have been successfully logged out.");
 
       // Navigate to login page
       router.push("/login");

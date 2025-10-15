@@ -21,12 +21,25 @@ export function MenuProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
+  const [menuCache, setMenuCache] = useState<Map<string, UserMenuData>>(new Map());
 
-  const fetchMenu = async () => {
+  const fetchMenu = async (forceRefresh = false) => {
     if (!isAuthenticated) {
       setMenuData(null);
       setLoading(false);
       return;
+    }
+
+      // Check cache first (skip if force refresh)
+    if (!forceRefresh && menuCache.has('menuData')) {
+      const cachedData = menuCache.get('menuData');
+      if (cachedData) {
+        setMenuData(cachedData);
+        setIsDeveloper(!!cachedData.isDeveloper);
+        setLoading(false);
+        setError(null);
+        return;
+      }
     }
 
     try {
@@ -49,13 +62,28 @@ export function MenuProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Failed to fetch menu');
       }
 
-      setMenuData({
+      const menuDataResult = {
         menuGroups: data.data || [],
         isDeveloper: data.isDeveloper || false,
-      });
-      setIsDeveloper(data.isDeveloper || false);
+      };
+
+      // Cache the result
+      setMenuCache(prev => new Map(prev).set('menuData', menuDataResult));
+
+      setMenuData(menuDataResult);
+      setIsDeveloper(!!data.isDeveloper);
 
     } catch (err: any) {
+      // If cache exists and request fails, use cached data but show error
+      const cached = menuCache.get('menuData');
+      if (cached && !forceRefresh) {
+        setMenuData(cached);
+        setIsDeveloper(!!cached.isDeveloper);
+        setLoading(false);
+        setError(`Using cached menu data: ${err.message}`);
+        return;
+      }
+
       setError(err.message);
       setMenuData(null);
     } finally {
@@ -85,13 +113,13 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated]);
 
-  // Periodic refresh every 5 minutes to ensure menu stays up to date
+  // Reduced refresh frequency to 15 minutes and increased cache validity for better performance
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const interval = setInterval(() => {
-      fetchMenu();
-    }, 5 * 60 * 1000); // 5 minutes
+      fetchMenu(true); // Force refresh occasionally
+    }, 15 * 60 * 1000); // 15 minutes
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);

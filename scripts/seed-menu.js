@@ -86,19 +86,19 @@ async function seedMenu() {
       });
     }
 
-    // Create menu groups with isDeveloper flags
+    // Create menu groups with isActive and isDeveloper flags
     const menuGroups = [
-      { name: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', order: 0 },
-      { name: 'control', label: 'Control', icon: 'Sliders', order: 1 },
-      { name: 'devices', label: 'Devices', icon: 'Cpu', order: 2 },
-      { name: 'network', label: 'Network', icon: 'Network', order: 3 },
-      { name: 'security', label: 'Security', icon: 'Shield', order: 4 },
-      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 5 },
-      { name: 'payload', label: 'Payload', icon: 'FileText', order: 6, isDeveloper: true },
-      { name: 'system', label: 'System Config', icon: 'Settings', order: 7, isDeveloper: true },
-      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 8 },
-      { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 9 },
-      { name: 'tools', label: 'Tools', icon: 'Tool', order: 10, isDeveloper: true },
+      { name: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', order: 0, isActive: true },
+      { name: 'control', label: 'Control', icon: 'Sliders', order: 1, isActive: true },
+      { name: 'devices', label: 'Devices', icon: 'Cpu', order: 2, isActive: true },
+      { name: 'network', label: 'Network', icon: 'Network', order: 3, isActive: true },
+      { name: 'security', label: 'Security', icon: 'Shield', order: 4, isActive: true },
+      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 5, isActive: true },
+      { name: 'payload', label: 'Payload', icon: 'FileText', order: 6, isActive: true, isDeveloper: true },
+      { name: 'system', label: 'System Config', icon: 'Settings', order: 7, isActive: true, isDeveloper: true },
+      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 8, isActive: true },
+      { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 9, isActive: true },
+      { name: 'tools', label: 'Tools', icon: 'Tool', order: 10, isActive: true, isDeveloper: true },
     ];
 
     const createdMenuGroups = {};
@@ -114,8 +114,8 @@ async function seedMenu() {
     // Create menu items
     const menuItems = [
       // Dashboard Group
-      { name: 'dashboard-overview', label: 'Overview Dashboard', path: '/', icon: 'LayoutDashboard', order: 0, groupName: 'dashboard', isDeveloper: false },
-      { name: 'dashboard-layout2d', label: 'Process Flow', path: '/layout2d', icon: 'Workflow', order: 1, groupName: 'dashboard', isDeveloper: false },
+      { name: 'dashboard-overview', label: 'Overview Dashboard', path: '/', icon: 'LayoutDashboard', order: 0, groupName: 'dashboard', isActive: true, isDeveloper: false },
+      { name: 'dashboard-layout2d', label: 'Process Flow', path: '/layout2d', icon: 'Workflow', order: 1, groupName: 'dashboard', isActive: true, isDeveloper: false },
 
       // Control Group
       { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isDeveloper: false },

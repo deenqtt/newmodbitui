@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const isAdmin = roleName === 'ADMIN';
     const isDeveloper = isAdmin || roleName.toLowerCase().includes('developer');
 
-    // Get ALL menu groups (both active and inactive) first
+    // Get ALL menu groups first (both active and inactive)
     const allMenuGroups = await prisma.menuGroup.findMany({
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       include: {
@@ -59,15 +59,8 @@ export async function GET(request: NextRequest) {
         },
         items: {
           where: {
-            /* MENU ACTIVE/INACTIVE FILTERING FIX:
-             * Previous: isActive: true ALWAYS
-             * Now: Respect the isActive field - only show active menu items
-             */
-            // isActive: true, // This field doesn't exist on MenuItem - removed to fix TypeScript error
-            // But we need to ensure the isActive field is properly handled
-            // Simplified developer item filtering
-            isDeveloper: isDeveloper ? undefined : false, // Show all for admin/developer, only non-developer for others
-            // Get ALL items but we'll filter permissions later
+            // Only show menu items for developers (or all if admin/developer)
+            isDeveloper: isDeveloper ? undefined : false,
           },
           include: {
             permissions: {
@@ -86,11 +79,16 @@ export async function GET(request: NextRequest) {
     });
 
     // MENU GROUPS FILTERING:
-    // Filter groups based on developer status only
-    // Note: isActive field doesn't exist on MenuGroup in the current schema
-    const menuGroups = allMenuGroups.filter((group: any) =>
-      group.isDeveloper === false || (group.isDeveloper === true && isDeveloper) // Developer groups only for developers
-    );
+    // Filter based on isActive status and developer permissions
+    const menuGroups = allMenuGroups
+      .filter((group: any) =>
+        // Developer groups only for developers
+        group.isDeveloper === false || (group.isDeveloper === true && isDeveloper)
+      )
+      .filter((group: any) =>
+        // Active groups only shown to non-admin/non-developer users
+        isAdmin || isDeveloper ? true : (group.isActive !== false) // isActive can be undefined (treated as active) or true
+      );
 
     // Filter menu items based on permissions, with special handling for admin manage-menu
     const filteredMenuGroups = menuGroups

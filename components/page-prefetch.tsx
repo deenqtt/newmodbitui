@@ -4,21 +4,22 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useMenu } from "@/contexts/MenuContext";
 
-// Hook for strategic page prefetching
+// Hook for strategic page prefetching - optimized for performance
 export function usePagePrefetch() {
   const router = useRouter();
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
   const { menuData } = useMenu();
 
   useEffect(() => {
-    // Prefetch core pages on initial load for better performance
-    const coreRoutes = [
-      '/devices/devices-internal',
-      '/lo-ra-wan/device-list',
-      '/system-config/user-management'
+    // Prefetch only essential pages on initial load - reduced from 20+ to 4-5 core routes
+    const essentialRoutes = [
+      '/devices', // Main devices page
+      '/alarms',  // Critical alarms page
+      '/dashboard', // Main dashboard
+      '/network',  // Network monitoring
     ];
 
-    coreRoutes.forEach(route => {
+    essentialRoutes.forEach(route => {
       if (!prefetchedRoutesRef.current.has(route)) {
         router.prefetch(route);
         prefetchedRoutesRef.current.add(route);
@@ -26,22 +27,29 @@ export function usePagePrefetch() {
     });
   }, [router]);
 
-  // Prefetch menu routes when menuData is available
+  // Reduced prefetching: Only prefetch menu routes on user interaction, not automatically
   useEffect(() => {
     if (menuData?.menuGroups) {
-      // Flatten all menu items from all groups
-      const allRoutes = menuData.menuGroups.flatMap(group =>
-        group.menuItems.map(item => item.path)
+      // Only prefetch frequently accessed routes, not all routes
+      const frequentRoutes = menuData.menuGroups.flatMap(group =>
+        group.menuItems
+          .filter(item =>
+            item.path.includes('/devices') ||
+            item.path.includes('/alarms') ||
+            item.path.includes('/dashboard') ||
+            item.path.includes('/network')
+          )
+          .map(item => item.path)
       );
 
-      // Prefetch all menu routes in batches to avoid overwhelming
-      allRoutes.forEach((route, index) => {
+      // Limit to maximum 5 additional prefetches and stagger them
+      frequentRoutes.slice(0, 5).forEach((route, index) => {
         if (!prefetchedRoutesRef.current.has(route)) {
-          // Delay prefetch to avoid blocking main thread
+          // Increased delay to prevent blocking and added more stagger
           setTimeout(() => {
             router.prefetch(route);
             prefetchedRoutesRef.current.add(route);
-          }, index * 100); // Stagger by 100ms each
+          }, index * 200); // Increased stagger to 200ms
         }
       });
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect } from "react";
-import { LogOut, BarChart3, ChevronDown, ChevronRight, LogIn, Loader2, AlertCircle } from "lucide-react";
+import { LogOut, BarChart3, ChevronDown, ChevronRight, LogIn, Loader2, AlertCircle, BlocksIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -31,7 +31,7 @@ const getIconComponent = (iconName: string) => {
   return getIconWithFallback(iconName)?.type || BarChart3;
 };
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "MQTT Gateway Dashboard";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Universal Dashboard";
 
 export const NavigationSidebar = memo(function NavigationSidebar({
   collapsible = false
@@ -77,11 +77,11 @@ export const NavigationSidebar = memo(function NavigationSidebar({
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center border-gray-400 justify-center rounded-lg bg-primary text-primary-foreground">
-              <BarChart3 className="h-5 w-5" />
+              <BlocksIcon className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-lg font-semibold text-sidebar-foreground">
-                UniBoard
+                Nexus
               </h1>
               <p className="text-xs text-sidebar-foreground/70">{appName}</p>
             </div>

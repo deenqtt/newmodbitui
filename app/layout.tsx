@@ -2,15 +2,19 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MenuProvider } from "@/contexts/MenuContext";
+import { MqttProvider } from "@/contexts/MqttContext";
 import { ThemeProvider } from "@/components/theme-provider";
-import { RootRedirectHandler } from "@/components/root-redirect-handler";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Modbo Monitoring",
-  description: "Enterprise monitoring system for MODbit",
+  title: "Nexus Universal Dashboard",
+  description: "Universal IoT monitoring and control dashboard",
+  icons: {
+    icon: "/blocks-icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -27,15 +31,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* AuthProvider membungkus semua halaman agar status login bisa diakses di mana saja */}
           <AuthProvider>
             <MenuProvider>
-              {/* Handle root path redirection for authenticated users */}
-              {/* <RootRedirectHandler> */}
-                {children}
-              {/* </RootRedirectHandler> */}
+              <MqttProvider>
+                  {children}
+                </MqttProvider>
             </MenuProvider>
           </AuthProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

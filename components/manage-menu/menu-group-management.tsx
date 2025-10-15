@@ -32,7 +32,14 @@ export function MenuGroupManagement() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<MenuGroup | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    label: string;
+    icon: string;
+    order: number;
+    isActive: boolean;
+    isDeveloper: boolean;
+  }>({
     name: "",
     label: "",
     icon: "",
@@ -40,6 +47,12 @@ export function MenuGroupManagement() {
     isActive: true,
     isDeveloper: false,
   });
+
+  // Ensure table switches are controlled
+  const processedMenuGroups = menuGroups.map(group => ({
+    ...group,
+    isActive: !!group.isActive, // Ensure boolean for switch
+  }));
 
   useEffect(() => {
     fetchMenuGroups();
@@ -143,7 +156,7 @@ export function MenuGroupManagement() {
       icon: group.icon || "",
       order: group.order,
       isActive: group.isActive,
-      isDeveloper: group.isDeveloper || false,
+      isDeveloper: !!group.isDeveloper,
     });
     setDialogOpen(true);
   };
@@ -380,7 +393,7 @@ export function MenuGroupManagement() {
                   <div className="flex items-center gap-3">
                     <Switch
                       id="isDeveloper"
-                      checked={formData.isDeveloper || false}
+                      checked={!!formData.isDeveloper}
                       onCheckedChange={(checked) => setFormData({ ...formData, isDeveloper: checked })}
                     />
                     <div className="grid grid-cols-1 gap-0">
@@ -416,7 +429,7 @@ export function MenuGroupManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {menuGroups.map((group) => (
+            {processedMenuGroups.map((group) => (
               <TableRow key={group.id}>
                 <TableCell className="font-medium">{group.name}</TableCell>
                 <TableCell>{group.label}</TableCell>

@@ -941,15 +941,15 @@ export default function DashboardEditorPage({
                 <LayoutGrid className="h-12 w-12 text-muted-foreground" />
               </div>
               <h3 className="text-xl font-semibold text-foreground">
-                Dashboard Kosong
+                Empty Dashboard
               </h3>
               <p className="text-muted-foreground mt-1 mb-4 max-w-sm">
-                Mulai bangun dashboard Anda dengan menambahkan widget pertama
-                dari pustaka.
+                Start building your dashboard by adding your first widget
+                from the library.
               </p>
               <Button size="lg" onClick={() => setIsSheetOpen(true)}>
                 <PlusCircle className="h-5 w-5 mr-2" />
-                Tambah Widget Pertama
+                Add First Widget
               </Button>
             </div>
           )}
