@@ -12,26 +12,15 @@ import {
   Plus,
   Settings,
   Navigation,
-  Cpu,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DataPointConfigModal from "@/components/layout2d/DataPointConfigModal";
 import FlowIndicatorConfigModal from "@/components/layout2d/FlowIndicatorConfigModal";
-import Swal from "sweetalert2";
-
-// SweetAlert Toast Configuration
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-});
+import { toast } from "sonner";
 
 // Dynamic imports to avoid SSR issues
 const Layout2DCanvas = dynamic(
@@ -62,7 +51,6 @@ interface Layout2D {
 }
 
 export default function Layout2DPage() {
-  const router = useRouter();
   const [layouts, setLayouts] = useState<Layout2D[]>([]);
   const [activeLayout, setActiveLayout] = useState<Layout2D | null>(null);
   const [selectedLayout, setSelectedLayout] = useState<Layout2D | null>(null);
@@ -178,30 +166,18 @@ export default function Layout2DPage() {
       );
 
       if (response.ok) {
-        Toast.fire({
-          icon: "success",
-          title: "Data point deleted!",
-          text: "The data point has been successfully removed.",
-        });
+        toast.success("Data point deleted");
         // Refresh canvas by updating selected layout timestamp
         setSelectedLayout({
           ...selectedLayout,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        Toast.fire({
-          icon: "error",
-          title: "Failed to delete data point",
-          text: "An error occurred while deleting the data point.",
-        });
+        toast.error("Failed to delete data point");
       }
     } catch (error) {
       console.error("Failed to delete data point:", error);
-      Toast.fire({
-        icon: "error",
-        title: "Connection Error",
-        text: "Unable to connect to the server. Please check your connection and try again.",
-      });
+      toast.error("Failed to delete data point");
     }
   };
 
@@ -217,37 +193,25 @@ export default function Layout2DPage() {
 
       const response = await fetch(url, {
         method,
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
 
       if (response.ok) {
-        Toast.fire({
-          icon: "success",
-          title: editingDataPoint ? "Data point updated!" : "Data point added!",
-          text: editingDataPoint ? "Your data point has been successfully updated." : "New data point has been successfully created.",
-        });
+        toast.success(
+          editingDataPoint ? "Data point updated" : "Data point added"
+        );
         // Refresh canvas by updating selected layout timestamp
         setSelectedLayout({
           ...selectedLayout,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        Toast.fire({
-          icon: "error",
-          title: "Failed to save data point",
-          text: errorData.message || "An error occurred while saving the data point.",
-        });
+        toast.error("Failed to save data point");
       }
     } catch (error) {
       console.error("Failed to save data point:", error);
-      Toast.fire({
-        icon: "error",
-        title: "Connection Error",
-        text: "Unable to connect to the server. Please check your connection and try again.",
-      });
+      toast.error("Failed to save data point");
     }
   };
 
@@ -276,71 +240,18 @@ export default function Layout2DPage() {
       );
 
       if (response.ok) {
-        Toast.fire({
-          icon: "success",
-          title: "Flow indicator deleted!",
-          text: "The flow indicator has been successfully removed.",
-        });
+        toast.success("Flow indicator deleted");
         // Refresh canvas by updating selected layout timestamp
         setSelectedLayout({
           ...selectedLayout,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        Toast.fire({
-          icon: "error",
-          title: "Failed to delete flow indicator",
-          text: "An error occurred while deleting the flow indicator.",
-        });
+        toast.error("Failed to delete flow indicator");
       }
     } catch (error) {
       console.error("Failed to delete flow indicator:", error);
-      Toast.fire({
-        icon: "error",
-        title: "Connection Error",
-        text: "Unable to connect to the server. Please check your connection and try again.",
-      });
-    }
-  };
-
-  const handleCopyFlowIndicator = async (flowIndicator: any) => {
-    if (!selectedLayout) return;
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/layout2d/${selectedLayout.id}/flowindicators/${flowIndicator.id}/copy`,
-        {
-          method: "POST",
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        Toast.fire({
-          icon: "success",
-          title: "Flow indicator copied!",
-          text: "The flow indicator has been successfully copied with offset position.",
-        });
-        // Refresh canvas by updating selected layout timestamp
-        setSelectedLayout({
-          ...selectedLayout,
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        Toast.fire({
-          icon: "error",
-          title: "Failed to copy flow indicator",
-          text: errorData.message || "An error occurred while copying the flow indicator.",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to copy flow indicator:", error);
-      Toast.fire({
-        icon: "error",
-        title: "Connection Error",
-        text: "Unable to connect to the server. Please check your connection and try again.",
-      });
+      toast.error("Failed to delete flow indicator");
     }
   };
 
@@ -356,70 +267,25 @@ export default function Layout2DPage() {
 
       const response = await fetch(url, {
         method,
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
 
       if (response.ok) {
-        Toast.fire({
-          icon: "success",
-          title: editingFlowIndicator ? "Flow indicator updated!" : "Flow indicator added!",
-          text: editingFlowIndicator ? "Your flow indicator has been successfully updated." : "New flow indicator has been successfully created.",
-        });
+        toast.success(
+          editingFlowIndicator ? "Flow indicator updated" : "Flow indicator added"
+        );
         // Refresh canvas by updating selected layout timestamp
         setSelectedLayout({
           ...selectedLayout,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        Toast.fire({
-          icon: "error",
-          title: "Failed to save flow indicator",
-          text: errorData.message || "An error occurred while saving the flow indicator.",
-        });
+        toast.error("Failed to save flow indicator");
       }
     } catch (error) {
       console.error("Failed to save flow indicator:", error);
-      Toast.fire({
-        icon: "error",
-        title: "Connection Error",
-        text: "Unable to connect to the server. Please check your connection and try again.",
-      });
-    }
-  };
-
-  // Device management handler
-  const handleManageDevices = () => {
-    router.push('/devices/device-external');
-  };
-
-  // Error recovery handler - retry data loading without page reload
-  const handleRetryDataLoading = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      await fetchLayouts();
-      await fetchActiveLayout();
-
-      Toast.fire({
-        icon: "success",
-        title: "Data loaded successfully",
-        text: "Connection restored and data refreshed.",
-      });
-    } catch (error) {
-      console.error("Retry failed:", error);
-      setError("Failed to load data. Please check your connection and try again.");
-
-      Toast.fire({
-        icon: "error",
-        title: "Retry Failed",
-        text: "Unable to connect to the server. Please check your connection.",
-      });
-    } finally {
-      setIsLoading(false);
+      toast.error("Failed to save flow indicator");
     }
   };
 
@@ -438,45 +304,16 @@ export default function Layout2DPage() {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold">Connection Error</h2>
-        <p className="text-muted-foreground mb-6 max-w-md">{error}</p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={handleRetryDataLoading}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                Retrying...
-              </>
-            ) : (
-              <>
-                <Settings className="w-4 h-4 mr-2" />
-                Try Again
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={handleManageDevices}
-            variant="outline"
-            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-          >
-            <Cpu className="w-4 h-4 mr-2" />
-            Manage Devices
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground mt-4">
-          💡 You can also check your device connections while we retry
-        </p>
+        <h2 className="text-xl font-semibold">An Error Occurred</h2>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
   }
 
   return (
-    <main className="min-h-full flex flex-col p-4 md:p-6">
-      <div className="flex flex-col space-y-6">
+    <main className="h-full flex flex-col p-4 md:p-6">
+      <div className="flex flex-col h-full space-y-6">
         {layouts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-15rem)] text-center relative">
             {/* Background Pattern */}
@@ -537,7 +374,7 @@ export default function Layout2DPage() {
                 </div>
               </div>
 
-              {/* CTA Section */}
+              {/* CTA Button */}
               <div className="space-y-4">
                 <Layout2DList
                   layouts={layouts}
@@ -545,20 +382,9 @@ export default function Layout2DPage() {
                   onLayoutSelect={handleLayoutSelect}
                   onSetActive={handleSetActiveLayout}
                 />
-                <div className="flex flex-col items-center gap-4">
-                  <p className="text-sm text-muted-foreground">
-                    Get started by creating your first process flow layout above ↗
-                  </p>
-                  <Button
-                    onClick={handleManageDevices}
-                    variant="outline"
-                    size="sm"
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                  >
-                    <Cpu className="mr-2 h-4 w-4" />
-                    Manage Devices
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Get started by creating your first process flow layout above ↗
+                </p>
               </div>
             </div>
           </div>
@@ -566,7 +392,7 @@ export default function Layout2DPage() {
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="flex flex-col"
+            className="flex flex-col flex-1"
           >
             <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
               <TabsTrigger value="canvas">Process Flow Canvas</TabsTrigger>
@@ -575,7 +401,7 @@ export default function Layout2DPage() {
 
             <TabsContent
               value="canvas"
-              className="flex flex-col min-h-[600px] space-y-4"
+              className="flex flex-col flex-1 space-y-4"
             >
               {activeLayout && (
                 <Card className="flex flex-col flex-1">
@@ -619,15 +445,6 @@ export default function Layout2DPage() {
                           </div>
                         )}
                         <Button
-                          onClick={handleManageDevices}
-                          variant="outline"
-                          size="sm"
-                          className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                        >
-                          <Cpu className="w-4 h-4 mr-2" />
-                          Manage Devices
-                        </Button>
-                        <Button
                           onClick={() => setIsManageMode(!isManageMode)}
                           variant={isManageMode ? "default" : "outline"}
                           size="sm"
@@ -670,7 +487,6 @@ export default function Layout2DPage() {
                       onDeleteDataPoint={handleDeleteDataPoint}
                       onAddFlowIndicator={handleAddFlowIndicator}
                       onEditFlowIndicator={handleEditFlowIndicator}
-                      onCopyFlowIndicator={handleCopyFlowIndicator}
                       onDeleteFlowIndicator={handleDeleteFlowIndicator}
                       refreshTrigger={selectedLayout?.updatedAt || activeLayout.updatedAt}
                     />
@@ -681,27 +497,12 @@ export default function Layout2DPage() {
               {!activeLayout && selectedLayout && (
                 <Card className="flex flex-col flex-1">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl">
-                          {selectedLayout.name}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          Preview Mode - This process flow is not currently active
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleManageDevices}
-                          variant="outline"
-                          size="sm"
-                          className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                        >
-                          <Cpu className="w-4 h-4 mr-2" />
-                          Manage Devices
-                        </Button>
-                      </div>
-                    </div>
+                    <CardTitle className="text-xl">
+                      {selectedLayout.name}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Preview Mode - This process flow is not currently active
+                    </p>
                   </CardHeader>
                   <CardContent className="flex-1 p-0">
                     <Layout2DCanvas
@@ -714,7 +515,6 @@ export default function Layout2DPage() {
                       onDeleteDataPoint={handleDeleteDataPoint}
                       onAddFlowIndicator={handleAddFlowIndicator}
                       onEditFlowIndicator={handleEditFlowIndicator}
-                      onCopyFlowIndicator={handleCopyFlowIndicator}
                       onDeleteFlowIndicator={handleDeleteFlowIndicator}
                       refreshTrigger={selectedLayout.updatedAt}
                     />
@@ -745,26 +545,15 @@ export default function Layout2DPage() {
                         Select a layout from the management tab to start visualizing your data.
                       </p>
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <Button
-                          onClick={() => setActiveTab("manage")}
-                          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                          size="lg"
-                        >
-                          <Settings className="mr-2 h-4 w-4" />
-                          Manage Layouts
-                        </Button>
-                        <Button
-                          onClick={handleManageDevices}
-                          variant="outline"
-                          size="lg"
-                          className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 shadow-lg hover:shadow-xl transition-all duration-200"
-                        >
-                          <Cpu className="mr-2 h-4 w-4" />
-                          Manage Devices
-                        </Button>
-                      </div>
+                      {/* Action Button */}
+                      <Button
+                        onClick={() => setActiveTab("manage")}
+                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                        size="lg"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Manage Layouts
+                      </Button>
 
                       {/* Helper text */}
                       <p className="text-sm text-muted-foreground mt-4">
@@ -776,7 +565,7 @@ export default function Layout2DPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="manage" className="mt-6">
+            <TabsContent value="manage">
               <Layout2DList
                 layouts={layouts}
                 onLayoutsChange={handleLayoutsChange}
