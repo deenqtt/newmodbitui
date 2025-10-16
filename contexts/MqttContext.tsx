@@ -75,17 +75,21 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     if (clientRef.current) return;
 
     const getMqttHost = () => {
-      // Development: gunakan env variable
+      // Production: SELALU gunakan window.location.hostname, abaikan ENV variables
+      if (process.env.NODE_ENV === "production") {
+        if (typeof window !== "undefined" && window.location) {
+          return window.location.hostname;
+        }
+        // Fallback untuk SSR
+        return "localhost";
+      }
+
+      // Development: gunakan env variable jika tersedia
       if (process.env.NEXT_PUBLIC_MQTT_HOST) {
         return process.env.NEXT_PUBLIC_MQTT_HOST;
       }
 
-      // Production: gunakan window.location.hostname jika tersedia (browser only)
-      if (typeof window !== "undefined" && window.location) {
-        return window.location.hostname;
-      }
-
-      // Fallback ke localhost
+      // Fallback untuk development
       return "localhost";
     };
 
@@ -98,6 +102,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     console.log(`MQTT Context: Broker port: ${mqttPort}`);
     console.log(`MQTT Context: Environment: ${process.env.NODE_ENV}`);
     console.log(`MQTT Context: Client ID: ${clientId}`);
+    console.log(`MQTT Context: Using hostname from: ${process.env.NODE_ENV === "production" ? "window.location.hostname" : "environment variable"}`);
 
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
