@@ -4,6 +4,7 @@ const { seedUsers } = require('./seed-users');
 const { seedMenu } = require('./seed-menu');
 const { seedDashboard } = require('./seed-dashboard');
 const { seedDevices } = require('./seed-devices');
+const { seedLayout2D } = require('./seed-layout2d');
 
 const prisma = new PrismaClient();
 
@@ -13,6 +14,7 @@ const SEED_CONFIG = {
   ENABLE_MENU: process.env.SEED_MENU !== 'false',  // Default: true
   ENABLE_DASHBOARD: process.env.SEED_DASHBOARD !== 'false', // Default: true
   ENABLE_DEVICES: process.env.SEED_DEVICES !== 'false', // Default: true
+  ENABLE_LAYOUT2D: process.env.SEED_LAYOUT2D !== 'false', // Default: true
   RESET_DATABASE: process.env.RESET_DB !== 'false', // Default: true
   FORCE_PRISMA_GENERATE: process.env.FORCE_GENERATE !== 'false', // Default: true
 };
@@ -37,6 +39,7 @@ async function seedInit() {
   console.log(`   - Menu: ${SEED_CONFIG.ENABLE_MENU ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Dashboard: ${SEED_CONFIG.ENABLE_DASHBOARD ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Devices: ${SEED_CONFIG.ENABLE_DEVICES ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`   - Layout 2D: ${SEED_CONFIG.ENABLE_LAYOUT2D ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Reset DB: ${SEED_CONFIG.RESET_DATABASE ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Force Generate: ${SEED_CONFIG.FORCE_PRISMA_GENERATE ? 'ENABLED' : 'DISABLED'}\n`);
 
@@ -82,6 +85,16 @@ async function seedInit() {
       console.log('📱 Starting device seeding...');
       await seedDevices();
       console.log('✅ Device seeding completed');
+      return true;
+    });
+  }
+
+  // Seed Layout 2D (optional)
+  if (SEED_CONFIG.ENABLE_LAYOUT2D) {
+    steps.push(async () => {
+      console.log('📟 Starting Layout 2D seeding...');
+      await seedLayout2D();
+      console.log('✅ Layout 2D seeding completed');
       return true;
     });
   }
@@ -145,7 +158,16 @@ async function seedInit() {
     console.log('   ⚪ Device seeding skipped (disabled)');
   }
 
-  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD && !SEED_CONFIG.ENABLE_DEVICES) {
+  if (SEED_CONFIG.ENABLE_LAYOUT2D) {
+    console.log('   ✅ Layout 2D seeded (1 layout)');
+    console.log('      - "IoT-Based Wastewater Treatment Monitoring System" (isUse: true)');
+    console.log('      - Background Image: /images/Diagram WTP.png');
+    console.log('      - Ready for data point configuration');
+  } else {
+    console.log('   ⚪ Layout 2D seeding skipped (disabled)');
+  }
+
+  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD && !SEED_CONFIG.ENABLE_DEVICES && !SEED_CONFIG.ENABLE_LAYOUT2D) {
     console.log('   ⚠️  No seeding modules were enabled');
   }
 
@@ -154,6 +176,7 @@ async function seedInit() {
   console.log('   SEED_MENU=false        # Disable menu seeding');
   console.log('   SEED_DASHBOARD=false   # Disable dashboard seeding');
   console.log('   SEED_DEVICES=false     # Disable device seeding');
+  console.log('   SEED_LAYOUT2D=false    # Disable Layout 2D seeding');
   console.log('   RESET_DB=false         # Disable database reset');
   console.log('   FORCE_GENERATE=false   # Skip Prisma generation');
 }
@@ -168,6 +191,7 @@ module.exports = {
   seedMenu,
   seedDashboard,
   seedDevices,
+  seedLayout2D,
 
   // Export config
   SEED_CONFIG

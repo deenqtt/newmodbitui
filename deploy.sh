@@ -299,6 +299,7 @@ run_database_seeding() {
     [ "$SEED_MENU" = false ] && seeder_envs="$seeder_envs SEED_MENU=false"
     [ "$SEED_DASHBOARD" = false ] && seeder_envs="$seeder_envs SEED_DASHBOARD=false"
     [ "$SEED_DEVICES" = false ] && seeder_envs="$seeder_envs SEED_DEVICES=false"
+    [ "$SEED_LAYOUT2D" = false ] && seeder_envs="$seeder_envs SEED_LAYOUT2D=false"
 
     log "Running seeding with configuration:"
     [[ -n "$seeder_envs" ]] && echo "  Environment: $seeder_envs" || echo "  Environment: Default (all modules)"
@@ -321,6 +322,9 @@ run_database_seeding() {
         fi
         if [ "$SEED_DEVICES" = true ]; then
             echo -e "   ${GREEN}✓${NC} IoT Devices seeded (11 devices)"
+        fi
+        if [ "$SEED_LAYOUT2D" = true ]; then
+            echo -e "   ${GREEN}✓${NC} Layout 2D seeded (Wastewater Monitoring)"
         fi
         echo ""
 
