@@ -72,24 +72,32 @@ export function getEnvMQTTBrokerUrl(): string {
     host = process.env.NEXT_PUBLIC_MQTT_BROKER_HOST || "192.168.0.193";
     port = process.env.NEXT_PUBLIC_MQTT_BROKER_PORT || "9000";
     protocol = "ws";
+    console.log(`Config: Development mode - MQTT broker: ${host}:${port}`);
   } else if (isProduction) {
-    // Production: Use window.location.hostname
+    // Production: Always use window.location.hostname, ignore ENV variables
     if (typeof window !== "undefined") {
       host = window.location.hostname;
-      port = process.env.NEXT_PUBLIC_MQTT_BROKER_PORT || "9000";
+      port = "9000"; // Fixed port for production
       protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      console.log(`Config: Production mode - MQTT broker: ${host}:${port} (${protocol})`);
+      console.log(`Config: Using window.location.hostname: ${host}`);
     } else {
-      // Fallback for SSR
+      // Fallback for SSR - still use hostname if available
       host = process.env.NEXT_PUBLIC_MQTT_BROKER_HOST || "localhost";
-      port = process.env.NEXT_PUBLIC_MQTT_BROKER_PORT || "9000";
+      port = "9000";
       protocol = "ws";
+      console.log(`Config: SSR mode - MQTT broker: ${host}:${port}`);
     }
   } else {
     // Fallback
     host = process.env.NEXT_PUBLIC_MQTT_BROKER_HOST || "localhost";
     port = process.env.NEXT_PUBLIC_MQTT_BROKER_PORT || "9000";
     protocol = "ws";
+    console.log(`Config: Fallback mode - MQTT broker: ${host}:${port}`);
   }
 
-  return `${protocol}://${host}:${port}`;
+  const brokerUrl = `${protocol}://${host}:${port}`;
+  console.log(`Config: Final MQTT broker URL: ${brokerUrl}`);
+
+  return brokerUrl;
 }

@@ -226,25 +226,49 @@ install_dependencies() {
 # Function to configure environment
 configure_environment() {
     log "=== Configuring Environment ==="
-    
-    cd "$PROJECT_ROOT"
-    
-    # Create .env file with your specific configuration
-    cat > .env << 'EOF'
 
-NEXT_PUBLIC_MQTT_PORT="9000"
-NEXT_PUBLIC_MQTT_USERNAME=""
-NEXT_PUBLIC_MQTT_PASSWORD=""
-JWT_SECRET="your-super-secret-key-that-is-very-long-and-random"
-WEBHOOK_PORT="3001"
-WEBHOOK_SECRET="masukkan_string_rahasia_anda_di_sini_yang_panjang_dan_acak"
-MQTT_BROKER_URL="ws://192.168.0.139:9000"
-CHIRPSTACK_API_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjaGlycHN0YWNrIiwiaXNzIjoiY2hpcnBzdGFjayIsInN1YiI6ImMyOWRlM2VkLWJjZTItNDY3NC05MWY3LTExZTkxNjJkMzk3OCIsInR5cCI6ImtleSJ9.Y_pGm_QMRwLPU3ShwxEul10r8ReGbc7nu7Aob0a14OA"
-CHIRPSTACK_API_URL="http://192.168.0.139:8090"
-NODE_ENV="production"
-PORT=3000
+    cd "$PROJECT_ROOT"
+
+    # Create .env file with production-specific configuration
+    cat > .env << EOF
+
+# Application Configuration
+NODE_ENV="$ENVIRONMENT_TYPE"
+PORT=$BACKEND_PORT
+
+# Frontend Configuration
+NEXT_PUBLIC_APP_ENV="$ENVIRONMENT_TYPE"
+NEXT_PUBLIC_APP_VERSION="1.2.0"
+
+# MQTT Configuration - Production will use window.location.hostname
+NEXT_PUBLIC_MQTT_HOST="$MQTT_HOST"
+NEXT_PUBLIC_MQTT_PORT="$MQTT_PORT"
+NEXT_PUBLIC_MQTT_USERNAME="$MQTT_USERNAME"
+NEXT_PUBLIC_MQTT_PASSWORD="$MQTT_PASSWORD"
+MQTT_BROKER_URL="ws://$MQTT_HOST:$MQTT_PORT"
+
+# Security Configuration
+JWT_SECRET="$JWT_SECRET"
+WEBHOOK_PORT=$BACKEND_PORT
+WEBHOOK_SECRET="$WEBHOOK_SECRET"
+
+# IoT Platform APIs (Placeholder - configure as needed)
+CHIRPSTACK_API_URL="http://$MQTT_HOST:8090"
+CHIRPSTACK_API_TOKEN=""
+
+# Database Configuration (SQLite)
+DATABASE_URL="file:./iot_dashboard.db"
+
+# Logging Configuration
+LOG_LEVEL="$ENVIRONMENT_TYPE"
+LOG_FILE="./logs/app.log"
+
+# Deployment Metadata
+DEPLOYMENT_PROFILE="$DEPLOYMENT_PROFILE"
+DEPLOYMENT_TIMESTAMP="$(date +'%Y-%m-%d %H:%M:%S %Z')"
+DEPLOYMENT_SERVER="$(hostname)"
 EOF
-    
+
     chmod 600 .env
     log_success "Environment configuration created"
 }

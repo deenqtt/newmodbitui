@@ -93,15 +93,20 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
     const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
 
-    // console.log(
-    //   `[MQTT] Connecting to ${mqttHost}:${mqttPort} (Environment: ${process.env.NODE_ENV})`
-    // );
+    console.log(`MQTT Context: Connecting to broker at ${mqttHost}:${mqttPort}`);
+    console.log(`MQTT Context: Broker host: ${mqttHost}`);
+    console.log(`MQTT Context: Broker port: ${mqttPort}`);
+    console.log(`MQTT Context: Environment: ${process.env.NODE_ENV}`);
+    console.log(`MQTT Context: Client ID: ${clientId}`);
 
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
 
     mqttClient.onConnectionLost = (responseObject: Paho.MQTTError) => {
       if (responseObject.errorCode !== 0) {
+        console.warn(`MQTT Context: Connection lost to ${mqttHost}:${mqttPort}`);
+        console.warn(`MQTT Context: Error code: ${responseObject.errorCode}`);
+        console.warn(`MQTT Context: Error message: ${responseObject.errorMessage}`);
         setConnectionStatus("Disconnected");
       }
     };
@@ -115,6 +120,8 @@ export function MqttProvider({ children }: { children: ReactNode }) {
 
     mqttClient.connect({
       onSuccess: () => {
+        console.log(`MQTT Context: Successfully connected to ${mqttHost}:${mqttPort}`);
+        console.log(`MQTT Context: Connection state: CONNECTED`);
         setConnectionStatus("Connected");
         setIsReady(true);
         listenersRef.current.forEach((_, topic) => {
@@ -122,6 +129,9 @@ export function MqttProvider({ children }: { children: ReactNode }) {
         });
       },
       onFailure: (responseObject: Paho.MQTTError) => {
+        console.error(`MQTT Context: Failed to connect to ${mqttHost}:${mqttPort}`);
+        console.error(`MQTT Context: Error code: ${responseObject.errorCode}`);
+        console.error(`MQTT Context: Error message: ${responseObject.errorMessage}`);
         setConnectionStatus("Failed to Connect");
         setIsReady(false); // Set isReady ke false jika koneksi gagal
       },

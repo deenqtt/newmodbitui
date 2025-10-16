@@ -86,7 +86,10 @@ export function connectMQTTAsync(): MqttClient {
 
     // For WebSocket connections, use URL as provided
     let finalUrl = mqttBrokerUrl;
-    console.log(`MQTT: Using broker URL as configured: ${finalUrl}`);
+    console.log(`MQTT: Connecting to broker at ${finalUrl}`);
+    console.log(`MQTT: Broker host: ${mqttBrokerUrl.split('://')[1]?.split(':')[0] || 'unknown'}`);
+    console.log(`MQTT: Broker port: ${mqttBrokerUrl.split(':').pop()}`);
+    console.log(`MQTT: Protocol: ${mqttBrokerUrl.split('://')[0]}`);
 
     client = mqtt.connect(finalUrl, connectionOptions);
 
@@ -94,6 +97,8 @@ export function connectMQTTAsync(): MqttClient {
       connectionState = "connected";
       isConnecting = false;
       reconnectAttempts = 0;
+      console.log(`MQTT: Successfully connected to broker at ${finalUrl}`);
+      console.log(`MQTT: Connection state: CONNECTED`);
       throttledLog(`MQTT: Connected to broker`);
     });
 
@@ -103,6 +108,8 @@ export function connectMQTTAsync(): MqttClient {
 
       // Only log errors if not too many reconnect attempts
       if (reconnectAttempts < maxReconnectAttempts) {
+        console.error(`MQTT: Error connecting to ${finalUrl}`);
+        console.error(`MQTT: Error message: ${err.message}`);
         throttledLog(`MQTT Error: ${err.message}`, "error");
       }
 
