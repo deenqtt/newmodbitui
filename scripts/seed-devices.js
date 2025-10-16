@@ -32,7 +32,7 @@ const DEVICES_DATA = [
   {
     name: "AIR QUALITY 1",
     address: null,
-    topic: "limbah/airquality1/lpss30"
+    topic: "limbah/airquality1/sps30"
   },
   {
     name: "TEMP HUM 1",
@@ -47,7 +47,7 @@ const DEVICES_DATA = [
   {
     name: "AIR QUALITY 2",
     address: null,
-    topic: "limbah/airquality2/lpss30"
+    topic: "limbah/airquality2/sps30"
   },
   {
     name: "TEMP HUM 2",
