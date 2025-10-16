@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.terminal.activateEnvironment": false,
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.flake8Enabled": false,
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": ["--line-length", "88"]
+}

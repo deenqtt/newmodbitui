@@ -12,7 +12,7 @@ export async function GET(
   }
 
   try {
-    const dataPoints = await prisma.layout2DDataPoint.findMany({
+    const dataPoints = await (prisma as any).layout2DDataPoint.findMany({
       where: { layoutId: params.id },
       include: {
         device: {
@@ -51,7 +51,15 @@ export async function POST(
   }
 
   try {
-    const body = await request.json();
+    // Parse request body with error handling
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      return new NextResponse("Invalid JSON body", { status: 400 });
+    }
+
     const {
       deviceUniqId,
       selectedKeys, // New multi-key format
@@ -69,24 +77,45 @@ export async function POST(
       layout,
     } = body;
 
-    if (!deviceUniqId || !customName) {
-      return new NextResponse("Missing required fields", { status: 400 });
+    // Validate required fields
+    if (!deviceUniqId) {
+      return new NextResponse("deviceUniqId is required", { status: 400 });
+    }
+
+    if (!customName) {
+      return new NextResponse("customName is required", { status: 400 });
     }
 
     // Check if using multi-key or single-key format
-    const isMultiKey =
-      selectedKeys && Array.isArray(selectedKeys) && selectedKeys.length > 0;
+    let isMultiKey = false;
+    if (selectedKeys !== undefined) {
+      if (!Array.isArray(selectedKeys)) {
+        return new NextResponse("selectedKeys must be an array", { status: 400 });
+      }
+      if (selectedKeys.length === 0) {
+        return new NextResponse("selectedKeys array cannot be empty", { status: 400 });
+      }
+      isMultiKey = true;
+    }
 
     if (!isMultiKey && !selectedKey) {
       return new NextResponse(
-        "Either selectedKeys or selectedKey must be provided",
+        "Either selectedKeys (array) or selectedKey (string) must be provided",
         { status: 400 }
       );
     }
 
-    const dataPoint = await prisma.layout2DDataPoint.create({
+    // Validate multiplier
+    const validatedMultiply = multiply !== undefined ? parseFloat(multiply) : 1.0;
+    if (isNaN(validatedMultiply)) {
+      return new NextResponse("multiply must be a valid number", { status: 400 });
+    }
+
+    const dataPoint = await (prisma as any).layout2DDataPoint.create({
       data: {
-        layoutId: params.id,
+        layout: {
+          connect: { id: params.id }
+        },
         device: {
           connect: { uniqId: deviceUniqId }
         },

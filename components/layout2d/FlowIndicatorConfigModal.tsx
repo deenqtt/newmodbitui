@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,8 +31,10 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useMqtt } from "@/contexts/MqttContext";
 
 interface Device {
   uniqId: string;
@@ -111,8 +113,12 @@ export default function FlowIndicatorConfigModal({
   initialConfig,
   position,
 }: FlowIndicatorConfigModalProps) {
+  const { subscribe, unsubscribe } = useMqtt();
+  const subscribedTopicRef = useRef<string | null>(null);
+
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const [formData, setFormData] = useState<Partial<FlowIndicator>>({
     deviceUniqId: "",
     selectedKey: "",
@@ -189,26 +195,59 @@ export default function FlowIndicatorConfigModal({
     }
   }, [initialConfig, position]);
 
-  // Get available keys from selected device's last payload
-  useEffect(() => {
-    if (formData.deviceUniqId) {
-      const selectedDevice = devices.find(d => d.uniqId === formData.deviceUniqId);
-      if (selectedDevice?.lastPayload) {
-        try {
-          const payload = JSON.parse(selectedDevice.lastPayload);
-          const innerPayload = typeof payload.value === "string"
+  // MQTT message handler for real-time key fetching
+  const handleMqttMessage = useCallback(
+    (topic: string, payloadString: string) => {
+      try {
+        const payload = JSON.parse(payloadString);
+        const innerPayload =
+          typeof payload.value === "string"
             ? JSON.parse(payload.value)
             : payload.value || {};
-          setAvailableKeys(Object.keys(innerPayload));
-        } catch (error) {
-          console.error("Failed to parse device payload:", error);
-          setAvailableKeys([]);
+        const keys = Object.keys(innerPayload);
+        setAvailableKeys(keys);
+      } catch (e) {
+        console.error("Failed to parse MQTT payload:", e);
+      } finally {
+        setIsWaitingForKey(false);
+        if (subscribedTopicRef.current) {
+          unsubscribe(subscribedTopicRef.current, handleMqttMessage);
+          subscribedTopicRef.current = null;
         }
-      } else {
-        setAvailableKeys([]);
       }
+    },
+    [unsubscribe]
+  );
+
+  // Real-time device key fetching via MQTT
+  useEffect(() => {
+    const selectedDevice = devices.find(d => d.uniqId === formData.deviceUniqId);
+    const newTopic = selectedDevice?.topic;
+
+    if (subscribedTopicRef.current && subscribedTopicRef.current !== newTopic) {
+      unsubscribe(subscribedTopicRef.current, handleMqttMessage);
+      subscribedTopicRef.current = null;
     }
-  }, [formData.deviceUniqId, devices]);
+
+    if (newTopic && newTopic !== subscribedTopicRef.current) {
+      setAvailableKeys([]);
+      setIsWaitingForKey(true);
+      subscribe(newTopic, handleMqttMessage);
+      subscribedTopicRef.current = newTopic;
+    } else if (!newTopic) {
+      setAvailableKeys([]);
+      setIsWaitingForKey(false);
+    }
+  }, [formData.deviceUniqId, devices, subscribe, unsubscribe, handleMqttMessage]);
+
+  // Cleanup MQTT subscription on modal close
+  useEffect(() => {
+    if (!isOpen && subscribedTopicRef.current) {
+      unsubscribe(subscribedTopicRef.current, handleMqttMessage);
+      subscribedTopicRef.current = null;
+      setIsWaitingForKey(false);
+    }
+  }, [isOpen, unsubscribe, handleMqttMessage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,8 +265,8 @@ export default function FlowIndicatorConfigModal({
       deviceUniqId: "",
       selectedKey: "",
       customName: "",
-      positionX: clickPosition?.x || 50,
-      positionY: clickPosition?.y || 50,
+      positionX: position?.x || 50,
+      positionY: position?.y || 50,
       arrowDirection: "right",
       logicOperator: ">",
       compareValue: "",
@@ -243,6 +282,11 @@ export default function FlowIndicatorConfigModal({
       warningValue: "",
     });
     setAvailableKeys([]);
+    setIsWaitingForKey(false);
+    if (subscribedTopicRef.current) {
+      unsubscribe(subscribedTopicRef.current, handleMqttMessage);
+      subscribedTopicRef.current = null;
+    }
     onClose();
   };
 
@@ -302,7 +346,7 @@ export default function FlowIndicatorConfigModal({
                     <SelectContent>
                       {(devices || []).map((device) => (
                         <SelectItem key={device.uniqId} value={device.uniqId}>
-                          {device.name} ({device.topic})
+                          {device.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -327,10 +371,28 @@ export default function FlowIndicatorConfigModal({
                       ))}
                     </SelectContent>
                   </Select>
-                  {formData.deviceUniqId && availableKeys.length === 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      No data available from this device
-                    </p>
+                  {formData.deviceUniqId && (
+                    <div className="text-xs mt-1 flex items-center gap-1">
+                      {isWaitingForKey ? (
+                        <>
+                          <Clock className="h-3 w-3 text-blue-600" />
+                          <span className="text-blue-600">
+                            Waiting for real-time data...
+                          </span>
+                        </>
+                      ) : availableKeys.length === 0 ? (
+                        <p className="text-yellow-600">
+                          No data available from this device
+                        </p>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-3 w-3 text-green-600" />
+                          <span className="text-green-600">
+                            {availableKeys.length} keys available
+                          </span>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
 

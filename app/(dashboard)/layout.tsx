@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePagePrefetch } from "@/components/page-prefetch";
+import { MqttProvider } from "@/contexts/MqttContext";
 
 import {
   DropdownMenu,
@@ -111,18 +112,20 @@ export default function DashboardLayout({
   const isLayout2DPage = pathname.includes('/layout2d');
 
   return (
-    <SidebarProvider defaultOpen={!isLayout2DPage}>
-      <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900/50">
-        <NavigationSidebar collapsible={true} />
-        <div className="flex flex-col flex-1 min-h-0">
-          <MainHeader />
-          <div className="flex-1 min-h-0">
-            {children}
+    <MqttProvider>
+      <SidebarProvider defaultOpen={!isLayout2DPage}>
+        <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900/50">
+          <NavigationSidebar collapsible={true} />
+          <div className="flex flex-col flex-1 min-h-0">
+            <MainHeader />
+            <div className="flex-1 min-h-0">
+              {children}
+            </div>
           </div>
+          {/* Enhanced loading screen for better user experience */}
+          <LoginSuccessLoader />
         </div>
-        {/* Enhanced loading screen for better user experience */}
-        <LoginSuccessLoader />
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </MqttProvider>
   );
 }

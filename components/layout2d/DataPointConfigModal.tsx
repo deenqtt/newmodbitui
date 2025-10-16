@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Clock, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useMqtt } from "@/contexts/MqttContext";
 import IconPicker from "./IconPicker";
@@ -371,22 +371,28 @@ export default function DataPointConfigModal({
                   })}
                 </div>
                 {config.deviceUniqId && (
-                  <div className="text-xs mt-1">
-                    {isWaitingForKey ? (
-                      <p className="text-blue-600">
-                        ⏳ Waiting for real-time data...
-                      </p>
-                    ) : availableKeys.length === 0 ? (
-                      <p className="text-yellow-600">
-                        No data available from this device
-                      </p>
-                    ) : (
-                      <p className="text-green-600">
-                        ✓ {availableKeys.length} keys available •{" "}
-                        {config.selectedKeys.length} selected
-                      </p>
-                    )}
-                  </div>
+                    <div className="text-xs mt-1 flex items-center gap-1">
+                      {isWaitingForKey ? (
+                        <>
+                          <Clock className="h-3 w-3 text-blue-600" />
+                          <span className="text-blue-600">
+                            Waiting for real-time data...
+                          </span>
+                        </>
+                      ) : availableKeys.length === 0 ? (
+                        <p className="text-yellow-600">
+                          No data available from this device
+                        </p>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-3 w-3 text-green-600" />
+                          <span className="text-green-600">
+                            {availableKeys.length} keys available •{" "}
+                            {config.selectedKeys.length} selected
+                          </span>
+                        </>
+                      )}
+                    </div>
                 )}
               </div>
             )}

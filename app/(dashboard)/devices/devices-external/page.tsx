@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useMqtt } from "@/contexts/MqttContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,15 +107,6 @@ const DevicesExternalContent = () => {
   });
 
   const { toast } = useToast();
-
-  // Mock MQTT hook since we're keeping the existing MQTT functionality
-  // In the original code, useMqtt comes from MqttProvider
-  const useMqtt = () => ({
-    isReady: true,
-    connectionStatus: "Connected",
-    subscribe: (topic: string, handler: (topic: string, payload: string) => void) => {},
-    unsubscribe: (topic: string, handler: (topic: string, payload: string) => void) => {},
-  });
 
   const { isReady, connectionStatus, subscribe, unsubscribe } = useMqtt();
 
