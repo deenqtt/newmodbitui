@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { truncate } = require('lodash');
 
 const prisma = new PrismaClient();
 
@@ -89,16 +90,16 @@ async function seedMenu() {
     // Create menu groups with isActive and isDeveloper flags
     const menuGroups = [
       { name: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', order: 0, isActive: true },
-      { name: 'control', label: 'Control', icon: 'Sliders', order: 1, isActive: true },
+      { name: 'control', label: 'Control', icon: 'Sliders', order: 1, isActive: false },
       { name: 'devices', label: 'Devices', icon: 'Cpu', order: 2, isActive: true },
       { name: 'network', label: 'Network', icon: 'Network', order: 3, isActive: true },
-      { name: 'security', label: 'Security', icon: 'Shield', order: 4, isActive: true },
-      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 5, isActive: true },
-      { name: 'payload', label: 'Payload', icon: 'FileText', order: 6, isActive: true, isDeveloper: true },
+      { name: 'security', label: 'Security', icon: 'Shield', order: 4, isActive: false },
+      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 5, isActive: false },
+      { name: 'payload', label: 'Payload', icon: 'FileText', order: 6, isActive: false, isDeveloper: true },
       { name: 'system', label: 'System Config', icon: 'Settings', order: 7, isActive: true, isDeveloper: true },
-      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 8, isActive: true },
+      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 8, isActive: false },
       { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 9, isActive: true },
-      { name: 'tools', label: 'Tools', icon: 'Tool', order: 10, isActive: true, isDeveloper: true },
+      { name: 'tools', label: 'Tools', icon: 'Tool', order: 10, isActive: false, isDeveloper: true },
     ];
 
     const createdMenuGroups = {};
@@ -118,60 +119,61 @@ async function seedMenu() {
       { name: 'dashboard-layout2d', label: 'Process Flow', path: '/layout2d', icon: 'Workflow', order: 1, groupName: 'dashboard', isActive: true, isDeveloper: false },
 
       // Control Group
-      { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isDeveloper: false },
-      { name: 'control-schedule', label: 'Scheduled Control', path: '/control/schedule', icon: 'Calendar', order: 1, groupName: 'control', isDeveloper: false },
-      { name: 'control-logic', label: 'Logic Control', path: '/control/logic', icon: 'GitBranch', order: 2, groupName: 'control', isDeveloper: false },
-      { name: 'control-unified', label: 'Unified Control', path: '/control/unified', icon: 'Sliders', order: 3, groupName: 'control', isDeveloper: false },
-      { name: 'control-value', label: 'Value Control', path: '/control/value', icon: 'Gauge', order: 4, groupName: 'control', isDeveloper: false },
-      { name: 'control-voice', label: 'Voice Control', path: '/control/voice', icon: 'Mic', order: 5, groupName: 'control', isDeveloper: false },
+      { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isActive: false, isDeveloper: false },
+      { name: 'control-schedule', label: 'Scheduled Control', path: '/control/schedule', icon: 'Calendar', order: 1, groupName: 'control', isActive: false, isDeveloper: false },
+      { name: 'control-logic', label: 'Logic Control', path: '/control/logic', icon: 'GitBranch', order: 2, groupName: 'control', isActive: false, isDeveloper: false },
+      { name: 'control-unified', label: 'Unified Control', path: '/control/unified', icon: 'Sliders', order: 3, groupName: 'control', isActive: false, isDeveloper: false },
+      { name: 'control-value', label: 'Value Control', path: '/control/value', icon: 'Gauge', order: 4, groupName: 'control', isActive: false, isDeveloper: false },
+      { name: 'control-voice', label: 'Voice Control', path: '/control/voice', icon: 'Mic', order: 5, groupName: 'control', isActive: false, isDeveloper: false },
 
       // Devices Group
-      { name: 'devices-internal', label: 'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 0, groupName: 'devices', isDeveloper: false },
-      { name: 'devices-external', label: 'External Devices', path: '/devices/devices-external', icon: 'Globe', order: 1, groupName: 'devices', isDeveloper: false },
-      { name: 'devices-access-controllers', label: 'Access Controllers', path: '/devices/access-controllers', icon: 'Shield', order: 2, groupName: 'devices', isDeveloper: false },
-      { name: 'devices-zigbee', label: 'Zigbee Devices', path: '/devices/zigbee', icon: 'Zap', order: 3, groupName: 'devices', isDeveloper: false },
+      { name: 'devices-internal', label: 'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 0, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'devices-external', label: 'External Devices', path: '/devices/devices-external', icon: 'Globe', order: 1, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'logging-configs', label: 'Device Log Configs', path: '/devices/devices-for-logging', icon: 'Database', order: 2, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'devices-access-controllers', label: 'Access Controllers', path: '/devices/access-controllers', icon: 'Shield', order: 3, groupName: 'devices', isActive: false, isDeveloper: false },
+      { name: 'devices-zigbee', label: 'Zigbee Devices', path: '/devices/zigbee', icon: 'Zap', order: 4, groupName: 'devices', isActive: false, isDeveloper: false },
 
       // Network Group
-      { name: 'network-communication-setup', label: 'Communication Setup', path: '/network/communication-setup', icon: 'Waves', order: 0, groupName: 'network', isDeveloper: false },
-      { name: 'network-mqtt-broker', label: 'MQTT Broker', path: '/network/mqtt-broker', icon: 'Radio', order: 1, groupName: 'network', isDeveloper: false },
-      { name: 'network-register-snmp', label: 'SNMP Registration', path: '/network/register-snmp', icon: 'Database', order: 2, groupName: 'network', isDeveloper: false },
+      { name: 'network-communication-setup', label: 'Communication Setup', path: '/network/communication-setup', icon: 'Waves', order: 0, groupName: 'network', isActive: true, isDeveloper: false },
+      { name: 'network-mqtt-broker', label: 'MQTT Broker', path: '/network/mqtt-broker', icon: 'Radio', order: 1, groupName: 'network', isActive: true, isDeveloper: false },
+      { name: 'network-register-snmp', label: 'SNMP Registration', path: '/network/register-snmp', icon: 'Database', order: 2, groupName: 'network', isActive: true, isDeveloper: false },
 
       // Security Group
-      { name: 'security-access-control', label: 'Access Control', path: '/security-access/access-control', icon: 'Lock', order: 0, groupName: 'security', isDeveloper: false },
-      { name: 'security-surveillance-cctv', label: 'CCTV Surveillance', path: '/security-access/surveillance-cctv', icon: 'Camera', order: 1, groupName: 'security', isDeveloper: false },
+      { name: 'security-access-control', label: 'Access Control', path: '/security-access/access-control', icon: 'Lock', order: 0, groupName: 'security', isActive: false, isDeveloper: false },
+      { name: 'security-surveillance-cctv', label: 'CCTV Surveillance', path: '/security-access/surveillance-cctv', icon: 'Camera', order: 1, groupName: 'security', isActive: false, isDeveloper: false },
 
       // LoRaWAN Group
-      { name: 'lorawan-gateways', label: 'LoRaWAN Gateways', path: '/lo-ra-wan/gateways', icon: 'Router', order: 0, groupName: 'lorawan', isDeveloper: false },
-      { name: 'lorawan-applications', label: 'LoRaWAN Apps', path: '/lo-ra-wan/applications', icon: 'Layers', order: 1, groupName: 'lorawan', isDeveloper: false },
-      { name: 'lorawan-device-profiles', label: 'Device Profiles', path: '/lo-ra-wan/device-profiles', icon: 'Settings2', order: 2, groupName: 'lorawan', isDeveloper: false },
-      { name: 'lorawan-device-list', label: 'Device List', path: '/lo-ra-wan/device-list', icon: 'List', order: 3, groupName: 'lorawan', isDeveloper: false },
-      { name: 'lorawan-ec25-modem', label: 'Mobile Modem', path: '/lo-ra-wan/ec25-modem', icon: 'Wireless', order: 4, groupName: 'lorawan', isDeveloper: false },
+      { name: 'lorawan-gateways', label: 'LoRaWAN Gateways', path: '/lo-ra-wan/gateways', icon: 'Router', order: 0, groupName: 'lorawan', isActive: false, isDeveloper: false },
+      { name: 'lorawan-applications', label: 'LoRaWAN Apps', path: '/lo-ra-wan/applications', icon: 'Layers', order: 1, groupName: 'lorawan', isActive: false, isDeveloper: false },
+      { name: 'lorawan-device-profiles', label: 'Device Profiles', path: '/lo-ra-wan/device-profiles', icon: 'Settings2', order: 2, groupName: 'lorawan', isActive: false, isDeveloper: false },
+      { name: 'lorawan-device-list', label: 'Device List', path: '/lo-ra-wan/device-list', icon: 'List', order: 3, groupName: 'lorawan', isActive: false, isDeveloper: false },
+      { name: 'lorawan-ec25-modem', label: 'Mobile Modem', path: '/lo-ra-wan/ec25-modem', icon: 'Wireless', order: 4, groupName: 'lorawan', isActive: false, isDeveloper: false },
 
       // Payload Group (Developer only)
-      { name: 'payload-static', label: 'Static Payload', path: '/payload/static', icon: 'FileText', order: 0, groupName: 'payload', isDeveloper: true },
-      { name: 'payload-remapping', label: 'Payload Remapping', path: '/payload/remapping', icon: 'ArrowRightLeft', order: 1, groupName: 'payload', isDeveloper: true },
-      { name: 'payload-discover', label: 'Payload Discovery', path: '/payload/discover', icon: 'Search', order: 2, groupName: 'payload', isDeveloper: true },
+      { name: 'payload-static', label: 'Static Payload', path: '/payload/static', icon: 'FileText', order: 0, groupName: 'payload', isActive: false, isDeveloper: true },
+      { name: 'payload-remapping', label: 'Payload Remapping', path: '/payload/remapping', icon: 'ArrowRightLeft', order: 1, groupName: 'payload', isActive: false, isDeveloper: true },
+      { name: 'payload-discover', label: 'Payload Discovery', path: '/payload/discover', icon: 'Search', order: 2, groupName: 'payload', isActive: false, isDeveloper: true },
 
       // System Config Group (Developer)
-      { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'system', isDeveloper: true },
-      { name: 'system-power-analyzer', label: 'Power Analyzer', path: '/system-config/power-analyzer', icon: 'Zap', order: 1, groupName: 'system', isDeveloper: true },
-      { name: 'system-system-backup', label: 'System Backup', path: '/system-config/system-backup', icon: 'HardDrive', order: 2, groupName: 'system', isDeveloper: true },
-      { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 99, groupName: 'system', isDeveloper: true },
+      { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'system', isActive: true, isDeveloper: true },
+      { name: 'system-power-analyzer', label: 'Power Analyzer', path: '/system-config/power-analyzer', icon: 'Zap', order: 1, groupName: 'system', isActive: false, isDeveloper: true },
+      { name: 'system-system-backup', label: 'System Backup', path: '/system-config/system-backup', icon: 'HardDrive', order: 2, groupName: 'system', isActive: true, isDeveloper: true },
+      { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 99, groupName: 'system', isActive: true, isDeveloper: true },
 
       // Analytics Group
-      { name: 'alarms-alarm-management', label: 'Alarm Management', path: '/alarms/alarm-management', icon: 'AlertTriangle', order: 0, groupName: 'analytics', isDeveloper: false },
-      { name: 'alarms-alarm-log-reports', label: 'Alarm Reports', path: '/alarms/alarm-log-reports', icon: 'FileBarChart', order: 1, groupName: 'analytics', isDeveloper: false },
-      { name: 'analytics-devices-log-report', label: 'Device Analytics', path: '/analytics/devices-log-report', icon: 'BarChart', order: 2, groupName: 'analytics', isDeveloper: false },
+      { name: 'alarms-alarm-management', label: 'Alarm Management', path: '/alarms/alarm-management', icon: 'AlertTriangle', order: 0, groupName: 'analytics', isActive: true, isDeveloper: false },
+      { name: 'alarms-alarm-log-reports', label: 'Alarm Reports', path: '/alarms/alarm-log-reports', icon: 'FileBarChart', order: 1, groupName: 'analytics', isActive: true, isDeveloper: false },
+      { name: 'analytics-devices-log-report', label: 'Device Analytics', path: '/analytics/devices-log-report', icon: 'BarChart', order: 2, groupName: 'analytics', isActive: true, isDeveloper: false },
 
       // Maintenance Group
-      { name: 'maintenance-schedule-management', label: 'Maintenance Schedule', path: '/maintenance/schedule-management', icon: 'Wrench', order: 0, groupName: 'maintenance', isDeveloper: false },
-      { name: 'racks-management', label: 'Rack Management', path: '/racks', icon: 'Archive', order: 1, groupName: 'maintenance', isDeveloper: false },
-      { name: 'info-system-info', label: 'System Information', path: '/info', icon: 'Info', order: 100, groupName: 'maintenance', isDeveloper: false },
+      { name: 'maintenance-schedule-management', label: 'Maintenance Schedule', path: '/maintenance/schedule-management', icon: 'Wrench', order: 0, groupName: 'maintenance', isActive: true, isDeveloper: false },
+      { name: 'racks-management', label: 'Rack Management', path: '/racks', icon: 'Archive', order: 1, groupName: 'maintenance', isActive: true, isDeveloper: false },
+      { name: 'info-system-info', label: 'System Information', path: '/info', icon: 'Info', order: 100, groupName: 'maintenance', isActive: true, isDeveloper: false },
 
       // Tools Group (Developer)
-      { name: 'snmp-data-get', label: 'SNMP Data Manager', path: '/snmp-data-get', icon: 'Network', order: 0, groupName: 'tools', isDeveloper: true },
-      { name: 'whatsapp-test', label: 'WhatsApp Integration', path: '/whatsapp-test', icon: 'MessageCircle', order: 1, groupName: 'tools', isDeveloper: true },
-      { name: 'test-system-test', label: 'System Testing', path: '/test', icon: 'Bug', order: 2, groupName: 'tools', isDeveloper: true },
+      { name: 'snmp-data-get', label: 'SNMP Data Manager', path: '/snmp-data-get', icon: 'Network', order: 0, groupName: 'tools', isActive: false, isDeveloper: true },
+      { name: 'whatsapp-test', label: 'WhatsApp Integration', path: '/whatsapp-test', icon: 'MessageCircle', order: 1, groupName: 'tools', isActive: false, isDeveloper: true },
+      { name: 'test-system-test', label: 'System Testing', path: '/test', icon: 'Bug', order: 2, groupName: 'tools', isActive: false, isDeveloper: true },
     ];
 
     for (const item of menuItems) {
@@ -185,6 +187,7 @@ async function seedMenu() {
           path: item.path,
           icon: item.icon,
           order: item.order,
+          isActive: item.isActive,
           isDeveloper: item.isDeveloper,
         },
       });

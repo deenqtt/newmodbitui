@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, FormEvent } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { MaintenanceTarget, Role } from "@prisma/client";
 import { useSortableTable } from "@/hooks/use-sort-table";
-import Swal from "sweetalert2";
+import { toast } from "@/components/ui/use-toast";
 import {
   format,
   startOfMonth,
@@ -119,13 +119,7 @@ interface MaintenanceData {
   updatedAt: string;
 }
 
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-});
+// Toast functions now replaced with toast system
 
 function MaintenanceManagementContent() {
   const { user, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
@@ -189,7 +183,11 @@ function MaintenanceManagementContent() {
         "[MaintenanceManagement] Gagal mengambil data:",
         error.message
       );
-      Toast.fire({ icon: "error", title: error.message });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -334,16 +332,20 @@ function MaintenanceManagementContent() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      Toast.fire({
-        icon: "success",
-        title: `Maintenance ${
+      toast({
+        title: "Success",
+        description: `Maintenance ${
           isEditMode ? "updated" : "created"
         } successfully!`,
       });
       handleCloseModal();
       fetchMaintenances();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -360,10 +362,17 @@ function MaintenanceManagementContent() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to delete maintenance.");
       }
-      Toast.fire({ icon: "success", title: "Maintenance deleted!" });
+      toast({
+        title: "Success",
+        description: "Maintenance deleted!",
+      });
       fetchMaintenances();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsDeleteAlertOpen(false);
       setMaintenanceToDelete(null);
@@ -371,60 +380,43 @@ function MaintenanceManagementContent() {
   };
 
   const handleSendWhatsAppNotification = async (maintenance: MaintenanceData) => {
-    const result = await Swal.fire({
-      title: 'Send WhatsApp Notification?',
-      text: `Send maintenance notification to ${maintenance.assignedTo.email}?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Send Notification',
-      cancelButtonText: 'Cancel',
-      input: 'text',
-      inputLabel: 'Phone Number (optional)',
-      inputPlaceholder: 'Enter phone number if different from user profile',
-      inputValidator: (value) => {
-        if (value && !/^[\d+\-\s()]+$/.test(value)) {
-          return 'Please enter a valid phone number';
-        }
-        return null;
-      }
-    });
+    // Confirmation dialog
+    if (!confirm(`Send WhatsApp notification to ${maintenance.assignedTo.email}?`)) {
+      return;
+    }
 
-    if (result.isConfirmed) {
-      setIsSendingWhatsApp(true);
-      try {
-        const response = await fetch('/api/whatsapp/maintenance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            maintenanceId: maintenance.id,
-            phoneNumber: result.value || undefined
-          }),
-        });
+    setIsSendingWhatsApp(true);
+    try {
+      const response = await fetch('/api/whatsapp/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maintenanceId: maintenance.id
+        }),
+      });
 
-        const data = await response.json();
-        
-        if (response.ok) {
-          Toast.fire({
-            icon: "success",
-            title: "WhatsApp notification sent!",
-            text: `Notification sent to ${maintenance.assignedTo.email}`
-          });
-        } else {
-          Toast.fire({
-            icon: "error",
-            title: "Failed to send notification",
-            text: data.message || "Unknown error occurred"
-          });
-        }
-      } catch (error: any) {
-        Toast.fire({
-          icon: "error",
-          title: "Failed to send notification",
-          text: error.message || "Network error occurred"
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: `WhatsApp notification sent to ${maintenance.assignedTo.email} successfully!`,
         });
-      } finally {
-        setIsSendingWhatsApp(false);
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to send notification",
+          variant: "destructive",
+        });
       }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Network error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingWhatsApp(false);
     }
   };
 

@@ -3,28 +3,88 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "role" TEXT NOT NULL DEFAULT 'USER',
+    "roleId" TEXT NOT NULL,
     "fingerprintId" TEXT,
     "cardUid" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    "phoneNumber" TEXT
+    "phoneNumber" TEXT,
+    CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "ZigbeeDevice" (
+CREATE TABLE "Role" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "deviceId" TEXT NOT NULL,
-    "friendlyName" TEXT NOT NULL,
-    "deviceType" TEXT NOT NULL,
-    "manufacturer" TEXT,
-    "modelId" TEXT,
-    "capabilities" JSONB NOT NULL,
-    "lastSeen" DATETIME,
-    "isOnline" BOOLEAN NOT NULL DEFAULT false,
-    "currentState" JSONB,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Permission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "resource" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "MenuGroup" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "icon" TEXT,
+    "order" INTEGER NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isDeveloper" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "MenuItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "menuGroupId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "icon" TEXT,
+    "order" INTEGER NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isDeveloper" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "MenuItem_menuGroupId_fkey" FOREIGN KEY ("menuGroupId") REFERENCES "MenuGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RoleMenuPermission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "roleId" TEXT NOT NULL,
+    "menuItemId" TEXT NOT NULL,
+    "canView" BOOLEAN NOT NULL DEFAULT true,
+    "canCreate" BOOLEAN NOT NULL DEFAULT false,
+    "canUpdate" BOOLEAN NOT NULL DEFAULT false,
+    "canDelete" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RoleMenuPermission_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "RoleMenuPermission_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "MenuItem" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RolePermission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "roleId" TEXT NOT NULL,
+    "permissionId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RolePermission_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "RolePermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -41,8 +101,9 @@ CREATE TABLE "Maintenance" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "deviceTargetId" TEXT,
     CONSTRAINT "Maintenance_assignTo_fkey" FOREIGN KEY ("assignTo") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Maintenance_targetId_fkey" FOREIGN KEY ("targetId") REFERENCES "DeviceExternal" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "Maintenance_deviceTargetId_fkey" FOREIGN KEY ("deviceTargetId") REFERENCES "DeviceExternal" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -54,7 +115,7 @@ CREATE TABLE "DeviceExternal" (
     "address" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    "lastPayload" TEXT,
+    "lastPayload" JSONB,
     "lastUpdatedByMqtt" DATETIME
 );
 
@@ -112,8 +173,8 @@ CREATE TABLE "PueConfiguration" (
     "customName" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'pue',
     "apiTopicUniqId" TEXT,
-    "pduList" TEXT,
-    "mainPower" TEXT,
+    "pduList" JSONB,
+    "mainPower" JSONB,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "PueConfiguration_apiTopicUniqId_fkey" FOREIGN KEY ("apiTopicUniqId") REFERENCES "DeviceExternal" ("uniqId") ON DELETE SET NULL ON UPDATE CASCADE
@@ -126,15 +187,15 @@ CREATE TABLE "PowerAnalyzerConfiguration" (
     "apiTopicUniqId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    "mainPower" TEXT,
-    "pduList" TEXT,
+    "mainPower" JSONB,
+    "pduList" JSONB,
     CONSTRAINT "PowerAnalyzerConfiguration_apiTopicUniqId_fkey" FOREIGN KEY ("apiTopicUniqId") REFERENCES "DeviceExternal" ("uniqId") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "MenuConfiguration" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "structure" TEXT NOT NULL,
+    "structure" JSONB NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -187,6 +248,24 @@ CREATE TABLE "Notification" (
 );
 
 -- CreateTable
+CREATE TABLE "zigbee_devices" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "zigbee_device_id" TEXT NOT NULL,
+    "friendlyName" TEXT,
+    "description" TEXT,
+    "deviceType" TEXT,
+    "manufacturer" TEXT,
+    "model" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'unknown',
+    "isOnline" BOOLEAN NOT NULL DEFAULT false,
+    "lastSeen" DATETIME,
+    "capabilities" JSONB,
+    "currentState" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
 CREATE TABLE "ZkTecoDevice" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
@@ -205,7 +284,7 @@ CREATE TABLE "ZkTecoUser" (
     "name" TEXT NOT NULL,
     "password" TEXT,
     "card" TEXT,
-    "fingerprints" TEXT,
+    "fingerprints" JSONB,
     "zkTecoDeviceId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -234,7 +313,7 @@ CREATE TABLE "Cctv" (
 CREATE TABLE "DashboardLayout" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "layout" TEXT NOT NULL,
+    "layout" JSONB NOT NULL,
     "userId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -248,7 +327,7 @@ CREATE TABLE "EnergyTarget" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "loggingConfigId" TEXT NOT NULL,
     "year" INTEGER NOT NULL,
-    "monthlyTargets" TEXT NOT NULL,
+    "monthlyTargets" JSONB NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -299,7 +378,7 @@ CREATE TABLE "DeviceData" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "timestamp" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deviceId" TEXT NOT NULL,
-    "data" TEXT NOT NULL,
+    "data" JSONB NOT NULL,
     CONSTRAINT "DeviceData_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "LoraDevice" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -349,6 +428,183 @@ CREATE TABLE "GatewayStats" (
     CONSTRAINT "GatewayStats_gatewayId_fkey" FOREIGN KEY ("gatewayId") REFERENCES "LoraGateway" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "ec25_modems" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "imei" TEXT NOT NULL,
+    "manufacturer" TEXT,
+    "model" TEXT,
+    "revision" TEXT,
+    "connected" BOOLEAN NOT NULL DEFAULT false,
+    "lastSeen" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "currentOperator" TEXT,
+    "currentRegistrationStatus" TEXT,
+    "currentNetworkType" TEXT,
+    "currentSignalStrength" INTEGER,
+    "currentSignalQuality" INTEGER,
+    "currentRsrp" REAL,
+    "currentRsrq" REAL,
+    "currentSinr" REAL,
+    "currentCellId" TEXT,
+    "currentLatitude" REAL,
+    "currentLongitude" REAL,
+    "currentAltitude" REAL,
+    "currentSpeed" REAL,
+    "currentSatellites" INTEGER,
+    "currentGpsFixStatus" TEXT,
+    "configApn" TEXT,
+    "configUsername" TEXT,
+    "configPin" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "ec25_network_data" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "modemId" TEXT NOT NULL,
+    "operator" TEXT,
+    "registrationStatus" TEXT,
+    "networkType" TEXT,
+    "signalStrength" INTEGER,
+    "signalQuality" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ec25_network_data_modemId_fkey" FOREIGN KEY ("modemId") REFERENCES "ec25_modems" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ec25_gps_data" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "modemId" TEXT NOT NULL,
+    "fixStatus" TEXT,
+    "latitude" REAL,
+    "longitude" REAL,
+    "altitude" REAL,
+    "speed" REAL,
+    "satellites" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ec25_gps_data_modemId_fkey" FOREIGN KEY ("modemId") REFERENCES "ec25_modems" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ec25_service_health" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "serviceId" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "lastSeen" DATETIME NOT NULL,
+    "lastHeartbeat" DATETIME,
+    "uptime" REAL,
+    "memoryUsage" TEXT,
+    "data" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "ec25_service_logs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "serviceId" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "uptime" REAL,
+    "data" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "ec25_alerts" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "type" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "severity" TEXT NOT NULL,
+    "requiresAction" BOOLEAN NOT NULL DEFAULT false,
+    "details" TEXT,
+    "resolved" BOOLEAN NOT NULL DEFAULT false,
+    "resolvedAt" DATETIME,
+    "resolvedBy" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "ec25_command_logs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "command" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "message" TEXT,
+    "data" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "Layout2D" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "isUse" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Layout2DDataPoint" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "layoutId" TEXT NOT NULL,
+    "deviceUniqId" TEXT NOT NULL,
+    "selectedKey" TEXT,
+    "selectedKeys" TEXT,
+    "units" TEXT,
+    "multiply" REAL DEFAULT 1,
+    "customName" TEXT NOT NULL,
+    "positionX" REAL NOT NULL,
+    "positionY" REAL NOT NULL,
+    "fontSize" INTEGER DEFAULT 14,
+    "color" TEXT DEFAULT '#000000',
+    "iconName" TEXT,
+    "iconColor" TEXT DEFAULT '#666666',
+    "showIcon" BOOLEAN DEFAULT false,
+    "displayLayout" TEXT DEFAULT 'vertical',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Layout2DDataPoint_layoutId_fkey" FOREIGN KEY ("layoutId") REFERENCES "Layout2D" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Layout2DDataPoint_deviceUniqId_fkey" FOREIGN KEY ("deviceUniqId") REFERENCES "DeviceExternal" ("uniqId") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Layout2DFlowIndicator" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "layoutId" TEXT NOT NULL,
+    "deviceUniqId" TEXT NOT NULL,
+    "selectedKey" TEXT NOT NULL,
+    "customName" TEXT NOT NULL,
+    "positionX" REAL NOT NULL,
+    "positionY" REAL NOT NULL,
+    "arrowDirection" TEXT NOT NULL DEFAULT 'right',
+    "logicOperator" TEXT NOT NULL,
+    "compareValue" TEXT NOT NULL,
+    "valueType" TEXT NOT NULL DEFAULT 'number',
+    "trueColor" TEXT NOT NULL DEFAULT '#22c55e',
+    "trueAnimation" BOOLEAN NOT NULL DEFAULT true,
+    "falseColor" TEXT NOT NULL DEFAULT '#ef4444',
+    "falseAnimation" BOOLEAN NOT NULL DEFAULT false,
+    "warningColor" TEXT NOT NULL DEFAULT '#f59e0b',
+    "warningAnimation" BOOLEAN NOT NULL DEFAULT true,
+    "warningEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "warningOperator" TEXT,
+    "warningValue" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Layout2DFlowIndicator_layoutId_fkey" FOREIGN KEY ("layoutId") REFERENCES "Layout2D" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Layout2DFlowIndicator_deviceUniqId_fkey" FOREIGN KEY ("deviceUniqId") REFERENCES "DeviceExternal" ("uniqId") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "_RolePermissions" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+    CONSTRAINT "_RolePermissions_A_fkey" FOREIGN KEY ("A") REFERENCES "Permission" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "_RolePermissions_B_fkey" FOREIGN KEY ("B") REFERENCES "Role" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -359,7 +615,25 @@ CREATE UNIQUE INDEX "User_fingerprintId_key" ON "User"("fingerprintId");
 CREATE UNIQUE INDEX "User_cardUid_key" ON "User"("cardUid");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ZigbeeDevice_deviceId_key" ON "ZigbeeDevice"("deviceId");
+CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Permission_name_key" ON "Permission"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Permission_resource_action_key" ON "Permission"("resource", "action");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MenuGroup_name_key" ON "MenuGroup"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MenuItem_name_key" ON "MenuItem"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RoleMenuPermission_roleId_menuItemId_key" ON "RoleMenuPermission"("roleId", "menuItemId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RolePermission_roleId_permissionId_key" ON "RolePermission"("roleId", "permissionId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DeviceExternal_uniqId_key" ON "DeviceExternal"("uniqId");
@@ -387,6 +661,9 @@ CREATE UNIQUE INDEX "PowerAnalyzerConfiguration_customName_key" ON "PowerAnalyze
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PowerAnalyzerConfiguration_apiTopicUniqId_key" ON "PowerAnalyzerConfiguration"("apiTopicUniqId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "zigbee_devices_zigbee_device_id_key" ON "zigbee_devices"("zigbee_device_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ZkTecoDevice_name_key" ON "ZkTecoDevice"("name");
@@ -417,3 +694,45 @@ CREATE UNIQUE INDEX "LoraDevice_devEui_key" ON "LoraDevice"("devEui");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "LoraGateway_gatewayId_key" ON "LoraGateway"("gatewayId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ec25_modems_imei_key" ON "ec25_modems"("imei");
+
+-- CreateIndex
+CREATE INDEX "ec25_network_data_modemId_createdAt_idx" ON "ec25_network_data"("modemId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ec25_gps_data_modemId_createdAt_idx" ON "ec25_gps_data"("modemId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ec25_gps_data_latitude_longitude_idx" ON "ec25_gps_data"("latitude", "longitude");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ec25_service_health_serviceId_key" ON "ec25_service_health"("serviceId");
+
+-- CreateIndex
+CREATE INDEX "ec25_service_logs_serviceId_createdAt_idx" ON "ec25_service_logs"("serviceId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ec25_alerts_resolved_createdAt_idx" ON "ec25_alerts"("resolved", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ec25_alerts_severity_createdAt_idx" ON "ec25_alerts"("severity", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ec25_command_logs_command_createdAt_idx" ON "ec25_command_logs"("command", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Layout2D_name_key" ON "Layout2D"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Layout2DDataPoint_layoutId_deviceUniqId_customName_key" ON "Layout2DDataPoint"("layoutId", "deviceUniqId", "customName");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Layout2DFlowIndicator_layoutId_deviceUniqId_selectedKey_positionX_positionY_key" ON "Layout2DFlowIndicator"("layoutId", "deviceUniqId", "selectedKey", "positionX", "positionY");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "_RolePermissions_AB_unique" ON "_RolePermissions"("A", "B");
+
+-- CreateIndex
+CREATE INDEX "_RolePermissions_B_index" ON "_RolePermissions"("B");

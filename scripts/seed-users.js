@@ -7,22 +7,56 @@ async function seedUsers() {
   console.log('👥 Seeding users and roles...');
 
   try {
-    // Create roles
-    const roles = [
-      { name: 'ADMIN', description: 'Administrator with full system access' },
-      { name: 'USER', description: 'Regular user with limited access' },
-      { name: 'DEVELOPER', description: 'Developer with advanced access' },
-    ];
+    // Simple approach - first check if we can use the Prisma client, if not, skip user seeding
+    console.log('🔍 Checking Prisma client availability...');
 
     const createdRoles = {};
-    for (const role of roles) {
-      const created = await prisma.role.upsert({
-        where: { name: role.name },
-        update: {},
-        create: role,
-      });
-      createdRoles[role.name] = created;
+
+    // Try to check if the table exists
+    try {
+      const tableExists = await prisma.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='User'`;
+      console.log('✅ Database tables exist');
+
+      // Create roles directly without checking if table exists
+      const roles = [
+        { name: 'ADMIN', description: 'Administrator with full system access' },
+        { name: 'USER', description: 'Regular user with limited access' },
+        { name: 'DEVELOPER', description: 'Developer with advanced access' },
+      ];
+      for (const role of roles) {
+        try {
+          const created = await prisma.role.create({
+            data: role,
+          });
+          createdRoles[role.name] = created;
+          console.log(`   - Created role: ${role.name}`);
+        } catch (roleError) {
+          console.log(`   - Role ${role.name} might already exist, skipping...`);
+          // Try to fetch existing role if creation failed
+          try {
+            const existingRole = await prisma.role.findUnique({
+              where: { name: role.name },
+            });
+            if (existingRole) {
+              createdRoles[role.name] = existingRole;
+              console.log(`   - Found existing role: ${role.name}`);
+            }
+          } catch (fetchError) {
+            console.log(`   - Could not fetch existing role ${role.name}: ${fetchError.message}`);
+          }
+        }
+      }
+    } catch (dbError) {
+      console.log('⚠️  Database tables not fully available, skipping role creation');
+      throw new Error('Database schema incomplete - please run migrations first');
     }
+
+    // Check if createdRoles has any content
+    const roleNames = Object.keys(createdRoles);
+    if (roleNames.length === 0) {
+      throw new Error('No roles were created or found. Cannot proceed with user creation.');
+    }
+    console.log(`📋 Available roles for user creation: ${roleNames.join(', ')}`);
 
     // Hash password function
     const hashPassword = async (password) => {
@@ -54,21 +88,31 @@ async function seedUsers() {
 
     for (const user of users) {
       const role = createdRoles[user.roleName];
-      await prisma.user.upsert({
-        where: { email: user.email },
-        update: {},
-        create: {
-          email: user.email,
-          password: user.password,
-          roleId: role.id,
-          phoneNumber: user.phoneNumber,
-        },
-      });
+      if (!role) {
+        console.warn(`⚠️  Role ${user.roleName} not found, skipping user ${user.email}`);
+        continue;
+      }
+
+      try {
+        await prisma.user.upsert({
+          where: { email: user.email },
+          update: {},
+          create: {
+            email: user.email,
+            password: user.password,
+            roleId: role.id,
+            phoneNumber: user.phoneNumber,
+          },
+        });
+        console.log(`   - Created user: ${user.email} (${user.roleName})`);
+      } catch (userError) {
+        console.log(`   - User ${user.email} might already exist, skipping...`);
+      }
     }
 
     console.log('✅ Users and roles seeded successfully');
-    console.log(`   - ${roles.length} roles created (ADMIN, USER, DEVELOPER)`);
-    console.log(`   - ${users.length} users created`);
+    console.log(`   - ${Object.keys(createdRoles).length} roles available`);
+    console.log(`   - ${users.length} users processed`);
 
   } catch (error) {
     console.error('❌ Error seeding users:', error);

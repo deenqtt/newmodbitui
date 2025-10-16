@@ -8,7 +8,7 @@ export interface UseSortableTableReturn<T> {
   sorted: T[];
   sortDirection: SortDirection;
   sortKey: string | null;
-  handleSort: (key: keyof T) => void;
+  handleSort: (key: string) => void;
 }
 
 export function useSortableTable<T extends Record<string, any>>(
@@ -63,8 +63,8 @@ export function useSortableTable<T extends Record<string, any>>(
     });
   }, [data, sortKey, sortDirection]);
 
-  const handleSort = (key: keyof T) => {
-    const keyStr = String(key);
+  const handleSort = (key: string) => {
+    const keyStr = key;
 
     if (sortKey === keyStr) {
       // Cycling through: asc -> desc -> null

@@ -3,7 +3,8 @@
 
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 
 // --- UI Components & Icons ---
@@ -57,14 +58,37 @@ type LoggingConfig = {
   device: { name: string };
 };
 
-// --- Konfigurasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
+// Confirmation Dialog State
+const [confirmationProps, setCconfirmationProps] = useState<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  type: "info" | "warning" | "destructive";
+  title: string;
+  description: string;
+  confirmText: string;
+  cancelText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}>({
+  open: false,
+  onOpenChange: () => {},
+  type: "info",
+  title: "",
+  description: "",
+  confirmText: "Confirm",
+  cancelText: "Cancel",
+  onConfirm: () => {},
+  onCancel: () => {},
 });
+
+const showConfirmation = (props: Partial<typeof confirmationProps>) => {
+  setCconfirmationProps(prev => ({
+    ...prev,
+    ...props,
+    open: true,
+    onOpenChange: (open) => setCconfirmationProps(prev => ({ ...prev, open })),
+  }));
+};
 
 // =================================================================
 // Main Page Component
@@ -140,9 +164,9 @@ export default function DeviceLogReportPage() {
       );
       if (!response.ok) throw new Error("Failed to fetch device logs");
       setLogs(await response.json());
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Toast.fire({ icon: "error", title: "Could not fetch device logs." });
+      showToast.error("Failed to fetch device logs", error.message || "Could not fetch device logs.");
     } finally {
       setIsLoading(false);
     }
@@ -153,29 +177,24 @@ export default function DeviceLogReportPage() {
   }, [fetchLogs]);
 
   const handleDeleteAll = () => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "This will permanently delete ALL device logs!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      confirmButtonText: "Yes, delete all!",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
+    showConfirmation({
+      type: "destructive",
+      title: "Delete All Device Logs",
+      description: "This will permanently delete ALL device logs! This action cannot be undone.",
+      confirmText: "Yes, delete all",
+      cancelText: "Cancel",
+      onConfirm: async () => {
         try {
           const response = await fetch("/api/devices-log-report", {
             method: "DELETE",
           });
           if (!response.ok) throw new Error("Failed to delete logs.");
-          Toast.fire({
-            icon: "success",
-            title: "All device logs have been deleted.",
-          });
+          showToast.success("All device logs have been deleted.");
           setLogs([]);
         } catch (error: any) {
-          Toast.fire({ icon: "error", title: error.message });
+          showToast.error("Deletion failed", error.message);
         }
-      }
+      },
     });
   };
 
@@ -342,6 +361,7 @@ export default function DeviceLogReportPage() {
             </Button>
           </div>
         </CardFooter>
+      <ConfirmationDialog {...confirmationProps} />
       </Card>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from "react";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 // Impor MqttProvider dan useMqtt
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
 // --- UI Components & Icons ---
@@ -111,18 +111,7 @@ const flattenObject = (
   return res;
 };
 
-// --- Konfigurasi Notifikasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-  didOpen: (toast) => {
-    toast.onmouseenter = Swal.stopTimer;
-    toast.onmouseleave = Swal.resumeTimer;
-  },
-});
+// Confirmation Dialog State - MOVED INSIDE COMPONENT
 
 // =================================================================
 // KONTEN UTAMA HALAMAN DIPINDAHKAN KE KOMPONEN SENDIRI
@@ -201,7 +190,7 @@ function DevicesForLoggingContent() {
       setLoggingConfigs(await configsRes.json());
       setAllDevices(await devicesRes.json());
     } catch (err: any) {
-      Toast.fire({ icon: "error", title: "Error", text: err.message });
+      showToast.error("Failed to load initial data", err.message);
     } finally {
       setIsLoading(false);
     }
@@ -271,11 +260,11 @@ function DevicesForLoggingContent() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to save configuration.");
       }
-      Toast.fire({ icon: "success", title: "Configuration saved!" });
+      showToast.success("Configuration saved!");
       handleCloseModal();
       fetchInitialData();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error("Save failed", error.message);
     }
   };
 
@@ -292,10 +281,10 @@ function DevicesForLoggingContent() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to delete configuration.");
       }
-      Toast.fire({ icon: "success", title: "Configuration deleted!" });
+      showToast.success("Configuration deleted!");
       fetchInitialData();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error("Deletion failed", error.message);
     } finally {
       setIsDeleteAlertOpen(false);
       setConfigToDelete(null);
@@ -305,7 +294,7 @@ function DevicesForLoggingContent() {
   // --- Download & Upload Handlers ---
   const handleDownload = () => {
     if (loggingConfigs.length === 0) {
-      Toast.fire({ icon: "info", title: "No configuration to download." });
+      showToast.info("No configuration to download");
       return;
     }
     const dataToDownload = loggingConfigs.map((c) => ({
@@ -330,7 +319,7 @@ function DevicesForLoggingContent() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/json") {
-      Toast.fire({ icon: "error", title: "Please select a valid JSON file." });
+      showToast.error("Please select a valid JSON file");
       return;
     }
     const reader = new FileReader();
@@ -341,13 +330,9 @@ function DevicesForLoggingContent() {
         if (!Array.isArray(data)) {
           throw new Error("JSON file must contain an array of configurations.");
         }
-        // Tampilkan loading Swal yang lebih besar
-        Swal.fire({
-          title: "Importing...",
-          text: "Please wait while we process your file.",
-          allowOutsideClick: false,
-          didOpen: () => Swal.showLoading(),
-        });
+        // Show loading state
+        showToast.success("Importing configurations...");
+
         const response = await fetch("/api/logging-configs/batch-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -355,21 +340,12 @@ function DevicesForLoggingContent() {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.message);
-        // Tutup loading Swal dan tampilkan hasil
-        Swal.close();
-        Toast.fire({
-          icon: "success",
-          title: "Import Complete!",
-          html: `Created/Updated: <b>${result.created}</b><br>Skipped: <b>${result.skipped}</b>`,
-        });
+
+        // Show success result
+        showToast.success(`Import Complete! Created/Updated: ${result.created}, Skipped: ${result.skipped}`);
         fetchInitialData();
       } catch (err: any) {
-        Swal.close();
-        Toast.fire({
-          icon: "error",
-          title: "Import Failed",
-          text: err.message,
-        });
+        showToast.error("Import Failed", err.message);
       } finally {
         if (uploadInputRef.current) uploadInputRef.current.value = "";
       }

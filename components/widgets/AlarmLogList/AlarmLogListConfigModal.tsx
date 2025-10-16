@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 
 interface Props {
   isOpen: boolean;
@@ -41,7 +41,7 @@ export const AlarmLogListConfigModal = ({ isOpen, onClose, onSave }: Props) => {
 
   const handleSave = () => {
     if (!widgetTitle) {
-      Swal.fire("Incomplete", "Widget Title is required.", "warning");
+      showToast.error("Widget Title is required.");
       return;
     }
     onSave({

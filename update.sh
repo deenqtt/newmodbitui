@@ -124,8 +124,15 @@ pull_latest_changes() {
         exit 1
     fi
 
-    # Check if there are updates
-    CHANGE_COUNT=$(git rev-list HEAD...origin/"$CURRENT_BRANCH" --count 2>/dev/null || echo "0")
+    # Check if remote branch exists
+    if ! git rev-parse --verify origin/"$CURRENT_BRANCH" >/dev/null 2>&1; then
+        log_warning "Remote branch origin/$CURRENT_BRANCH not found - local only repository"
+        CHANGE_COUNT=0
+    else
+        # Check if there are updates
+        CHANGE_COUNT=$(git rev-list HEAD...origin/"$CURRENT_BRANCH" --count 2>/dev/null || echo "0")
+    fi
+
     if [ "$CHANGE_COUNT" -gt "0" ]; then
         HAS_CHANGES=true
         log "Found $CHANGE_COUNT new commits to pull"
@@ -169,6 +176,10 @@ update_dependencies() {
         log_error "Failed to update dependencies"
         exit 1
     fi
+
+    # Clean npm cache after successful install
+    npm cache clean --force >/dev/null 2>&1 || true
+    log_success "NPM cache cleaned"
 }
 
 # Function to build application
@@ -186,6 +197,13 @@ rebuild_application() {
     log "Building Next.js application..."
     if npm run build >/dev/null 2>&1; then
         log_success "Application rebuilt successfully"
+
+        # Verify build artifacts
+        if [ ! -d ".next" ]; then
+            log_error "Build failed - .next directory not found"
+            exit 1
+        fi
+        log_success "Build artifacts verified"
 
         # Show build info if verbose mode
         if [ "$VERBOSE" = true ]; then
@@ -255,26 +273,59 @@ restart_application() {
 
 # Function to verify update
 verify_update() {
-    log "Verifying application health..."
+    log "Verifying application health after update..."
     cd "$PROJECT_ROOT"
 
-    # Test application health check
-    if curl -s -f http://localhost:3002/api/health >/dev/null 2>&1; then
-        log_success "Application health check passed"
+    # Enhanced application health check with retry logic
+    log "Testing application health check (/api/health)..."
+    local app_ready=false
+    for i in {1..45}; do
+        if curl -s -f http://localhost:3002/api/health >/dev/null 2>&1; then
+            app_ready=true
+            log_success "Application health check passed"
+            break
+        fi
+        sleep 2
+    done
+
+    if [ "$app_ready" = false ]; then
+        log_error "Application health check failed after 90 seconds"
+        log_warning "Application may need manual troubleshooting"
+    fi
+
+    # Verify build artifacts
+    if [ -d ".next" ]; then
+        log_success "Build artifacts verified (.next directory exists)"
     else
-        log_warning "Application health check failed - may need manual investigation"
+        log_warning "Build artifacts missing (.next directory not found)"
     fi
 
     # Show PM2 status
     echo ""
-    log "Current PM2 status:"
-    pm2 list | grep -E "(name|status|restart)" | head -10
+    log "Current PM2 application status:"
+    pm2 list | grep -E "(name|status|restart|memory)" | head -15 || pm2 list
 
-    # Check nginx status if available
+    # Check and reload Nginx if exists
     if command_exists nginx; then
         NGINX_STATUS=$(systemctl is-active nginx 2>/dev/null || echo "unknown")
         log "Nginx status: $NGINX_STATUS"
+
+        # Test Nginx configuration and reload if needed
+        if sudo nginx -t 2>/dev/null; then
+            if sudo systemctl reload nginx 2>/dev/null; then
+                log_success "Nginx configuration reloaded successfully"
+            else
+                log_warning "Nginx reload failed (may need manual reload)"
+            fi
+        else
+            log_error "Nginx configuration test failed"
+        fi
     fi
+
+    # Show resource usage
+    log "System resource status:"
+    echo "  Memory usage: $(free -h | awk 'NR==2{printf "%.1fG/%.1fG (%.0f%%)", $3/1024, $2/1024, $3*100/$2}')"
+    echo "  Disk usage: $(df -h . | awk 'NR==2{print $3"/"$2" ("$5" used)"}')"
 }
 
 # Function to show deployment status

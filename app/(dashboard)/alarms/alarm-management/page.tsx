@@ -2,9 +2,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Swal from "sweetalert2";
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext"; // <-- IMPORT MQTT
 import { useSortableTable } from "@/hooks/use-sort-table";
+import { showToast } from "@/lib/toast-utils";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 // --- UI Components & Icons ---
 import { Button } from "@/components/ui/button";
@@ -54,18 +55,37 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-// --- Konfigurasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-  didOpen: (toast) => {
-    toast.addEventListener("mouseenter", Swal.stopTimer);
-    toast.addEventListener("mouseleave", Swal.resumeTimer);
-  },
+// Confirmation Dialog State
+const [confirmationProps, setConfirmationProps] = useState<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  type: "info" | "warning" | "destructive";
+  title: string;
+  description: string;
+  confirmText: string;
+  cancelText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}>({
+  open: false,
+  onOpenChange: () => {},
+  type: "info",
+  title: "",
+  description: "",
+  confirmText: "Confirm",
+  cancelText: "Cancel",
+  onConfirm: () => {},
+  onCancel: () => {},
 });
+
+const showConfirmation = (props: Partial<typeof confirmationProps>) => {
+  setConfirmationProps(prev => ({
+    ...prev,
+    ...props,
+    open: true,
+    onOpenChange: (open) => setConfirmationProps(prev => ({ ...prev, open })),
+  }));
+};
 
 // --- Type Definitions ---
 type DeviceExternal = {
@@ -306,14 +326,11 @@ const AlarmDialog = ({
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to save alarm.");
       }
-      Toast.fire({
-        icon: "success",
-        title: `Alarm has been ${initialData ? "updated" : "created"}.`,
-      });
+      showToast.success(`Alarm has been ${initialData ? "updated" : "created"}.`);
       onSave();
       onOpenChange(false);
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error("Error", error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -624,12 +641,9 @@ function AlarmManagementPage() {
       const response = await fetch("/api/alarms");
       if (!response.ok) throw new Error("Failed to fetch alarms");
       setAlarms(await response.json());
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Toast.fire({
-        icon: "error",
-        title: "Could not fetch alarm configurations.",
-      });
+      showToast.error("Failed to fetch alarms", error.message || "Could not fetch alarm configurations.");
     } finally {
       setIsLoading(false);
     }
@@ -650,27 +664,24 @@ function AlarmManagementPage() {
   };
 
   const handleDelete = (id: string) => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "You won't be able to revert this!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      confirmButtonText: "Yes, delete it!",
-      background: "#fff",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
+    showConfirmation({
+      type: "destructive",
+      title: "Delete Alarm",
+      description: "Are you sure you want to delete this alarm? This action cannot be undone.",
+      confirmText: "Yes, delete it",
+      cancelText: "Cancel",
+      onConfirm: async () => {
         try {
           const response = await fetch(`/api/alarms/${id}`, {
             method: "DELETE",
           });
           if (!response.ok) throw new Error("Failed to delete alarm.");
-          Toast.fire({ icon: "success", title: "The alarm has been deleted." });
+          showToast.success("The alarm has been deleted.");
           fetchAlarms();
         } catch (error: any) {
-          Toast.fire({ icon: "error", title: error.message });
+          showToast.error("Deletion failed", error.message);
         }
-      }
+      },
     });
   };
 

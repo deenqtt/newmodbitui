@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 import { format } from "date-fns"; // <-- PATH IMPOR DIPERBAIKI DI SINI
 // --- UI Components & Icons ---
@@ -37,14 +38,37 @@ type AlarmLog = {
   timestamp: string;
 };
 
-// --- Konfigurasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
+// Confirmation Dialog State
+const [confirmationProps, setConfirmationProps] = useState<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  type: "info" | "warning" | "destructive";
+  title: string;
+  description: string;
+  confirmText: string;
+  cancelText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}>({
+  open: false,
+  onOpenChange: () => {},
+  type: "info",
+  title: "",
+  description: "",
+  confirmText: "Confirm",
+  cancelText: "Cancel",
+  onConfirm: () => {},
+  onCancel: () => {},
 });
+
+const showConfirmation = (props: Partial<typeof confirmationProps>) => {
+  setConfirmationProps(prev => ({
+    ...prev,
+    ...props,
+    open: true,
+    onOpenChange: (open) => setConfirmationProps(prev => ({ ...prev, open })),
+  }));
+};
 
 // =================================================================
 // Main Page Component
@@ -62,9 +86,9 @@ export default function AlarmLogPage() {
       if (!response.ok) throw new Error("Failed to fetch alarm logs");
       const data = await response.json();
       setLogs(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Toast.fire({ icon: "error", title: "Could not fetch alarm logs." });
+      showToast.error("Failed to fetch alarm logs", error.message || "Could not fetch alarm logs.");
     } finally {
       setIsLoading(false);
     }
@@ -75,27 +99,22 @@ export default function AlarmLogPage() {
   }, [fetchLogs]);
 
   const handleDeleteAll = () => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "This will permanently delete ALL alarm logs!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      confirmButtonText: "Yes, delete all!",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
+    showConfirmation({
+      type: "destructive",
+      title: "Delete All Alarm Logs",
+      description: "This will permanently delete ALL alarm logs! This action cannot be undone.",
+      confirmText: "Yes, delete all",
+      cancelText: "Cancel",
+      onConfirm: async () => {
         try {
           const response = await fetch("/api/alarm-log", { method: "DELETE" });
           if (!response.ok) throw new Error("Failed to delete logs.");
-          Toast.fire({
-            icon: "success",
-            title: "All alarm logs have been deleted.",
-          });
+          showToast.success("All alarm logs have been deleted.");
           setLogs([]); // Kosongkan data di frontend
         } catch (error: any) {
-          Toast.fire({ icon: "error", title: error.message });
+          showToast.error("Deletion failed", error.message);
         }
-      }
+      },
     });
   };
 
@@ -252,6 +271,7 @@ export default function AlarmLogPage() {
           </div>
         </CardFooter>
       </Card>
+      <ConfirmationDialog {...confirmationProps} />
     </div>
   );
 }

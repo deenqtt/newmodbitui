@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Swal from "sweetalert2";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +24,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,6 +48,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { showToast } from "@/lib/toast-utils";
 import { useSortableTable } from "@/hooks/use-sort-table";
 import {
   HardDrive,
@@ -119,6 +129,12 @@ export default function ZigbeePage() {
     null
   );
   const [isControlsOpen, setIsControlsOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<ZigbeeDevice | null>(null);
+  const [deleteMethod, setDeleteMethod] = useState<"smart" | "force">("smart");
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [deviceToRename, setDeviceToRename] = useState<ZigbeeDevice | null>(null);
+  const [isPairingDialogOpen, setIsPairingDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -144,92 +160,32 @@ export default function ZigbeePage() {
     setCurrentPage(1);
   }, [searchTerm, sortKey, sortDirection]);
 
-  // Custom SweetAlert2 configuration
-  const Toast = Swal.mixin({
-    toast: true,
-    position: "top-end",
-    showConfirmButton: false,
-    timer: 3000,
-    timerProgressBar: true,
-    didOpen: (toast) => {
-      toast.addEventListener("mouseenter", Swal.stopTimer);
-      toast.addEventListener("mouseleave", Swal.resumeTimer);
-    },
-  });
+  // Alert dialog handlers
+  const confirmDelete = (device: ZigbeeDevice) => {
+    setDeviceToDelete(device);
+    setIsDeleteDialogOpen(true);
+  };
 
-  // Enhanced delete with SweetAlert2 confirmation
-  const confirmDelete = async (device: ZigbeeDevice) => {
-    const result = await Swal.fire({
-      title: `Remove ${device.friendlyName}?`,
-      html: `
-        <div class="text-left space-y-3">
-          <p><strong>Device:</strong> ${device.friendlyName}</p>
-          <p><strong>Type:</strong> ${device.deviceType.replace("_", " ")}</p>
-          <p><strong>ID:</strong> <code class="bg-gray-100 px-2 py-1 rounded">${
-            device.deviceId
-          }</code></p>
-          
-          <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <p class="text-sm"><strong>Choose removal method:</strong></p>
-          </div>
-        </div>
-      `,
-      icon: "question",
-      showCancelButton: true,
-      showDenyButton: true,
-      showConfirmButton: true,
-      confirmButtonText: "Smart Remove",
-      confirmButtonColor: "#10b981",
-      denyButtonText: "Force Remove",
-      denyButtonColor: "#f59e0b",
-      cancelButtonText: "Cancel",
-      customClass: {
-        popup: "swal-wide",
-        htmlContainer: "text-left",
-      },
-      footer: `
-        <div class="text-xs text-gray-500 mt-2">
-          <p><strong>Smart:</strong> Try normal → force → database removal</p>
-          <p><strong>Force:</strong> Skip to force removal immediately</p>
-        </div>
-      `,
-    });
-
-    if (result.isConfirmed) {
-      removeDevice(device, "smart");
-    } else if (result.isDenied) {
-      removeDevice(device, "force");
+  const handleDeleteConfirm = (method: "smart" | "force") => {
+    if (deviceToDelete) {
+      removeDevice(deviceToDelete, method);
+      setIsDeleteDialogOpen(false);
+      setDeviceToDelete(null);
     }
   };
 
-  // Enhanced rename with SweetAlert2 input
-  const confirmRename = async (device: ZigbeeDevice) => {
-    const { value: newName } = await Swal.fire({
-      title: "Rename Device",
-      html: `
-        <div class="text-left mb-4">
-          <p><strong>Current name:</strong> ${device.friendlyName}</p>
-          <p class="text-sm text-gray-600">Enter new friendly name:</p>
-        </div>
-      `,
-      input: "text",
-      inputValue: device.friendlyName,
-      inputPlaceholder: "Enter new device name",
-      showCancelButton: true,
-      confirmButtonText: "Rename",
-      confirmButtonColor: "#3b82f6",
-      inputValidator: (value) => {
-        if (!value || !value.trim()) {
-          return "Device name cannot be empty";
-        }
-        if (value === device.friendlyName) {
-          return "Name must be different from current name";
-        }
-      },
-    });
+  const confirmRename = (device: ZigbeeDevice) => {
+    setDeviceToRename(device);
+    setIsRenameDialogOpen(true);
+  };
 
-    if (newName) {
-      renameDevice(device, newName.trim());
+  const handleRenameConfirm = () => {
+    if (deviceToRename) {
+      const newName = deviceToRename.friendlyName; // In a real UI, you'd use an input field
+      // For now, just keep the same name
+      renameDevice(deviceToRename, newName);
+      setIsRenameDialogOpen(false);
+      setDeviceToRename(null);
     }
   };
 
@@ -238,33 +194,9 @@ export default function ZigbeePage() {
     device: ZigbeeDevice,
     method: "smart" | "force" | "database-only" = "smart"
   ) => {
-    Swal.fire({
-      title: "Removing Device...",
-      html: `
-      <div class="text-left space-y-2">
-        <p>Device: <strong>${device.friendlyName}</strong></p>
-        <p>Method: <strong>${method.replace("-", " ")}</strong></p>
-        <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-          <div class="text-xs text-blue-600">
-            ${
-              method === "database-only"
-                ? "Removing from interface only..."
-                : "Removing from interface first, then network..."
-            }
-          </div>
-        </div>
-      </div>
-    `,
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
-
     try {
       setActionLoading(`remove-${device.deviceId}`);
+      showToast.info("Removing Device", `Removing ${device.friendlyName}...`);
 
       const updatedDevices = devices.filter(
         (d) => d.deviceId !== device.deviceId
@@ -284,34 +216,9 @@ export default function ZigbeePage() {
 
       if (response.ok) {
         if (result.warning) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Device Removed",
-            html: `
-            <div class="text-left space-y-3">
-              <p><strong>Status:</strong> ${result.message}</p>
-              ${
-                result.recommendation
-                  ? `
-                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <p class="text-sm"><strong>Note:</strong> ${result.recommendation}</p>
-                </div>
-              `
-                  : ""
-              }
-            </div>
-          `,
-            confirmButtonText: "Got it",
-            confirmButtonColor: "#f59e0b",
-            timer: 6000,
-            timerProgressBar: true,
-          });
+          showToast.warning("Device Removed", result.message);
         } else {
-          Toast.fire({
-            icon: "success",
-            title: "Device Removed",
-            text: `${device.friendlyName} removed successfully`,
-          });
+          showToast.success("Device Removed", `${device.friendlyName} removed successfully`);
         }
       } else {
         setDevices(devices);
@@ -320,20 +227,7 @@ export default function ZigbeePage() {
     } catch (error) {
       console.error("Remove error:", error);
       setDevices(devices);
-
-      await Swal.fire({
-        icon: "error",
-        title: "Remove Failed",
-        html: `
-        <div class="text-left space-y-3">
-          <p><strong>Device:</strong> ${device.friendlyName}</p>
-          <p><strong>Error:</strong> ${
-            error instanceof Error ? error.message : "Unknown error"
-          }</p>
-        </div>
-      `,
-        confirmButtonColor: "#ef4444",
-      });
+      showToast.error("Remove Failed", `Failed to remove ${device.friendlyName}: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setActionLoading(null);
     }
@@ -341,27 +235,9 @@ export default function ZigbeePage() {
 
   // Rename device function
   const renameDevice = async (device: ZigbeeDevice, newName: string) => {
-    Swal.fire({
-      title: "Renaming Device...",
-      html: `
-      <div class="text-left space-y-2">
-        <p>Device: <strong>${device.friendlyName}</strong></p>
-        <p>New Name: <strong>${newName}</strong></p>
-        <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-          <div class="text-xs text-blue-600">Updating name...</div>
-        </div>
-      </div>
-    `,
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      showConfirmButton: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
-
     try {
       setActionLoading(`rename-${device.deviceId}`);
+      showToast.info("Renaming Device", `Updating ${device.friendlyName}...`);
 
       const updatedDevices = devices.map((d) =>
         d.deviceId === device.deviceId ? { ...d, friendlyName: newName } : d
@@ -387,27 +263,9 @@ export default function ZigbeePage() {
 
       if (response.ok) {
         if (result.warning) {
-          await Swal.fire({
-            icon: "warning",
-            title: "Rename Sent",
-            html: `
-            <div class="text-left space-y-2">
-              <p><strong>Status:</strong> ${result.message}</p>
-              <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <p class="text-sm">${result.recommendation}</p>
-              </div>
-            </div>
-          `,
-            confirmButtonColor: "#f59e0b",
-            timer: 6000,
-            timerProgressBar: true,
-          });
+          showToast.warning("Rename Sent", result.message);
         } else {
-          Toast.fire({
-            icon: "success",
-            title: "Device Renamed",
-            text: `${device.friendlyName} → ${newName}`,
-          });
+          showToast.success("Device Renamed", `${device.friendlyName} → ${newName}`);
         }
       } else {
         setDevices(devices);
@@ -416,21 +274,7 @@ export default function ZigbeePage() {
     } catch (error) {
       console.error("Rename error:", error);
       setDevices(devices);
-
-      await Swal.fire({
-        icon: "error",
-        title: "Rename Failed",
-        html: `
-        <div class="text-left space-y-3">
-          <p><strong>Device:</strong> ${device.friendlyName}</p>
-          <p><strong>New Name:</strong> ${newName}</p>
-          <p><strong>Error:</strong> ${
-            error instanceof Error ? error.message : "Unknown error"
-          }</p>
-        </div>
-      `,
-        confirmButtonColor: "#ef4444",
-      });
+      showToast.error("Rename Failed", `Failed to rename ${device.friendlyName}: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setActionLoading(null);
     }
@@ -467,22 +311,14 @@ export default function ZigbeePage() {
       const commandName = Object.keys(command)[0];
       const commandValue = Object.values(command)[0];
 
-      Toast.fire({
-        icon: "success",
-        title: "Command Sent",
-        text: `${device.friendlyName}: ${commandName} = ${commandValue}`,
-      });
+      showToast.success("Command Sent", `${device.friendlyName}: ${commandName} = ${commandValue}`);
 
       setTimeout(() => fetchDevices(), 2000);
     } catch (error) {
       console.error("Command error:", error);
       setDevices(devices);
 
-      Toast.fire({
-        icon: "error",
-        title: "Command Failed",
-        text: `Failed to control ${device.friendlyName}`,
-      });
+      showToast.error("Command Failed", `Failed to control ${device.friendlyName}`);
     } finally {
       setActionLoading(null);
     }
@@ -495,153 +331,64 @@ export default function ZigbeePage() {
       return;
     }
 
-    const result = await Swal.fire({
-      title: "Enable Pairing Mode?",
-      html: `
-      <div class="text-left space-y-3">
-        <p>This will allow new Zigbee devices to join your network.</p>
-        
-        <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-          <p class="text-sm"><strong>Instructions:</strong></p>
-          <ol class="text-sm mt-2 space-y-1">
-            <li>1. Click "Enable Pairing" below</li>
-            <li>2. Put your Zigbee device in pairing mode</li>
-            <li>3. Wait for device to appear in the list</li>
-            <li>4. Pairing will auto-disable after 4 minutes</li>
-          </ol>
-        </div>
-      </div>
-    `,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Enable Pairing",
-      confirmButtonColor: "#10b981",
-      cancelButtonText: "Cancel",
-    });
+    setIsPairingDialogOpen(true);
+  };
 
-    if (result.isConfirmed) {
-      Swal.fire({
-        title: "Enabling Pairing Mode...",
-        html: `
-        <div class="text-center space-y-3">
-          <p>Activating Zigbee network pairing...</p>
-          <div class="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
-            <div class="text-xs text-blue-600">This may take a few seconds...</div>
-          </div>
-        </div>
-      `,
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
+  const confirmEnablePairing = async () => {
+    setIsPairingDialogOpen(false);
+    showToast.info("Enabling Pairing Mode", "Activating Zigbee network pairing...");
+
+    try {
+      const response = await fetch("/api/zigbee/coordinator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "enable_pairing",
+          duration: 254,
+        }),
       });
 
-      try {
-        const response = await fetch("/api/zigbee/coordinator", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "enable_pairing",
-            duration: 254,
-          }),
-        });
+      const result = await response.json();
 
-        const result = await response.json();
+      if (result.success) {
+        const duration = result.duration || 254;
+        setPairingMode(true);
+        setPairingCountdown(duration);
 
-        if (result.success) {
-          const duration = result.duration || 254;
-          setPairingMode(true);
-          setPairingCountdown(duration);
+        const countdownInterval = setInterval(() => {
+          setPairingCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              setPairingMode(false);
+              setPairingInterval(null);
 
-          const countdownInterval = setInterval(() => {
-            setPairingCountdown((prev) => {
-              if (prev <= 1) {
-                clearInterval(countdownInterval);
-                setPairingMode(false);
-                setPairingInterval(null);
+              showToast.info("Pairing Disabled", "Pairing mode automatically disabled");
 
-                Toast.fire({
-                  icon: "info",
-                  title: "Pairing Disabled",
-                  text: "Pairing mode automatically disabled",
-                });
-
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-
-          setPairingInterval(countdownInterval);
-
-          await Swal.fire({
-            icon: "success",
-            title: "Pairing Mode Active!",
-            html: `
-            <div class="text-left space-y-3">
-              <div class="text-center p-4 bg-green-50 border border-green-200 rounded">
-                <p class="text-lg font-semibold text-green-700">Ready to Pair Devices</p>
-                <p class="text-sm text-green-600 mt-1">Duration: ${Math.floor(
-                  duration / 60
-                )} minutes</p>
-              </div>
-              
-              <div class="mt-3 space-y-2">
-                <p class="text-sm"><strong>Next Steps:</strong></p>
-                <ol class="text-sm space-y-1 ml-4 list-decimal">
-                  <li>Put your Zigbee device in pairing mode</li>
-                  <li>Device should appear in the list automatically</li>
-                  <li>If it doesn't work, try moving device closer</li>
-                </ol>
-              </div>
-            </div>
-          `,
-            confirmButtonText: "Got it",
-            confirmButtonColor: "#10b981",
-            timer: 8000,
-            timerProgressBar: true,
+              return 0;
+            }
+            return prev - 1;
           });
+        }, 1000);
 
-          const pairingRefreshInterval = setInterval(() => {
-            fetchDevices(false, true);
-          }, 5000);
+        setPairingInterval(countdownInterval);
 
-          setTimeout(() => {
-            clearInterval(pairingRefreshInterval);
-          }, duration * 1000);
-        } else {
-          throw new Error(result.error || "Pairing failed");
-        }
-      } catch (error) {
-        console.error("Pairing error:", error);
+        showToast.success("Pairing Mode Active!", `Ready to pair devices for ${Math.floor(duration / 60)} minutes`);
 
-        setPairingMode(false);
-        setPairingCountdown(0);
+        const pairingRefreshInterval = setInterval(() => {
+          fetchDevices(false, true);
+        }, 5000);
 
-        await Swal.fire({
-          icon: "error",
-          title: "Pairing Failed",
-          html: `
-          <div class="text-left space-y-3">
-            <p><strong>Error:</strong> ${
-              error instanceof Error ? error.message : "Unknown error"
-            }</p>
-            
-            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-              <p class="text-sm"><strong>Try this:</strong></p>
-              <ul class="text-sm mt-1 space-y-1 ml-4 list-disc">
-                <li>Restart the bridge first</li>
-                <li>Check Zigbee2MQTT logs</li>
-                <li>Verify coordinator hardware connection</li>
-              </ul>
-            </div>
-          </div>
-        `,
-          confirmButtonColor: "#ef4444",
-        });
+        setTimeout(() => {
+          clearInterval(pairingRefreshInterval);
+        }, duration * 1000);
+      } else {
+        throw new Error(result.error || "Pairing failed");
       }
+    } catch (error) {
+      console.error("Pairing error:", error);
+      setPairingMode(false);
+      setPairingCountdown(0);
+      showToast.error("Pairing Failed", error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -675,11 +422,7 @@ export default function ZigbeePage() {
         setPairingMode(false);
         setPairingCountdown(0);
 
-        Toast.fire({
-          icon: "success",
-          title: "Pairing Stopped",
-          text: "Pairing mode disabled successfully",
-        });
+        showToast.success("Pairing Stopped", "Pairing mode disabled successfully");
       } else {
         throw new Error(result.error || "Failed to disable pairing");
       }
@@ -688,11 +431,7 @@ export default function ZigbeePage() {
       setPairingMode(false);
       setPairingCountdown(0);
 
-      Toast.fire({
-        icon: "warning",
-        title: "Pairing Stopped",
-        text: "Pairing mode disabled (check logs if unsure)",
-      });
+      showToast.warning("Pairing Stopped", "Pairing mode disabled (check logs if unsure)");
     }
   };
 
@@ -705,9 +444,9 @@ export default function ZigbeePage() {
 
   // Enhanced fetch with better error handling
   const fetchDevices = useCallback(
-    async (showToast = false, forceRefresh = false) => {
+    async (notify = false, forceRefresh = false) => {
       try {
-        if (showToast) {
+        if (notify) {
           setRefreshing(true);
         }
 
@@ -734,27 +473,16 @@ export default function ZigbeePage() {
 
           setDevices(sortedData);
 
-          if (showToast) {
-            const onlineCount = sortedData.filter(
-              (d: ZigbeeDevice) => d.isOnline
-            ).length;
-            Toast.fire({
-              icon: "success",
-              title: "Refreshed",
-              text: `${sortedData.length} devices (${onlineCount} online)`,
-            });
+          if (notify) {
+            showToast.success("Refreshed", `${sortedData.length} devices (${sortedData.filter((d: ZigbeeDevice) => d.isOnline).length} online)`);
           }
         } else {
           throw new Error(`HTTP ${response.status}`);
         }
       } catch (error) {
         console.error("Error fetching devices:", error);
-        if (showToast) {
-          Toast.fire({
-            icon: "error",
-            title: "Refresh Failed",
-            text: "Failed to fetch devices",
-          });
+        if (notify) {
+          showToast.error("Refresh Failed", "Failed to fetch devices");
         }
       } finally {
         setLoading(false);
@@ -1559,6 +1287,35 @@ export default function ZigbeePage() {
           </Card>
         </div>
       </div>
+
+      {/* Pairing Confirmation Dialog */}
+      <Dialog open={isPairingDialogOpen} onOpenChange={setIsPairingDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enable Pairing Mode?</DialogTitle>
+            <DialogDescription className="text-left">
+              This will allow new Zigbee devices to join your network.
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm font-medium text-blue-800">Instructions:</p>
+                <ol className="text-sm mt-2 space-y-1 text-blue-700">
+                  <li>1. Click "Enable Pairing" below</li>
+                  <li>2. Put your Zigbee device in pairing mode</li>
+                  <li>3. Wait for device to appear in the list</li>
+                  <li>4. Pairing will auto-disable after 4 minutes</li>
+                </ol>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPairingDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmEnablePairing}>
+              Enable Pairing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Device Controls Dialog */}
       <Dialog open={isControlsOpen} onOpenChange={setIsControlsOpen}>

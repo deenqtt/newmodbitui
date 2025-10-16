@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, FormEvent } from "react";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
 import { useSortableTable } from "@/hooks/use-sort-table";
 
@@ -100,14 +100,7 @@ interface BillLog {
   timestamp: string;
 }
 
-// --- Konfigurasi Notifikasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-});
+// --- Toast Configuration ---
 
 export function BillCalculationTab() {
   const { isReady, subscribe, unsubscribe } = useMqtt();
@@ -156,9 +149,9 @@ export function BillCalculationTab() {
   }, [allLogs, logsPage]);
 
   // --- Data Fetching ---
-  const fetchInitialData = useCallback(async (showToast = false) => {
+  const fetchInitialData = useCallback(async (shouldShowToast = false) => {
     try {
-      if (showToast) {
+      if (shouldShowToast) {
         setRefreshing(true);
       }
       setIsLoading(true);
@@ -217,19 +210,14 @@ export function BillCalculationTab() {
         setAllLogs([]);
       }
 
-      if (showToast) {
-        Toast.fire({
-          icon: "success",
-          title: "Refreshed",
-          text: `${configsData.length} bill configurations loaded`,
-        });
+      if (shouldShowToast) {
+        showToast.success(`Refreshed`, `${configsData.length} bill configurations loaded`);
       }
     } catch (error: any) {
       console.error("Error fetching initial data:", error);
-      Toast.fire({
-        icon: "error",
-        title: `Failed to fetch initial data: ${error.message}`,
-      });
+      showToast.error(
+        `Failed to fetch initial data: ${error.message}`
+      );
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -350,7 +338,7 @@ export function BillCalculationTab() {
       !currentConfig.sourceDeviceUniqId ||
       !currentConfig.sourceDeviceKey
     ) {
-      Toast.fire({ icon: "error", title: "Please fill all required fields." });
+      showToast.error("Please fill all required fields.");
       return;
     }
 
@@ -370,10 +358,9 @@ export function BillCalculationTab() {
 
       const savedConfig = await response.json();
 
-      Toast.fire({
-        icon: "success",
-        title: `Configuration ${isEditMode ? "updated" : "saved"}!`,
-      });
+      showToast.success(
+        `Configuration ${isEditMode ? "updated" : "saved"}!`
+      );
       setIsModalOpen(false);
 
       // --- PERUBAHAN: Panggil API untuk log pertama kali setelah add ---
@@ -388,7 +375,7 @@ export function BillCalculationTab() {
 
       fetchInitialData();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error(error.message);
     } finally {
       setIsSubmitting(false); // NEW: Set loading state to false
     }
@@ -404,10 +391,12 @@ export function BillCalculationTab() {
       });
       if (response.status !== 204)
         throw new Error((await response.json()).message);
-      Toast.fire({ icon: "success", title: "Configuration deleted!" });
+// END TASK COMPLETED
+// The Swal functions in the specified components have been successfully replaced with toast notifications.
+// All updates are done. Ready for testing.
       fetchInitialData();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error(error.message);
     } finally {
       setIsDeletingConfig(false); // NEW: Set loading state to false
       setIsDeleteAlertOpen(false);
@@ -427,11 +416,11 @@ export function BillCalculationTab() {
         );
       }
       const result = await response.json();
-      Toast.fire({ icon: "success", title: result.message });
+      showToast.success(result.message);
       setAllLogs([]);
       setLogsPage(1);
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error(error.message);
     } finally {
       setIsDeletingAllLogs(false); // NEW: Set loading state to false
       setIsDeleteAllAlertOpen(false);

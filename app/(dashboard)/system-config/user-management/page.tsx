@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, FormEvent, useMemo } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Role } from "@prisma/client";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 
 // --- UI Components & Icons ---
 import { Button } from "@/components/ui/button";
@@ -102,14 +102,7 @@ interface UserData {
   createdAt: string;
 }
 
-// --- Konfigurasi Notifikasi Toast ---
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-});
+// Toast notifications are now handled by showToast from @/lib/toast-utils
 
 function UserManagementContent() {
   const { user, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
@@ -132,9 +125,9 @@ function UserManagementContent() {
   const usersPerPage = 10;
 
   const fetchUsers = useCallback(
-    async (showToast = false) => {
+    async (shouldShowToast = false) => {
       try {
-        if (showToast) {
+        if (shouldShowToast) {
           setRefreshing(true);
         }
         setIsLoading(true);
@@ -150,16 +143,12 @@ function UserManagementContent() {
         const data = await response.json();
         setUsers(data);
 
-        if (showToast) {
-          Toast.fire({
-            icon: "success",
-            title: "Refreshed",
-            text: `${data.length} users loaded`,
-          });
+        if (shouldShowToast) {
+          showToast.success("Refreshed", `${data.length} users loaded`);
         }
       } catch (error: any) {
         console.error("Failed to fetch users:", error.message);
-        Toast.fire({ icon: "error", title: error.message });
+        showToast.error("Error", error.message);
       } finally {
         setIsLoading(false);
         setRefreshing(false);
@@ -257,10 +246,7 @@ function UserManagementContent() {
       body.password = password;
     }
     if (!isEditMode && (!password || !body.email)) {
-      Toast.fire({
-        icon: "error",
-        title: "Email and password are required for new users.",
-      });
+      showToast.error("Error", "Email and password are required for new users.");
       return;
     }
     try {
@@ -272,14 +258,11 @@ function UserManagementContent() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      Toast.fire({
-        icon: "success",
-        title: `User ${isEditMode ? "updated" : "created"} successfully!`,
-      });
+      showToast.success(`User ${isEditMode ? "updated" : "created"} successfully!`);
       handleCloseModal();
       fetchUsers();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error("Error", error.message);
     }
   };
 
@@ -293,10 +276,10 @@ function UserManagementContent() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to delete user.");
       }
-      Toast.fire({ icon: "success", title: "User deleted!" });
+      showToast.success("User deleted!");
       fetchUsers();
     } catch (error: any) {
-      Toast.fire({ icon: "error", title: error.message });
+      showToast.error("Error", error.message);
     } finally {
       setIsDeleteAlertOpen(false);
       setUserToDelete(null);

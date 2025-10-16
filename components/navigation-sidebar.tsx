@@ -105,7 +105,9 @@ export const NavigationSidebar = memo(function NavigationSidebar({
             <div className="text-sm text-red-400 text-center">Error loading menu</div>
           </div>
         ) : menuData?.menuGroups && menuData.menuGroups.length > 0 ? (
-          menuData.menuGroups.map((group, groupIndex) => {
+          menuData.menuGroups
+            .filter((group) => group.isActive === true)
+            .map((group, groupIndex) => {
             const groupId = group.id || `group-${groupIndex}`;
             if (collapsible) {
               const isOpen = openGroups.has(groupId);
@@ -128,7 +130,9 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                     <CollapsibleContent>
                       <SidebarGroupContent>
                         <SidebarMenu>
-                          {(group.menuItems || group.items || []).map((item, itemIndex) => {
+                          {(group.menuItems || group.items || [])
+                            .filter((item) => item.isActive !== false)
+                            .map((item, itemIndex) => {
                             const IconComponent = getIconComponent(item.icon || 'BarChart3');
                             return (
                             <SidebarMenuItem key={item.id || itemIndex} className="relative">
@@ -170,7 +174,9 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {(group.menuItems || group.items || []).map((item, itemIndex) => {
+                      {(group.menuItems || group.items || [])
+                        .filter((item) => item.isActive !== false)
+                        .map((item, itemIndex) => {
                         const IconComponent = getIconComponent(item.icon || 'BarChart3');
                         return (
                           <SidebarMenuItem key={item.id || itemIndex} className="relative">

@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 
-function getValueByKeyPath(obj: any, keyPath: string): string {
-  const keys = keyPath.split(".");
+function getValueByKeyPath(obj: any, keyPath: string | string[]): string {
+  let keys: string[];
+  if (Array.isArray(keyPath)) {
+    keys = keyPath;
+  } else {
+    keys = keyPath.split(".");
+  }
   let value = obj;
   for (const key of keys) {
     if (value && typeof value === "object") {
@@ -15,7 +20,7 @@ function getValueByKeyPath(obj: any, keyPath: string): string {
 
 export function useSearchFilter<T>(
   data: T[],
-  keys: string[]
+  keys: (string | string[])[]
 ) {
   const [searchQuery, setSearchQuery] = useState("");
 

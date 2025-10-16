@@ -418,14 +418,18 @@ start_pm2_application() {
 # Function to setup Nginx reverse proxy
 setup_nginx() {
     log "=== Setting Up Nginx Reverse Proxy ==="
-    
+
     # Create Nginx configuration for iot-dashboard
     sudo tee /etc/nginx/sites-available/iot-dashboard > /dev/null << EOF
 # IoT Dashboard - Port $NGINX_PORT
 server {
     listen $NGINX_PORT;
     server_name localhost;
-    
+
+    # Basic security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
     location / {
         proxy_pass http://localhost:$APP_PORT;
         proxy_http_version 1.1;
@@ -436,14 +440,24 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Static files caching
+    location /_next/static/ {
+        proxy_pass http://localhost:$APP_PORT;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
 }
 EOF
-    
+
     # Remove default site and enable iot-dashboard
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo ln -sf /etc/nginx/sites-available/iot-dashboard /etc/nginx/sites-enabled/
-    
+
     # Test Nginx configuration
     if sudo nginx -t; then
         log_success "Nginx configuration is valid"
@@ -912,18 +926,18 @@ server {
     listen $FRONTEND_PORT;
     server_name localhost;
 
-    # Security headers
+    # Basic security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Simplified CSP header
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss: http: https:;" always;
 
     # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
-    gzip_proxied expired no-cache no-store private must-revalidate auth;
+    gzip_proxied expired no-cache no-store private;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss;
 
     location / {

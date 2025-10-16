@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 import { useSortableTable } from "@/hooks/use-sort-table";
 import {
   Plus,
@@ -371,18 +371,10 @@ export function PowerAnalyzerTab() {
       !mainPower.key ||
       pduList.some((p) => !p.uniqId || p.keys.length === 0)
     ) {
-      Swal.fire("Error", "Harap isi semua field yang wajib diisi.", "error");
+      showToast.error("Harap isi semua field yang wajib diisi.");
       return;
     }
     setIsSubmitting(true);
-    Swal.fire({
-      title: "Menyimpan...",
-      text: "Harap tunggu sebentar.",
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
-    });
 
     try {
       const payload = { customName, pduList, mainPower };
@@ -392,62 +384,36 @@ export function PowerAnalyzerTab() {
 
       await promise;
 
-      Swal.fire({
-        title: "Berhasil!",
-        text: `Data berhasil ${editingId ? "diperbarui" : "disimpan"}.`,
-        icon: "success",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      showToast.success(`Data berhasil ${editingId ? "diperbarui" : "disimpan"}.`);
 
       fetchAllData();
       setIsModalOpen(false);
     } catch (error: any) {
-      Swal.fire({
-        title: "Gagal!",
-        text:
-          error.response?.data?.message ||
-          "Terjadi kesalahan saat menyimpan data.",
-        icon: "error",
-      });
+      showToast.error(
+        error.response?.data?.message ||
+        "Terjadi kesalahan saat menyimpan data."
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = (id: string) => {
-    Swal.fire({
-      title: "Apakah Anda yakin?",
-      text: "Anda tidak akan bisa mengembalikan data ini!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: "Ya, hapus!",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setIsSubmitting(true);
-        Swal.fire({
-          title: "Menghapus...",
-          allowOutsideClick: false,
-          didOpen: () => Swal.showLoading(),
-        });
-
-        try {
-          await axios.delete(`/api/power-analyzer/${id}`);
-          Swal.fire("Dihapus!", "Data Anda telah berhasil dihapus.", "success");
-          fetchAllData();
-        } catch (error: any) {
-          Swal.fire(
-            "Gagal!",
-            error.response?.data?.message || "Gagal menghapus data.",
-            "error"
-          );
-        } finally {
-          setIsSubmitting(false);
-        }
+  const handleDelete = async (id: string) => {
+    const confirmation = confirm("Apakah Anda yakin? Anda tidak akan bisa mengembalikan data ini!"); // Simple confirm for now
+    if (confirmation) {
+      setIsSubmitting(true);
+      try {
+        await axios.delete(`/api/power-analyzer/${id}`);
+        showToast.success("Data berhasil dihapus.");
+        fetchAllData();
+      } catch (error: any) {
+        showToast.error(
+          error.response?.data?.message || "Gagal menghapus data."
+        );
+      } finally {
+        setIsSubmitting(false);
       }
-    });
+    }
   };
 
   return (

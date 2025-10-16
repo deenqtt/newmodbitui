@@ -23,13 +23,13 @@ import {
   LayoutGrid,
   Sparkles,
 } from "lucide-react";
-import Swal from "sweetalert2";
 import _ from "lodash";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 import { mainWidgets, widgets, getWidgetCount } from "@/lib/widget-data";
+import { showToast } from "@/lib/toast-utils";
 
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { SingleValueCardConfigModal } from "@/components/widgets/SingleValueCard/SingleValueCardConfigModal";
@@ -149,7 +149,7 @@ export default function DashboardEditorPage({
         setLayout(parsedLayout);
         setInitialLayout(_.cloneDeep(parsedLayout));
       } catch (error: any) {
-        Swal.fire("Error", error.message, "error");
+        showToast.error("Error", error.message);
         router.push("/manage-dashboard");
       }
     };
@@ -177,17 +177,10 @@ export default function DashboardEditorPage({
         body: JSON.stringify({ layout }), // ✅ Send as array, let backend handle stringification
       });
       setInitialLayout(_.cloneDeep(layout));
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Layout saved successfully!",
-        showConfirmButton: false,
-        timer: 2000,
-      });
+      showToast.success("Layout saved successfully!");
     } catch (error: any) {
       console.error("Save error:", error);
-      Swal.fire("Error", error.message || "Failed to save layout", "error");
+      showToast.error("Error", error.message || "Failed to save layout");
     } finally {
       setIsSaving(false);
     }
@@ -252,11 +245,7 @@ export default function DashboardEditorPage({
       ) {
         setIsConfigModalOpen(true);
       } else {
-        Swal.fire(
-          "Info",
-          `Configuration for "${widgetName}" is not implemented yet.`,
-          "info"
-        );
+        showToast.info(`Configuration for "${widgetName}" is not implemented yet.`);
       }
     }
     setIsSheetOpen(false);
@@ -379,22 +368,12 @@ export default function DashboardEditorPage({
       router.push("/manage-dashboard");
       return;
     }
-    Swal.fire({
-      title: "You have unsaved changes!",
-      icon: "warning",
-      showCancelButton: true,
-      showDenyButton: true,
-      confirmButtonText: "Save & Exit",
-      denyButtonText: `Discard & Exit`,
-      cancelButtonText: "Stay on Page",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        await handleSaveLayout();
-        router.push("/manage-dashboard");
-      } else if (result.isDenied) {
-        router.push("/manage-dashboard");
-      }
-    });
+    // Use confirm dialog instead of Swal
+    if (window.confirm("You have unsaved changes! Click OK to save and exit, or Cancel to discard changes and exit.")) {
+      handleSaveLayout().then(() => router.push("/manage-dashboard"));
+    } else {
+      router.push("/manage-dashboard");
+    }
   };
 
   const handleSheetOpenChange = (open: boolean) => {

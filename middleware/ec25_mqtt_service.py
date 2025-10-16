@@ -36,7 +36,8 @@ class EnhancedEC25MQTTService:
         self.heartbeat_thread = None
         
         # Configuration
-        self.config_file = "ec25_enhanced_config.json"
+        self.config_folder = "JSON"
+        self.config_file = os.path.join(self.config_folder, "ec25_enhanced_config.json")
         self.config = self.load_config()
         
         # State tracking for updates instead of logs
@@ -86,11 +87,14 @@ class EnhancedEC25MQTTService:
             return default_config
 
     def save_config(self):
-        """Save current configuration"""
+        """Save current configuration with folder creation"""
         try:
+            # Create folder if it doesn't exist
+            os.makedirs(self.config_folder, exist_ok=True)
+
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
-            self.logger.info("Configuration saved")
+            self.logger.info(f"Configuration saved to {self.config_file}")
         except Exception as e:
             self.logger.error(f"Error saving config: {e}")
 

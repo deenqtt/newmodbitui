@@ -35,6 +35,9 @@ import {
   Activity,
   FileText,
   Info,
+  Zap,
+  Smartphone,
+  RadioTower,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +46,7 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
+import { useMenu } from "@/contexts/MenuContext";
 
 // Static menu configuration (copied from app-sidebar.tsx)
 const menuData = {
@@ -124,74 +128,152 @@ const menuData = {
   ],
 };
 
-// Function to map menu items to features
-const mapMenuToFeatures = () => {
+// Function to map menu items to features dynamically from actual menu data
+const mapMenuToFeatures = (menuData: any) => {
   const featureMap: Record<string, any> = {
-    "Dashboard": {
+    // Dashboard items
+    "Overview Dashboard": {
       icon: <BarChart3 className="w-6 h-6 text-blue-600" />,
-      category: "Overview",
-      description: "Real-time dashboard displaying system status, device connectivity, and key metrics overview.",
+      category: "Dashboard",
+      description: "Real-time overview dashboard with system metrics and key indicators.",
     },
-    "IP Address Settings": {
-      icon: <Network className="w-6 h-6 text-green-600" />,
-      category: "Network Configuration",
-      description: "Configure network interfaces, IP addresses, subnet masks, and gateway settings.",
+    "Process Flow": {
+      icon: <Network className="w-6 h-6 text-blue-600" />,
+      category: "Dashboard",
+      description: "Interactive 2D process flow visualization for industrial operations.",
     },
-    "WiFi Settings": {
-      icon: <Wifi className="w-6 h-6 text-blue-500" />,
-      category: "Network Configuration",
-      description: "Configure wireless network settings, access points, and connection parameters.",
-    },
-    "SNMP Protocol": {
-      icon: <Monitor className="w-6 h-6 text-purple-600" />,
-      category: "Network Configuration",
-      description: "Configure SNMP communication protocol settings and monitoring parameters.",
-    },
-    "Modbus Device Manager": {
-      icon: <HardDrive className="w-6 h-6 text-orange-600" />,
+
+    // Devices items
+    "Internal Devices": {
+      icon: <HardDrive className="w-6 h-6 text-green-600" />,
       category: "Device Management",
-      description: "Manage Modbus RTU and TCP devices, configure communication parameters and data mappings.",
+      description: "Manage and monitor internal device racks and data center infrastructure.",
     },
-    "SNMP MIB Data": {
-      icon: <Activity className="w-6 h-6 text-cyan-600" />,
+    "External Devices": {
+      icon: <RadioTower className="w-6 h-6 text-green-600" />,
       category: "Device Management",
-      description: "Access and manage SNMP MIB data, monitoring information bases for network devices.",
+      description: "Handle MQTT-connected external IoT devices and sensors.",
     },
-    "General Settings": {
-      icon: <Settings className="w-6 h-6 text-gray-600" />,
-      category: "System Settings",
-      description: "System-wide configurations, user preferences, and interface customization options.",
+    "Access Controllers": {
+      icon: <Shield className="w-6 h-6 text-green-600" />,
+      category: "Device Management",
+      description: "Configure access control systems and security devices.",
     },
-    "Error Logs": {
+    "Zigbee Devices": {
+      icon: <Zap className="w-6 h-6 text-green-600" />,
+      category: "Device Management",
+      description: "Manage Zigbee wireless network devices and automation.",
+    },
+
+    // Network items
+    "Communication Setup": {
+      icon: <Network className="w-6 h-6 text-blue-500" />,
+      category: "Network Configuration",
+      description: "Configure communication protocols and gateway settings.",
+    },
+    "MQTT Broker": {
+      icon: <SatelliteDish className="w-6 h-6 text-blue-500" />,
+      category: "Network Configuration",
+      description: "Manage MQTT message broker connections and subscriptions.",
+    },
+    "SNMP Registration": {
+      icon: <Monitor className="w-6 h-6 text-blue-500" />,
+      category: "Network Configuration",
+      description: "Configure SNMP protocol and network monitoring agents.",
+    },
+
+    // System Config items
+    "User Management": {
+      icon: <Shield className="w-6 h-6 text-purple-600" />,
+      category: "System Configuration",
+      description: "Manage system users, roles, and access permissions.",
+    },
+    "Power Analyzer": {
+      icon: <Zap className="w-6 h-6 text-purple-600" />,
+      category: "System Configuration",
+      description: "Configure power analysis tools and energy monitoring.",
+    },
+    "System Backup": {
+      icon: <HardDrive className="w-6 h-6 text-purple-600" />,
+      category: "System Configuration",
+      description: "Manage system backups and data recovery procedures.",
+    },
+    "Menu Management": {
+      icon: <Settings className="w-6 h-6 text-purple-600" />,
+      category: "System Configuration",
+      description: "Customize and manage system navigation menus.",
+    },
+
+    // Analytics items
+    "Alarm Management": {
+      icon: <Activity className="w-6 h-6 text-red-600" />,
+      category: "Analytics & Monitoring",
+      description: "Configure alarm thresholds and notification systems.",
+    },
+    "Alarm Reports": {
       icon: <FileText className="w-6 h-6 text-red-600" />,
-      category: "System Settings",
-      description: "View system error logs, diagnostic information, and troubleshooting data.",
+      category: "Analytics & Monitoring",
+      description: "Generate and analyze alarm reports and historical data.",
     },
-    "Information": {
-      icon: <Info className="w-6 h-6 text-indigo-600" />,
-      category: "System Settings",
-      description: "System information, version details, and feature documentation.",
+    "Device Analytics": {
+      icon: <BarChart3 className="w-6 h-6 text-red-600" />,
+      category: "Analytics & Monitoring",
+      description: "Comprehensive device performance analytics and insights.",
+    },
+
+    // Maintenance items
+    "Maintenance Schedule": {
+      icon: <Wrench className="w-6 h-6 text-orange-600" />,
+      category: "Maintenance",
+      description: "Schedule and manage preventive maintenance tasks.",
+    },
+    "Rack Management": {
+      icon: <Server className="w-6 h-6 text-orange-600" />,
+      category: "Maintenance",
+      description: "Monitor and manage server racks and data center equipment.",
+    },
+    "System Information": {
+      icon: <Info className="w-6 h-6 text-orange-600" />,
+      category: "Maintenance",
+      description: "View comprehensive system information and diagnostics.",
+    },
+
+    // VoIP items
+    "VoIP Gateway": {
+      icon: <Smartphone className="w-6 h-6 text-cyan-600" />,
+      category: "Communication",
+      description: "Configure VoIP gateway settings and voice communications.",
+    },
+    "Call Management": {
+      icon: <Mic className="w-6 h-6 text-cyan-600" />,
+      category: "Communication",
+      description: "Manage telephone calls and communication logs.",
     },
   };
 
   const features: any[] = [];
 
-  menuData.groups.forEach(group => {
-    group.items.forEach(item => {
-      if (item.isUse === true && featureMap[item.title]) {
-        features.push({
-          title: item.title,
-          ...featureMap[item.title]
+  if (menuData?.menuGroups) {
+    menuData.menuGroups.forEach((group: any) => {
+      if (group.items) {
+        group.items.forEach((item: any) => {
+          if (item.isActive !== false && featureMap[item.label]) {
+            features.push({
+              title: item.label,
+              ...featureMap[item.label]
+            });
+          }
         });
       }
     });
-  });
+  }
 
   return features;
 };
 
 export default function InfoPage() {
   const { theme } = useTheme();
+  const { menuData } = useMenu();
 
   // Dynamic image based on theme
   const gatewayImage = theme === 'dark'
@@ -199,7 +281,7 @@ export default function InfoPage() {
     : "/images/ilustation-mqtt-gateway-light.png";
 
   // Get features dynamically based on enabled menu items
-  const features = mapMenuToFeatures();
+  const features = mapMenuToFeatures(menuData);
 
   const techStack = [
     { name: "Node.js", icon: <SiNodedotjs size={32} className="text-green-600" />, description: "Backend runtime environment" },
@@ -253,16 +335,7 @@ export default function InfoPage() {
 
             {/* MQTT Gateway Illustration and Description */}
             <div className="flex flex-col lg:flex-row items-start gap-8 mb-6">
-              {/* Image Section */}
-              <div className="flex-shrink-0 w-[300px]">
-                <div className="relative">
-                  <img
-                    src={gatewayImage}
-                    alt="MQTT Gateway Illustration"
-                    className="w-full h-auto rounded-lg shadow-lg border border-border"
-                  />
-                </div>
-              </div>
+             
 
               {/* Description Section */}
               <div className="flex-1 w-full lg:w-1/2">

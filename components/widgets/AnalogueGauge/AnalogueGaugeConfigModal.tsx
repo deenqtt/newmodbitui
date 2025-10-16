@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import Swal from "sweetalert2";
+import { showToast } from "@/lib/toast-utils";
 import { useMqtt } from "@/contexts/MqttContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -83,7 +83,7 @@ export const AnalogueGaugeConfigModal = ({
           if (!response.ok) throw new Error("Failed to fetch devices");
           setDevices(await response.json());
         } catch (error: any) {
-          Swal.fire("Error", error.message, "error");
+          showToast.error(error.message);
           onClose();
         } finally {
           setIsLoadingDevices(false);
@@ -150,7 +150,7 @@ export const AnalogueGaugeConfigModal = ({
 
   const handleSave = () => {
     if (!customName || !selectedDeviceUniqId || !selectedKey) {
-      Swal.fire("Incomplete", "Please fill all required fields.", "warning");
+      showToast.error("Please fill all required fields.");
       return;
     }
     onSave({

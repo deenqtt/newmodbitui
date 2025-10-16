@@ -24,10 +24,7 @@ export default function MenuManagement() {
         <TabsContent value="roles" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Role Management</CardTitle>
-              <CardDescription>
-                Create, edit, and manage user roles with different access levels.
-              </CardDescription>
+             
             </CardHeader>
             <CardContent>
               <RoleManagement />
@@ -38,10 +35,7 @@ export default function MenuManagement() {
         <TabsContent value="menu-groups" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Menu Group Management</CardTitle>
-              <CardDescription>
-                Organize menu items into logical groups for better navigation.
-              </CardDescription>
+             
             </CardHeader>
             <CardContent>
               <MenuGroupManagement />
@@ -52,10 +46,7 @@ export default function MenuManagement() {
         <TabsContent value="menu-items" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Menu Item Management</CardTitle>
-              <CardDescription>
-                Create and configure individual menu items with paths and permissions.
-              </CardDescription>
+             
             </CardHeader>
             <CardContent>
               <MenuItemManagement />
@@ -66,10 +57,7 @@ export default function MenuManagement() {
         <TabsContent value="permissions" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Permission Management</CardTitle>
-              <CardDescription>
-                Assign menu access permissions to different roles.
-              </CardDescription>
+          
             </CardHeader>
             <CardContent>
               <PermissionManagement />

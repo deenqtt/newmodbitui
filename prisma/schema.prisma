@@ -36,7 +36,7 @@ model Role {
   permissions     Permission[]         @relation("RolePermissions")
   menuPermissions RoleMenuPermission[]
 
-  @@map("roles")
+  @@map("Role")
 }
 
 model Permission {
@@ -51,7 +51,7 @@ model Permission {
   roles           Role[]           @relation("RolePermissions")
 
   @@unique([resource, action])
-  @@map("permissions")
+  @@map("Permission")
 }
 
 model MenuGroup {
@@ -66,7 +66,7 @@ model MenuGroup {
   updatedAt   DateTime   @updatedAt
   items       MenuItem[]
 
-  @@map("menu_groups")
+  @@map("MenuGroup")
 }
 
 model MenuItem {
@@ -84,7 +84,7 @@ model MenuItem {
   menuGroup   MenuGroup            @relation(fields: [menuGroupId], references: [id])
   permissions RoleMenuPermission[]
 
-  @@map("menu_items")
+  @@map("MenuItem")
 }
 
 model RoleMenuPermission {
@@ -101,7 +101,7 @@ model RoleMenuPermission {
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
 
   @@unique([roleId, menuItemId])
-  @@map("role_menu_permissions")
+  @@map("RoleMenuPermission")
 }
 
 model RolePermission {
@@ -114,7 +114,7 @@ model RolePermission {
   permission   Permission @relation("RolePermissions", fields: [permissionId], references: [id])
 
   @@unique([roleId, permissionId])
-  @@map("role_permissions")
+  @@map("RolePermission")
 }
 
 model Maintenance {

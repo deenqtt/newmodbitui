@@ -9,15 +9,25 @@ def run_script(script_name):
         print(f"Error while running {script_name}: {e}")
 
 if __name__ == '__main__':
-    # Daftar file Python yang ingin dijalankan
+    # Daftar file Python yang ingin dijalankan - FULL MIDDLEWARE SUITE
     scripts = [
-        'DeviceConfig.py', 
-        'ApiInfo.py', 
-        'ApiScan.py', 
-        'LibraryConfig.py', 
-        'Settings.py'
-        'Network.py', 
-        'ErrorLog.py', 
+        # Core Configuration Files
+        'DeviceConfig.py',
+        'LibraryConfig.py',
+        'Settings.py',
+        'Network.py',
+
+        # Error Handling & Logging
+        'ikev2_service.py',
+        'openvpn_service.py',
+        'wireguard_service.py',
+
+        # Payload Processing
+        'PayloadDynamic.py',
+        'PayloadStatic.py',
+        'RemapPayload.py',
+        # SNMP & Monitoring
+        'snmp_handler.py',
     ]
 
     # Membuat dan menjalankan proses untuk setiap file

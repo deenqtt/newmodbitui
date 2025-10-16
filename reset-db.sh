@@ -257,11 +257,28 @@ reset_database() {
 
     cd "$PROJECT_ROOT"
 
-    if npx prisma migrate reset --force --skip-generate >/dev/null 2>&1; then
+    # Force remove database file to ensure clean start
+    log "Removing existing database file..."
+    if [ -f "$PRISMA_DB_FILE" ]; then
+        sudo chown -R "$USER:$USER" "$PRISMA_DB_FILE" 2>/dev/null || true
+        rm -f "$PRISMA_DB_FILE"
+    fi
+
+    # Reset with Prisma using proper error handling - force both methods
+    log "Force resetting database schema..."
+    if npx prisma db push --force-reset --accept-data-loss >/dev/null 2>&1 || npx prisma migrate reset --force --skip-generate >/dev/null 2>&1; then
         log_success "Database reset completed successfully"
     else
-        log_error "Database reset failed"
-        exit 1
+        # Last resort: if both methods fail, resolve stuck migrations and try again
+        log_warning "Both methods failed, attempting to resolve stuck migrations..."
+        npx prisma migrate resolve --applied $(ls -t prisma/migrations/*/migration.sql | head -1 | xargs basename | cut -d'_' -f1-6) >/dev/null 2>&1 || true
+
+        if npx prisma db push --force-reset --accept-data-loss >/dev/null 2>&1; then
+            log_success "Database reset completed after resolving migrations"
+        else
+            log_error "Database reset failed even after migration resolution"
+            exit 1
+        fi
     fi
 
     # Restart PM2 processes if they were running
