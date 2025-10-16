@@ -631,7 +631,10 @@ main() {
         log_warning "Some verification tests failed, but deployment may still be functional"
     fi
     
-    # Step 9: Show deployment status
+    # Step 9: Fix database permissions for production
+    fix_database_permissions
+
+    # Step 10: Show deployment status
     show_deployment_status
 }
 
@@ -950,6 +953,9 @@ server {
     listen $FRONTEND_PORT;
     server_name localhost;
 
+    # File upload configuration - increased max body size for image uploads
+    client_max_body_size 100M;
+
     # Basic security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -1016,6 +1022,35 @@ EOF
 
     log_success "Nginx configured for environment: $ENVIRONMENT_TYPE"
 }
+
+# Function to fix database permissions for production
+fix_database_permissions() {
+    log "=== Fixing Database Permissions for Production ==="
+    
+    cd "$PROJECT_ROOT"
+    
+    # Check if database file exists
+    if [[ -f "prisma/iot_dashboard.db" ]]; then
+        log "Database file found, fixing permissions..."
+        
+        # Change ownership to current user (not root)
+        sudo chown $(whoami):$(whoami) prisma/iot_dashboard.db 2>/dev/null || true
+        
+        # Set proper permissions for read/write access
+        chmod 666 prisma/iot_dashboard.db 2>/dev/null || true
+        
+        # Verify permissions
+        if [[ -w "prisma/iot_dashboard.db" ]]; then
+            log_success "Database permissions fixed successfully"
+        else
+            log_warning "Could not fix database permissions automatically"
+            log_warning "You may need to run: sudo chown $(whoami):$(whoami) prisma/iot_dashboard.db"
+        fi
+    else
+        log_warning "Database file not found, will be created on first run"
+    fi
+}
+
 
 # Enhanced verification
 verify_deployment() {
@@ -1174,7 +1209,10 @@ main() {
         log_warning "Some verification tests failed, but deployment may still be functional"
     fi
 
-    # Step 9: Show deployment status
+    # Step 9: Fix database permissions for production
+    fix_database_permissions
+
+    # Step 10: Show deployment status
     show_deployment_status
 }
 

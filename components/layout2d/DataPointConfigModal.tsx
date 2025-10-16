@@ -143,11 +143,25 @@ export default function DataPointConfigModal({
     try {
       const url = `${API_BASE_URL}/api/devices/for-selection`;
 
+      // Helper function to get cookie
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+        return null;
+      };
+
+      const authToken = getCookie('authToken');
+
       const response = await fetch(url, {
         method: "GET",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          // Include token in authorization header for server-side processing
+          ...(authToken && { "Authorization": `Bearer ${authToken}` }),
+          // Also include all cookies in the Cookie header as fallback
+          "Cookie": document.cookie,
         },
       });
 
