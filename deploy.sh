@@ -32,8 +32,8 @@ show_deployment_banner
 # Project configuration - Will be overridden by user input
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="nexus-dashboard"
-DEFAULT_FRONTEND_PORT=3001
-DEFAULT_BACKEND_PORT=3002
+DEFAULT_FRONTEND_PORT=3500
+DEFAULT_BACKEND_PORT=3501
 NODE_VERSION="18"
 
 # Global variables for user configuration

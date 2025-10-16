@@ -362,7 +362,7 @@ show_update_status() {
     echo "  View app logs: pm2 logs $APP_NAME"
     echo "  Monitor PM2: pm2 monit"
     echo "  View recent commits: git log --oneline -5"
-    echo "  Check app status: curl http://localhost:3002/api/health"
+    echo "  Check app status: curl http://localhost:3501/api/health"
 
     echo ""
     if [ "$HAS_CHANGES" = true ]; then

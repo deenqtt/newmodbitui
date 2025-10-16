@@ -55,37 +55,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-// Confirmation Dialog State
-const [confirmationProps, setConfirmationProps] = useState<{
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  type: "info" | "warning" | "destructive";
-  title: string;
-  description: string;
-  confirmText: string;
-  cancelText: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}>({
-  open: false,
-  onOpenChange: () => {},
-  type: "info",
-  title: "",
-  description: "",
-  confirmText: "Confirm",
-  cancelText: "Cancel",
-  onConfirm: () => {},
-  onCancel: () => {},
-});
-
-const showConfirmation = (props: Partial<typeof confirmationProps>) => {
-  setConfirmationProps(prev => ({
-    ...prev,
-    ...props,
-    open: true,
-    onOpenChange: (open) => setConfirmationProps(prev => ({ ...prev, open })),
-  }));
-};
+// Confirmation Dialog State - removed duplicate
 
 // --- Type Definitions ---
 type DeviceExternal = {
