@@ -2,85 +2,85 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Pre-configured logging configurations data
+// Pre-configured logging configurations dengan predictable IDs
 const LOGGING_CONFIGS_DATA = [
   {
-    id: "cmgucfm1b0005gv5mxw5fvdds",
+    id: "flow-rate-1",
     customName: "Flow Rate [Water Flow Meter 1]",
     key: "flow_rate",
     units: "L/s",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3c00a7gvt6tkidrj3l",
+    deviceUniqId: "limbah-flow1",
     createdAt: "2025-10-17T04:23:16.559Z",
     updatedAt: "2025-10-17T04:23:16.559Z"
   },
   {
-    id: "cmgucgqi20009gv5m7uwzh7tp",
+    id: "flow-rate-2",
     customName: "Flow Rate [Water Flow Meter 2]",
     key: "flow_rate",
     units: "L/s",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3d00a9gvt6n54a91r2",
+    deviceUniqId: "limbah-flow2",
     createdAt: "2025-10-17T04:24:09.002Z",
     updatedAt: "2025-10-17T04:24:09.002Z"
   },
   {
-    id: "cmgucisy2000fgv5mn5dsj5rz",
+    id: "ph-sensor-1",
     customName: "PH [PH Sensor 1]",
     key: "ph",
     units: "%",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3400a1gvt6a4dbjsii",
+    deviceUniqId: "limbah-ph1",
     createdAt: "2025-10-17T04:25:45.483Z",
     updatedAt: "2025-10-17T04:25:45.483Z"
   },
   {
-    id: "cmgucj7uc000hgv5m2g0c2ssg",
+    id: "ph-sensor-2",
     customName: "PH [PH Sensor 2]",
     key: "ph",
     units: "C",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3700a3gvt6pysfjq9p",
+    deviceUniqId: "limbah-ph2",
     createdAt: "2025-10-17T04:26:04.788Z",
     updatedAt: "2025-10-17T04:26:04.788Z"
   },
   {
-    id: "cmguchzdx000dgv5m1hnnu1ag",
+    id: "temp-sensor-1",
     customName: "Temperature [PH Sensor 1]",
     key: "temp",
     units: "C",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3400a1gvt6a4dbjsii",
+    deviceUniqId: "limbah-ph1",
     createdAt: "2025-10-17T04:25:07.173Z",
     updatedAt: "2025-10-17T04:25:07.173Z"
   },
   {
-    id: "cmgucjn7p000jgv5mknd9gsir",
+    id: "temp-sensor-2",
     customName: "Temperature [PH Sensor 2]",
     key: "temp",
     units: "C",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3700a3gvt6pysfjq9p",
+    deviceUniqId: "limbah-ph2",
     createdAt: "2025-10-17T04:26:24.709Z",
     updatedAt: "2025-10-17T04:26:24.709Z"
   },
   {
-    id: "cmgucgbqq0007gv5mhr5n8tf1",
+    id: "total-flow-1",
     customName: "Total Flow [Water Flow Meter 1]",
     key: "total_flow",
     units: "L",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3c00a7gvt6tkidrj3l",
+    deviceUniqId: "limbah-flow1",
     createdAt: "2025-10-17T04:23:49.875Z",
     updatedAt: "2025-10-17T04:23:49.875Z"
   },
   {
-    id: "cmguchak9000bgv5mmqv8duef",
+    id: "total-flow-2",
     customName: "Total Flow [Water Flow Meter 2]",
     key: "total_flow",
     units: "L",
     multiply: 1,
-    deviceUniqId: "cmgsx5t3d00a9gvt6n54a91r2",
+    deviceUniqId: "limbah-flow2",
     createdAt: "2025-10-17T04:24:35.002Z",
     updatedAt: "2025-10-17T04:24:35.002Z"
   }

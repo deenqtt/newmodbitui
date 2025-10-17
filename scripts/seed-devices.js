@@ -76,40 +76,63 @@ async function seedDevices() {
   try {
     // Gunakan transaksi untuk memastikan semua atau tidak sama sekali
     await prisma.$transaction(async (tx) => {
-      for (const deviceData of DEVICES_DATA) {
-        try {
-          console.log(`🔍 Processing: ${deviceData.name}`);
+  for (const deviceData of DEVICES_DATA) {
+    try {
+      console.log(`🔍 Processing: ${deviceData.name}`);
 
-          // Cek apakah device sudah ada berdasarkan topic atau uniqId
-          const existingByTopic = await tx.deviceExternal.findUnique({
-            where: { topic: deviceData.topic }
-          });
+      // Create predictable uniqId based on topic (remove slashes and create consistent ID)
+      const predictableUniqId = deviceData.topic.replace(/\//g, '-');
 
-          if (existingByTopic) {
-            // Update device yang sudah ada
-            await tx.deviceExternal.update({
-              where: { topic: deviceData.topic },
-              data: {
-                name: deviceData.name,
-                address: deviceData.address,
-                updatedAt: new Date()
-              }
-            });
-            updatedCount++;
-            console.log(`   📝 Updated: ${deviceData.name}`);
+      // Cek apakah device sudah ada berdasarkan topic atau uniqId
+      const existingByTopic = await tx.deviceExternal.findUnique({
+        where: { topic: deviceData.topic }
+      });
 
-          } else {
-            // Buat device baru
-            await tx.deviceExternal.create({
-              data: {
-                name: deviceData.name,
-                topic: deviceData.topic,
-                address: deviceData.address
-              }
-            });
-            createdCount++;
-            console.log(`   ➕ Created: ${deviceData.name}`);
+      const existingByUniqId = await tx.deviceExternal.findUnique({
+        where: { uniqId: predictableUniqId }
+      });
+
+      if (existingByTopic) {
+        // Update device yang sudah ada - juga update uniqId untuk konsistensi
+        await tx.deviceExternal.update({
+          where: { topic: deviceData.topic },
+          data: {
+            name: deviceData.name,
+            uniqId: predictableUniqId, // Set predictable uniqId
+            address: deviceData.address,
+            updatedAt: new Date()
           }
+        });
+        updatedCount++;
+        console.log(`   📝 Updated: ${deviceData.name} (ID: ${predictableUniqId})`);
+
+      } else if (existingByUniqId) {
+        // Update by uniqId if topic doesn't exist but uniqId does
+        await tx.deviceExternal.update({
+          where: { uniqId: predictableUniqId },
+          data: {
+            name: deviceData.name,
+            topic: deviceData.topic,
+            address: deviceData.address,
+            updatedAt: new Date()
+          }
+        });
+        updatedCount++;
+        console.log(`   📝 Updated by ID: ${deviceData.name} (ID: ${predictableUniqId})`);
+
+      } else {
+        // Buat device baru dengan predictable uniqId
+        await tx.deviceExternal.create({
+          data: {
+            name: deviceData.name,
+            topic: deviceData.topic,
+            uniqId: predictableUniqId, // Use predictable uniqId instead of auto-generated
+            address: deviceData.address
+          }
+        });
+        createdCount++;
+        console.log(`   ➕ Created: ${deviceData.name} (ID: ${predictableUniqId})`);
+      }
 
         } catch (deviceError) {
           console.error(`   ❌ Error processing ${deviceData.name}:`, deviceError.message);
@@ -123,6 +146,13 @@ async function seedDevices() {
     console.log(`   ✅ Created: ${createdCount} devices`);
     console.log(`   📝 Updated: ${updatedCount} devices`);
     console.log(`   ❌ Skipped: ${skippedCount} devices`);
+
+    console.log('\n🔗 Predictable Device IDs:');
+    console.log('   💡 Device IDs are now topic-based and consistent:');
+    DEVICES_DATA.forEach(device => {
+      const id = device.topic.replace(/\//g, '-');
+      console.log(`   • ${device.name}: ${id}`);
+    });
 
     if (errors.length > 0) {
       console.log('\n⚠️  Errors encountered:');
