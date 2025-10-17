@@ -123,12 +123,12 @@ const StatusRow = ({
 
   const IconComponent = getIconComponent(itemConfig.selectedIcon || "Zap");
 
-  // Clean minimal status styling
+  // Enhanced status styling with dark mode support
   const getStatusStyles = () => {
     const baseStyles = {
-      title: "text-slate-700",
-      value: "text-slate-900",
-      unit: "text-slate-500",
+      title: "text-muted-foreground",
+      value: "text-foreground",
+      unit: "text-muted-foreground/70",
       iconBg: itemConfig.iconBgColor || "#64748B", // Default neutral
       iconColor: itemConfig.iconColor || "#FFFFFF",
     };
@@ -137,7 +137,7 @@ const StatusRow = ({
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500",
+          indicator: "bg-green-500",
           pulse: false,
         };
       case "error":
@@ -145,22 +145,22 @@ const StatusRow = ({
           ...baseStyles,
           indicator: "bg-red-500",
           pulse: false,
-          title: "text-red-600",
-          value: "text-red-700",
+          title: "text-red-600 dark:text-red-400",
+          value: "text-red-700 dark:text-red-300",
         };
       case "loading":
       case "waiting":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500",
+          indicator: "bg-amber-500 dark:bg-amber-400",
           pulse: true,
-          title: "text-slate-600",
-          value: "text-slate-700",
+          title: "text-muted-foreground/80",
+          value: "text-muted-foreground",
         };
       default:
         return {
           ...baseStyles,
-          indicator: "bg-slate-400",
+          indicator: "bg-slate-400 dark:bg-slate-500",
           pulse: false,
         };
     }
@@ -315,7 +315,7 @@ const StatusRow = ({
     <div
       className={`
         relative group transition-all duration-300 ease-out
-        bg-white border border-slate-200/60 rounded-lg 
+        bg-card border border-border rounded-lg
         shadow-sm hover:shadow-md hover:scale-[1.01] transform-gpu
         overflow-hidden
       `}
@@ -406,7 +406,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
     },
   });
 
-  // Enhanced responsive system
+  // Advanced dynamic responsive layout system
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -417,56 +417,95 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
       setDimensions({ width, height });
 
-      // Smart layout calculation
+      if (width === 0 || height === 0) return; // Prevent division by zero
+
       const area = width * height;
       const itemCount = config?.items?.length || 1;
       const aspectRatio = width / height;
 
-      // Determine layout mode
+      // Enhanced layout mode detection based on viewport and content
       let layoutMode: "mini" | "compact" | "normal";
-      if (area < 15000 || height < 120) {
+
+      // Smallest areas are mini
+      if (area < 12000) {
         layoutMode = "mini";
-      } else if (area < 30000 || height < 200) {
+      } else if (area < 25000 || height < 180 || (width < 350 && itemCount > 2)) {
         layoutMode = "compact";
       } else {
         layoutMode = "normal";
       }
 
-      // Determine column count
+      // Advanced column calculation based on multiple factors
       let columnCount = 1;
-      if (width > 400 && itemCount > 2) {
-        columnCount =
-          aspectRatio > 1.5 ? Math.min(3, Math.ceil(itemCount / 2)) : 2;
-      } else if (width > 300 && itemCount > 1 && aspectRatio > 1.2) {
-        columnCount = 2;
+
+      if (itemCount === 1) {
+        columnCount = 1; // Single item always full width
+      } else if (itemCount === 2) {
+        columnCount = aspectRatio > 1.3 ? 2 : 1; // 2 items: wide layout gets 2 cols
+      } else if (itemCount === 3) {
+        columnCount = width > 450 && aspectRatio > 1.2 ? (width > 600 ? 3 : 2) : 1;
+      } else if (itemCount === 4) {
+        columnCount = width > 500 ? (aspectRatio > 1.5 ? 2 : Math.min(2, Math.ceil(itemCount / 2))) : 1;
+      } else {
+        // For 5+ items: complex calculation
+        const idealItemsPerCol = Math.ceil(itemCount / 4); // Max 4 rows per col
+        const colsByWidth = Math.floor(width / 250); // Min 250px per col
+        const colsByHeight = Math.floor(height / 120); // Min 120px per col per item
+
+        columnCount = Math.min(
+          Math.max(1, colsByWidth),
+          Math.max(1, idealItemsPerCol),
+          Math.max(1, colsByHeight),
+          4 // Max 4 columns
+        );
       }
 
-      // Calculate dynamic sizes
-      const itemHeight =
-        (height - (layoutMode === "mini" ? 40 : 60)) /
-        Math.ceil(itemCount / columnCount);
+      // Prevent overly tall columns by allowing more rows
+      const rows = Math.ceil(itemCount / columnCount);
+      if (rows > 5 && columnCount > 1) {
+        columnCount = Math.ceil(itemCount / 5); // Limit to 5 rows max
+      }
 
+      // Ensure column count works with available space
+      const availableContentHeight = height - (layoutMode === "mini" ? 36 : layoutMode === "compact" ? 44 : 52);
+      const maxRowsBySpace = Math.floor(availableContentHeight / (layoutMode === "mini" ? 80 : layoutMode === "compact" ? 100 : 120));
+      if (maxRowsBySpace < rows && columnCount > 1) {
+        // Adjust to fit vertically
+        const adjustedCols = Math.ceil(itemCount / maxRowsBySpace);
+        columnCount = Math.min(columnCount, adjustedCols);
+      }
+
+      // Final safety check
+      if (columnCount > itemCount) columnCount = itemCount;
+      if (columnCount < 1) columnCount = 1;
+
+      // Calculate dynamic sizes with improved formulas
+      const contentAreaHeight = height - (layoutMode === "mini" ? 36 : layoutMode === "compact" ? 44 : 52);
+      const cellHeight = contentAreaHeight / Math.ceil(itemCount / columnCount);
+      const cellWidth = width / columnCount;
+
+      // Size calculations with better proportions - INCREASED TEXT SIZE BY 50%
       const sizes = {
         mini: {
-          iconSize: Math.max(12, Math.min(itemHeight / 4, 16)),
-          fontSize: Math.max(10, Math.min(itemHeight / 6, 12)),
-          padding: Math.max(4, itemHeight / 12),
-          gap: Math.max(4, itemHeight / 15),
-          headerHeight: 40,
+          iconSize: Math.max(12, Math.min(cellHeight * 0.45, cellWidth * 0.3, 24)),
+          fontSize: Math.max(15, Math.min(cellHeight * 0.375, cellWidth * 0.225, 18)),
+          padding: Math.max(4, Math.min(cellHeight * 0.18, cellWidth * 0.12, 9)),
+          gap: Math.max(4, cellHeight * 0.12, 6),
+          headerHeight: 42,
         },
         compact: {
-          iconSize: Math.max(16, Math.min(itemHeight / 3.5, 20)),
-          fontSize: Math.max(11, Math.min(itemHeight / 5, 14)),
-          padding: Math.max(6, itemHeight / 10),
-          gap: Math.max(6, itemHeight / 12),
+          iconSize: Math.max(24, Math.min(cellHeight * 0.525, cellWidth * 0.33, 33)),
+          fontSize: Math.max(16, Math.min(cellHeight * 0.405, cellWidth * 0.255, 21)),
+          padding: Math.max(7, Math.min(cellHeight * 0.225, cellWidth * 0.15, 12)),
+          gap: Math.max(6, cellHeight * 0.15, 9),
           headerHeight: 48,
         },
         normal: {
-          iconSize: Math.max(20, Math.min(itemHeight / 3, 24)),
-          fontSize: Math.max(12, Math.min(itemHeight / 4.5, 16)),
-          padding: Math.max(8, itemHeight / 8),
-          gap: Math.max(8, itemHeight / 10),
-          headerHeight: 56,
+          iconSize: Math.max(30, Math.min(cellHeight * 0.6, cellWidth * 0.375, 39)),
+          fontSize: Math.max(18, Math.min(cellHeight * 0.45, cellWidth * 0.27, 24)),
+          padding: Math.max(10, Math.min(cellHeight * 0.27, cellWidth * 0.18, 15)),
+          gap: Math.max(9, cellHeight * 0.18, 12),
+          headerHeight: 54,
         },
       };
 
@@ -486,9 +525,9 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
   if (!config || !config.items) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-white border border-slate-200/60 rounded-xl shadow-sm">
-        <AlertTriangle className="h-8 w-8 text-red-500 mb-3" />
-        <p className="text-sm font-medium text-red-600 text-center">
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-card border border-border rounded-xl shadow-sm">
+        <AlertTriangle className="h-8 w-8 text-destructive mb-3" />
+        <p className="text-sm font-medium text-destructive text-center">
           Widget not configured correctly
         </p>
       </div>
@@ -503,22 +542,22 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
     <div
       ref={containerRef}
       className="w-full h-full flex flex-col
-                 bg-white
-                 border border-slate-200/60 rounded-xl
+                 bg-card
+                 border border-border rounded-xl
                  shadow-sm hover:shadow-md
                  transition-all duration-300 ease-out
                  overflow-hidden"
     >
       {/* Clean minimal header */}
       <div
-        className="flex items-center justify-between px-4 py-3 
-                  bg-white border-b border-slate-200/40"
+        className="flex items-center justify-between px-4 py-3
+                  bg-card border-b border-border"
         style={{ height: layoutConfig.dynamicSizes.headerHeight }}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex-shrink-0 p-2 bg-slate-100 rounded-lg shadow-sm">
+          <div className="flex-shrink-0 p-2 bg-muted rounded-lg shadow-sm">
             <List
-              className="text-slate-600"
+              className="text-muted-foreground"
               style={{
                 width: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
                 height: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
@@ -527,7 +566,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
           </div>
           <div className="flex-1 min-w-0">
             <h3
-              className="font-bold text-slate-900 truncate leading-tight"
+              className="font-bold text-foreground truncate leading-tight"
               style={{
                 fontSize: `${layoutConfig.dynamicSizes.fontSize * 1.1}px`,
               }}
@@ -537,7 +576,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
             </h3>
             {layoutConfig.layoutMode === "normal" && (
               <p
-                className="text-slate-500 truncate"
+                className="text-muted-foreground truncate"
                 style={{
                   fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
                 }}
@@ -551,9 +590,9 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
         {/* Status count indicator */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-2 h-2 rounded-full bg-slate-400" />
+          <div className="w-2 h-2 rounded-full bg-muted-foreground/50" />
           <span
-            className="text-slate-600 font-medium"
+            className="text-muted-foreground font-medium"
             style={{
               fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.8}px`,
             }}
@@ -592,10 +631,10 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
 
       {/* Clean minimal footer for large widgets */}
       {config.items.length > 6 && layoutConfig.layoutMode === "normal" && (
-        <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-200/40">
+        <div className="px-4 py-2 bg-muted/50 border-t border-border">
           <div className="flex items-center justify-between">
             <p
-              className="text-slate-600"
+              className="text-muted-foreground"
               style={{
                 fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
               }}
@@ -604,9 +643,9 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
             </p>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
                 <span
-                  className="text-slate-500"
+                  className="text-muted-foreground"
                   style={{
                     fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.7}px`,
                   }}

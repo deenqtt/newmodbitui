@@ -5,6 +5,8 @@ const { seedMenu } = require('./seed-menu');
 const { seedDashboard } = require('./seed-dashboard');
 const { seedDevices } = require('./seed-devices');
 const { seedLayout2D } = require('./seed-layout2d');
+const { seedLoggingConfigs } = require('./seed-logging-configs');
+const { seedMaintenance } = require('./seed-maintenance');
 
 const prisma = new PrismaClient();
 
@@ -15,6 +17,8 @@ const SEED_CONFIG = {
   ENABLE_DASHBOARD: process.env.SEED_DASHBOARD !== 'false', // Default: true
   ENABLE_DEVICES: process.env.SEED_DEVICES !== 'false', // Default: true
   ENABLE_LAYOUT2D: process.env.SEED_LAYOUT2D !== 'false', // Default: true
+  ENABLE_LOGGING_CONFIGS: process.env.SEED_LOGGING_CONFIGS !== 'false', // Default: true
+  ENABLE_MAINTENANCE: process.env.SEED_MAINTENANCE !== 'false', // Default: true
   RESET_DATABASE: process.env.RESET_DB !== 'false', // Default: true
   FORCE_PRISMA_GENERATE: process.env.FORCE_GENERATE !== 'false', // Default: true
 };
@@ -40,6 +44,8 @@ async function seedInit() {
   console.log(`   - Dashboard: ${SEED_CONFIG.ENABLE_DASHBOARD ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Devices: ${SEED_CONFIG.ENABLE_DEVICES ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Layout 2D: ${SEED_CONFIG.ENABLE_LAYOUT2D ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`   - Logging Configs: ${SEED_CONFIG.ENABLE_LOGGING_CONFIGS ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`   - Maintenance: ${SEED_CONFIG.ENABLE_MAINTENANCE ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Reset DB: ${SEED_CONFIG.RESET_DATABASE ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   - Force Generate: ${SEED_CONFIG.FORCE_PRISMA_GENERATE ? 'ENABLED' : 'DISABLED'}\n`);
 
@@ -109,6 +115,26 @@ async function seedInit() {
     });
   }
 
+  // Seed Logging Configs (optional)
+  if (SEED_CONFIG.ENABLE_LOGGING_CONFIGS) {
+    steps.push(async () => {
+      console.log('📈 Starting logging configurations seeding...');
+      await seedLoggingConfigs();
+      console.log('✅ Logging configurations seeding completed');
+      return true;
+    });
+  }
+
+  // Seed Maintenance (optional)
+  if (SEED_CONFIG.ENABLE_MAINTENANCE) {
+    steps.push(async () => {
+      console.log('🔧 Starting maintenance seeding...');
+      await seedMaintenance();
+      console.log('✅ Maintenance seeding completed');
+      return true;
+    });
+  }
+
   // Execute all enabled steps
   for (const step of steps) {
     if (!await step()) {
@@ -141,8 +167,10 @@ async function seedInit() {
 
   if (SEED_CONFIG.ENABLE_DASHBOARD) {
     console.log('   ✅ Dashboard Layout seeded');
-    console.log('      - Default dashboard for user ID 1');
-    console.log('      - Basic widget layout');
+    console.log('      - Pre-configured dashboard with 11 monitoring widgets');
+    console.log('      - Flow meters, PH sensors, temperature monitoring');
+    console.log('      - Multi-series charts and navigation shortcuts');
+    console.log('      - Ready-to-use for IoT wastewater monitoring');
   } else {
     console.log('   ⚪ Dashboard seeding skipped (disabled)');
   }
@@ -167,18 +195,39 @@ async function seedInit() {
     console.log('   ⚪ Layout 2D seeding skipped (disabled)');
   }
 
-  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD && !SEED_CONFIG.ENABLE_DEVICES && !SEED_CONFIG.ENABLE_LAYOUT2D) {
+  if (SEED_CONFIG.ENABLE_LOGGING_CONFIGS) {
+    console.log('   ✅ Logging Configurations seeded (8 configurations)');
+    console.log('      - 4 Flow monitoring configs (rates and totals)');
+    console.log('      - 2 PH sensor configs (pH levels)');
+    console.log('      - 2 Temperature monitoring configs');
+    console.log('      - Ready for chart visualization and data logging');
+  } else {
+    console.log('   ⚪ Logging configurations seeding skipped (disabled)');
+  }
+
+  if (SEED_CONFIG.ENABLE_MAINTENANCE) {
+    console.log('   ✅ Maintenance seeded (2 scheduled tasks)');
+    console.log('      - PH Sensor maintenance schedules');
+    console.log('      - Weekly maintenance cycles');
+    console.log('      - Assigned to regular users');
+  } else {
+    console.log('   ⚪ Maintenance seeding skipped (disabled)');
+  }
+
+  if (!SEED_CONFIG.ENABLE_USERS && !SEED_CONFIG.ENABLE_MENU && !SEED_CONFIG.ENABLE_DASHBOARD && !SEED_CONFIG.ENABLE_DEVICES && !SEED_CONFIG.ENABLE_LAYOUT2D && !SEED_CONFIG.ENABLE_LOGGING_CONFIGS && !SEED_CONFIG.ENABLE_MAINTENANCE) {
     console.log('   ⚠️  No seeding modules were enabled');
   }
 
   console.log('\n💡 Control seeding with environment variables:');
-  console.log('   SEED_USERS=false       # Disable user seeding');
-  console.log('   SEED_MENU=false        # Disable menu seeding');
-  console.log('   SEED_DASHBOARD=false   # Disable dashboard seeding');
-  console.log('   SEED_DEVICES=false     # Disable device seeding');
-  console.log('   SEED_LAYOUT2D=false    # Disable Layout 2D seeding');
-  console.log('   RESET_DB=false         # Disable database reset');
-  console.log('   FORCE_GENERATE=false   # Skip Prisma generation');
+  console.log('   SEED_USERS=false         # Disable user seeding');
+  console.log('   SEED_MENU=false          # Disable menu seeding');
+  console.log('   SEED_DASHBOARD=false     # Disable dashboard seeding');
+  console.log('   SEED_DEVICES=false       # Disable device seeding');
+  console.log('   SEED_LAYOUT2D=false      # Disable Layout 2D seeding');
+  console.log('   SEED_LOGGING_CONFIGS=false # Disable logging configs seeding');
+  console.log('   SEED_MAINTENANCE=false   # Disable maintenance seeding');
+  console.log('   RESET_DB=false           # Disable database reset');
+  console.log('   FORCE_GENERATE=false     # Skip Prisma generation');
 }
 
 // Export functions for external use
@@ -192,6 +241,8 @@ module.exports = {
   seedDashboard,
   seedDevices,
   seedLayout2D,
+  seedLoggingConfigs,
+  seedMaintenance,
 
   // Export config
   SEED_CONFIG

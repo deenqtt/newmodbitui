@@ -409,6 +409,7 @@ main() {
     # Parse command line options
     VERBOSE=false
     DRY_RUN=false
+    DO_SEEDING=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -418,6 +419,10 @@ main() {
                 ;;
             -v|--verbose)
                 VERBOSE=true
+                shift
+                ;;
+            --seed)
+                DO_SEEDING=true
                 shift
                 ;;
             --dry-run)
@@ -437,6 +442,7 @@ main() {
     log "Project Root: $PROJECT_ROOT"
     log "Timestamp: $(date)"
     log "Verbose Mode: $VERBOSE"
+    log "Seeding Mode: $DO_SEEDING"
     log "Dry Run: $DRY_RUN"
 
     # Dry run mode - show what would happen

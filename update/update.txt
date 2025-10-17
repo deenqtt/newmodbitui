@@ -1,0 +1,33 @@
+INSTRUKSI UPDATE PROJECT
+========================
+
+Langkah 1: Replace File Page.tsx
+---------------------------------
+Replace file page.tsx yang ada di folder-folder berikut dengan file baru dari folder ini:
+- communication-setup/page.tsx
+- mqtt-broker/page.tsx
+
+Cara:
+1. Hapus file page.tsx yang lama
+2. Copy file page.tsx yang baru dari folder ini ke lokasi yang sesuai
+
+Langkah 2: Pindahkan Folder Network
+------------------------------------
+Pindahkan seluruh folder "network" beserta isinya ke direktori "components"
+
+Struktur akhir yang diharapkan:
+components/
+  └── network/
+      └── (semua isi folder network)
+
+Cara:
+1. Cut folder "network" dari lokasi saat ini
+2. Paste ke dalam folder "components"
+3. Pastikan semua file di dalam folder network ikut terpindah
+
+CATATAN:
+--------
+- Periksa kembali struktur folder setelah pemindahan
+- Update import path jika diperlukan setelah folder network dipindah
+
+Selesai!

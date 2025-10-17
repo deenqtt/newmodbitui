@@ -1,22 +1,20 @@
-[0;34m[2025-10-16 11:27:48][0m Starting Nexus IoT Database Reset & Re-seeding
-[0;34m[2025-10-16 11:27:48][0m Timestamp: Thu Oct 16 11:27:48 AM WIB 2025
-[0;34m[2025-10-16 11:27:48][0m Project: /home/ubuntu/Alfi/RnD/Development/newmodbitui
+[0;34m[2025-10-17 14:52:45][0m Starting Nexus IoT Database Reset & Re-seeding
+[0;34m[2025-10-17 14:52:45][0m Timestamp: Fri 17 Oct 2025 02:52:45 PM WIB
+[0;34m[2025-10-17 14:52:45][0m Project: /home/ubuntu/Alfi/RnD/Development/newmodbitui
 [0;36m[STEP][0m Checking prerequisites...
 [0;32m[SUCCESS][0m Prerequisites check passed
-[0;36m[STEP][0m Resetting database...
-[0;34m[2025-10-16 11:27:49][0m Removing existing database file...
-[0;34m[2025-10-16 11:27:49][0m Force resetting database schema...
-[0;32m[SUCCESS][0m Database reset completed successfully
+[0;36m[STEP][0m Skipping database reset (--no-reset specified)
 [0;36m[STEP][0m Generating Prisma client...
 [0;32m[SUCCESS][0m Prisma client generated successfully
 [0;36m[STEP][0m Running configured seeders...
-[0;34m[2025-10-16 11:27:53][0m Running seed command with environment: 
+[0;34m[2025-10-17 14:52:47][0m Running seed command with environment: 
 [0;32m[SUCCESS][0m Seeding completed successfully
 [0;36m[STEP][0m Verifying seeding results...
 [1;33m[WARNING][0m Seeding verification: No success logs found in recent entries
-[0;32m[SUCCESS][0m Database file exists (592K)
+[0;32m[SUCCESS][0m Database file exists (604K)
+[0;32m[SUCCESS][0m Database accessible: 3 users found
 [1;33m[WARNING][0m Some verification checks failed - please check logs manually
 [0;32m[SUCCESS][0m 📋 Operation Summary:
 [0;32m[SUCCESS][0m 🎉 Database reset and re-seeding completed successfully!
 [0;32m[SUCCESS][0m 🚀 Ready to run the application with fresh data!
-[0;34m[2025-10-16 11:27:58][0m All operations completed successfully
+[0;34m[2025-10-17 14:52:52][0m All operations completed successfully

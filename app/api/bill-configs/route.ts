@@ -1,13 +1,10 @@
-// File: app/api/bill-configs/route.ts
 import { NextResponse } from "next/server";
 import { getAuthFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- IMPORT
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * FUNGSI GET: Mengambil semua konfigurasi tagihan.
- * (Tidak ada perubahan di sini, include sudah benar)
  */
 export async function GET(request: Request) {
   const auth = await getAuthFromCookie(request);
@@ -39,8 +36,8 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -65,13 +62,82 @@ export async function POST(request: Request) {
       },
     });
 
-    triggerMqttServiceUpdate(); // <-- PANGGIL FUNGSI DI SINI
+    triggerMqttServiceUpdate();
 
     return NextResponse.json(newConfig, { status: 201 });
   } catch (error) {
     console.error("Error creating bill configuration:", error);
     return NextResponse.json(
       { message: "Failed to create configuration." },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * FUNGSI PUT: Mengupdate konfigurasi tagihan berdasarkan ID.
+ */
+export async function PUT(request: Request) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, customName, sourceDeviceUniqId, sourceDeviceKey, rupiahRatePerKwh, dollarRatePerKwh } = body;
+
+    const updatedConfig = await prisma.billConfiguration.update({
+      where: { id },
+      data: {
+        customName,
+        sourceDeviceUniqId,
+        sourceDeviceKey,
+        rupiahRatePerKwh,
+        dollarRatePerKwh,
+      },
+    });
+
+    triggerMqttServiceUpdate();
+
+    return NextResponse.json(updatedConfig);
+  } catch (error) {
+    console.error("Error updating bill configuration:", error);
+    return NextResponse.json(
+      { message: "Failed to update configuration." },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * FUNGSI DELETE: Menghapus konfigurasi tagihan berdasarkan ID.
+ */
+export async function DELETE(request: Request) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ message: "ID is required" }, { status: 400 });
+    }
+
+    await prisma.billConfiguration.delete({
+      where: { id },
+    });
+
+    triggerMqttServiceUpdate();
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("Error deleting bill configuration:", error);
+    return NextResponse.json(
+      { message: "Failed to delete configuration." },
       { status: 500 }
     );
   }

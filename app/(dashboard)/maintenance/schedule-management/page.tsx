@@ -32,6 +32,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -86,7 +87,7 @@ import {
   MessageSquare,
   Send,
 } from "lucide-react";
-import { WhatsAppConfigModal } from "@/components/whatsapp/WhatsAppConfigModal";
+
 
 // --- Type Definitions ---
 interface UserData {
@@ -161,9 +162,7 @@ function MaintenanceManagementContent() {
   const [maintenanceToView, setMaintenanceToView] =
     useState<MaintenanceData | null>(null);
 
-  // WhatsApp state
-  const [isWhatsAppConfigOpen, setIsWhatsAppConfigOpen] = useState(false);
-  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+
 
   // --- FUNGSI FETCH API ---
   const fetchMaintenances = useCallback(async () => {
@@ -298,12 +297,21 @@ function MaintenanceManagementContent() {
   ) => {
     if (maintenanceToEdit) {
       setIsEditMode(true);
-      setCurrentMaintenance(maintenanceToEdit);
+      setCurrentMaintenance({
+        ...maintenanceToEdit,
+        // Ensure all select values are defined for controlled components
+        assignTo: maintenanceToEdit.assignTo || "",
+        status: maintenanceToEdit.status || "Scheduled",
+        targetType: maintenanceToEdit.targetType || MaintenanceTarget.Device,
+        targetId: maintenanceToEdit.targetId || "",
+      });
     } else {
       setIsEditMode(false);
       setCurrentMaintenance({
         targetType: MaintenanceTarget.Device,
         status: "Scheduled",
+        assignTo: "",
+        targetId: "",
       });
     }
     setIsModalOpen(true);
@@ -313,15 +321,69 @@ function MaintenanceManagementContent() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    console.log("[Frontend] handleSubmit called with currentMaintenance:", currentMaintenance);
+
+    // Client-side validation
+    if (!currentMaintenance.name?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Task name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentMaintenance.assignTo) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a user to assign the task to.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentMaintenance.targetId) {
+      const targetLabel = currentMaintenance.targetType === MaintenanceTarget.Device ? "device" : "rack ID";
+      toast({
+        title: "Validation Error",
+        description: `Please select a ${targetLabel}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentMaintenance.startTask || !currentMaintenance.endTask) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide both start and end times.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (new Date(currentMaintenance.startTask) >= new Date(currentMaintenance.endTask)) {
+      toast({
+        title: "Validation Error",
+        description: "End time must be after start time.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const url = isEditMode ? `/api/maintenance` : "/api/maintenance";
     const method = isEditMode ? "PUT" : "POST";
 
-    // Perbaikan: Pastikan targetId diubah ke string jika itu yang diharapkan oleh API
-    // Asumsi API mengharapkan number, jadi tidak perlu konversi
     const body = {
       ...currentMaintenance,
-      targetId: currentMaintenance.targetId,
+      name: currentMaintenance.name.trim(),
+      description: currentMaintenance.description?.trim() || null,
     };
+
+    // Include id for edit mode
+    if (isEditMode && currentMaintenance.id) {
+      body.id = currentMaintenance.id;
+    }
 
     try {
       const response = await fetch(url, {
@@ -379,46 +441,7 @@ function MaintenanceManagementContent() {
     }
   };
 
-  const handleSendWhatsAppNotification = async (maintenance: MaintenanceData) => {
-    // Confirmation dialog
-    if (!confirm(`Send WhatsApp notification to ${maintenance.assignedTo.email}?`)) {
-      return;
-    }
 
-    setIsSendingWhatsApp(true);
-    try {
-      const response = await fetch('/api/whatsapp/maintenance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          maintenanceId: maintenance.id
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: `WhatsApp notification sent to ${maintenance.assignedTo.email} successfully!`,
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to send notification",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Network error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingWhatsApp(false);
-    }
-  };
 
   if (isAuthLoading) {
     return (
@@ -432,41 +455,51 @@ function MaintenanceManagementContent() {
 
   return (
     <TooltipProvider>
-      <main className="p-4 md:p-6">
-        <Tabs defaultValue="table" className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1">
-              <TabsList>
-                <TabsTrigger value="table">Table View</TabsTrigger>
-                <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-              </TabsList>
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4 md:p-6">
+        <div className="container mx-auto">
+          <Tabs defaultValue="table" className="w-full">
+            <div className="flex items-center justify-between mb-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Calendar className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                      Maintenance Management
+                    </h1>
+                    <p className="text-muted-foreground">
+                      Schedule and manage preventive maintenance tasks
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Database
+                      className={`h-4 w-4 ${
+                        "connected" === "connected"
+                          ? "text-green-500 dark:text-green-400"
+                          : "text-red-500 dark:text-red-400"
+                      }`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>Database Status</TooltipContent>
+                </Tooltip>
+
+                <Button onClick={() => handleOpenModal()}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Maintenance
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Database
-                    className={`h-4 w-4 ${
-                      "connected" === "connected"
-                        ? "text-green-500"
-                        : "text-red-500"
-                    }`}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>Database Status</TooltipContent>
-              </Tooltip>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsWhatsAppConfigOpen(true)}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" /> WhatsApp Config
-              </Button>
-              <Button onClick={() => handleOpenModal()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Maintenance
-              </Button>
-            </div>
-          </div>
-          <TabsContent value="table" className="space-y-4">
-            <Card className="shadow-sm">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="table">Table View</TabsTrigger>
+              <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="table" className="space-y-4">
+              <Card className="shadow-sm">
               <CardHeader>
                 <div>
                   <CardTitle>Maintenance List</CardTitle>
@@ -515,19 +548,6 @@ function MaintenanceManagementContent() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleSendWhatsAppNotification(m)}
-                                disabled={isSendingWhatsApp}
-                                title="Send WhatsApp Notification"
-                              >
-                                {isSendingWhatsApp ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Send className="h-4 w-4 text-green-500 hover:text-green-600" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
                                 onClick={() => handleOpenModal(m)}
                               >
                                 <Edit className="h-4 w-4" />
@@ -549,7 +569,7 @@ function MaintenanceManagementContent() {
                         <TableRow>
                           <TableCell
                             colSpan={6}
-                            className="text-center h-48 text-gray-500"
+                            className="text-center h-48 text-muted-foreground"
                           >
                             No maintenance schedules found.
                           </TableCell>
@@ -623,11 +643,11 @@ function MaintenanceManagementContent() {
                       <div
                         key={index}
                         className={cn(
-                          "min-h-[120px] p-2 border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg",
+                          "min-h-[120px] p-2 border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-lg",
                           !isCurrentMonth &&
-                            "text-muted-foreground bg-gray-50/50",
-                          isSelected && "bg-blue-50 border-blue-300",
-                          isCurrentDay && "bg-yellow-50 border-yellow-300"
+                            "text-muted-foreground bg-slate-50/50 dark:bg-slate-800/50",
+                          isSelected && "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700",
+                          isCurrentDay && "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700"
                         )}
                         onClick={() => setSelectedDate(day)}
                       >
@@ -692,7 +712,7 @@ function MaintenanceManagementContent() {
                 </div>
                 {/* Selected Date Details */}
                 {selectedDate && (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-gray-200">
+                  <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border-l-4 border-slate-200 dark:border-slate-700">
                     <h4 className="font-semibold mb-3">
                       Maintenance for{" "}
                       {format(selectedDate, "EEEE, MMMM d, yyyy")}
@@ -707,7 +727,7 @@ function MaintenanceManagementContent() {
                           (maintenance) => (
                             <div
                               key={maintenance.id}
-                              className="flex items-center justify-between p-3 bg-white rounded border cursor-pointer hover:border-gray-300"
+                              className="flex items-center justify-between p-3 bg-card rounded border cursor-pointer hover:border-slate-300 dark:hover:border-slate-600"
                               onClick={() => openViewDialog(maintenance)}
                             >
                               <div className="flex-1">
@@ -761,6 +781,9 @@ function MaintenanceManagementContent() {
               <DialogTitle>
                 {isEditMode ? "Edit Maintenance" : "Add New Maintenance"}
               </DialogTitle>
+              <DialogDescription>
+                {isEditMode ? "Update maintenance schedule details" : "Create a new maintenance schedule with the required details"}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-2">
@@ -969,6 +992,9 @@ function MaintenanceManagementContent() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Maintenance Details</DialogTitle>
+              <DialogDescription>
+                View detailed information about the selected maintenance task
+              </DialogDescription>
             </DialogHeader>
             {maintenanceToView && (
               <div className="space-y-4">
@@ -1053,11 +1079,8 @@ function MaintenanceManagementContent() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* --- WhatsApp Configuration Modal --- */}
-        <WhatsAppConfigModal
-          isOpen={isWhatsAppConfigOpen}
-          onClose={() => setIsWhatsAppConfigOpen(false)}
-        />
+
+        </div>
       </main>
     </TooltipProvider>
   );

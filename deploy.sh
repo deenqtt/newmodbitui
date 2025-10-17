@@ -80,6 +80,27 @@ else
     SEED_DEVICES=true
 fi
 
+if [[ -n "${SEED_LAYOUT2D}" ]]; then
+    SEED_LAYOUT2D=$(echo "${SEED_LAYOUT2D}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_LAYOUT2D}" == "true" || "${SEED_LAYOUT2D}" == "1" ]] && SEED_LAYOUT2D=true || SEED_LAYOUT2D=false
+else
+    SEED_LAYOUT2D=true
+fi
+
+if [[ -n "${SEED_LOGGING_CONFIGS}" ]]; then
+    SEED_LOGGING_CONFIGS=$(echo "${SEED_LOGGING_CONFIGS}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_LOGGING_CONFIGS}" == "true" || "${SEED_LOGGING_CONFIGS}" == "1" ]] && SEED_LOGGING_CONFIGS=true || SEED_LOGGING_CONFIGS=false
+else
+    SEED_LOGGING_CONFIGS=true
+fi
+
+if [[ -n "${SEED_MAINTENANCE}" ]]; then
+    SEED_MAINTENANCE=$(echo "${SEED_MAINTENANCE}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_MAINTENANCE}" == "true" || "${SEED_MAINTENANCE}" == "1" ]] && SEED_MAINTENANCE=true || SEED_MAINTENANCE=false
+else
+    SEED_MAINTENANCE=true
+fi
+
 # Log functions
 log() {
     echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
@@ -300,6 +321,8 @@ run_database_seeding() {
     [ "$SEED_DASHBOARD" = false ] && seeder_envs="$seeder_envs SEED_DASHBOARD=false"
     [ "$SEED_DEVICES" = false ] && seeder_envs="$seeder_envs SEED_DEVICES=false"
     [ "$SEED_LAYOUT2D" = false ] && seeder_envs="$seeder_envs SEED_LAYOUT2D=false"
+    [ "$SEED_LOGGING_CONFIGS" = false ] && seeder_envs="$seeder_envs SEED_LOGGING_CONFIGS=false"
+    [ "$SEED_MAINTENANCE" = false ] && seeder_envs="$seeder_envs SEED_MAINTENANCE=false"
 
     log "Running seeding with configuration:"
     [[ -n "$seeder_envs" ]] && echo "  Environment: $seeder_envs" || echo "  Environment: Default (all modules)"
@@ -325,6 +348,12 @@ run_database_seeding() {
         fi
         if [ "$SEED_LAYOUT2D" = true ]; then
             echo -e "   ${GREEN}✓${NC} Layout 2D seeded (Wastewater Monitoring)"
+        fi
+        if [ "$SEED_LOGGING_CONFIGS" = true ]; then
+            echo -e "   ${GREEN}✓${NC} Logging Configs seeded (8 configs)"
+        fi
+        if [ "$SEED_MAINTENANCE" = true ]; then
+            echo -e "   ${GREEN}✓${NC} Maintenance seeded (2 schedules)"
         fi
         echo ""
 

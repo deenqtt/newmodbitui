@@ -355,7 +355,7 @@ function DevicesForLoggingContent() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background text-foreground">
         <div className="container mx-auto p-4 md:p-6 space-y-8">
           {/* Header Section */}
           <div className="space-y-2">
@@ -376,7 +376,7 @@ function DevicesForLoggingContent() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -394,7 +394,7 @@ function DevicesForLoggingContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -410,7 +410,7 @@ function DevicesForLoggingContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -430,8 +430,8 @@ function DevicesForLoggingContent() {
           </div>
 
           {/* File Management Card */}
-          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <Card>
+            <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                   <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -476,8 +476,8 @@ function DevicesForLoggingContent() {
           </Card>
 
           {/* Main Configuration Table */}
-          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <Card>
+            <CardHeader>
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <CardTitle className="text-xl">
@@ -738,33 +738,60 @@ function DevicesForLoggingContent() {
                   disabled={isPayloadLoading || availableKeys.length === 0}
                 >
                   <SelectTrigger id="key-select" className="h-10">
-                    <SelectValue placeholder="Choose a data key to log..." />
+                    <SelectValue
+                      placeholder={
+                        isPayloadLoading
+                          ? "Waiting for device data..."
+                          : "Choose a data key to log..."
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {isPayloadLoading ? (
-                      <div className="p-4 text-sm text-muted-foreground flex items-center justify-center">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Waiting for device data...
+                      <div className="p-4 flex flex-col items-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <p className="text-sm text-center text-muted-foreground">
+                          Waiting for real-time data from device...
+                        </p>
+                        <p className="text-xs text-muted-foreground/80">
+                          Make sure {selectedDeviceForModal.name} is connected and sending data
+                        </p>
                       </div>
                     ) : availableKeys.length > 0 ? (
                       availableKeys.map((k) => (
                         <SelectItem key={k} value={k}>
-                          <code className="font-mono">{k}</code>
+                          <div className="flex items-center justify-between">
+                            <code className="font-mono">{k}</code>
+                            {currentConfig.key === k && (
+                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            )}
+                          </div>
                         </SelectItem>
                       ))
                     ) : (
-                      <div className="p-4 text-sm text-muted-foreground text-center">
-                        No data received from device. Make sure the device is
-                        sending data.
+                      <div className="p-4 flex flex-col items-center gap-2">
+                        <XCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p className="text-sm text-center text-muted-foreground">
+                          No data available from this device
+                        </p>
+                        <p className="text-xs text-center text-muted-foreground/70">
+                          Ensure the device is connected and actively publishing data
+                        </p>
                       </div>
                     )}
                   </SelectContent>
                 </Select>
-                {isPayloadLoading && (
-                  <p className="text-xs text-muted-foreground">
-                    Listening for data from {selectedDeviceForModal.name}...
-                  </p>
-                )}
+                {selectedDeviceForModal && isPayloadLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span>Listening for live data from {selectedDeviceForModal.name}...</span>
+                  </div>
+                ) : availableKeys.length > 0 ? (
+                  <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>{availableKeys.length} keys available • Select one to log</span>
+                  </div>
+                ) : null}
               </div>
             )}
 

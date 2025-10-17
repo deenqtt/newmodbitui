@@ -64,7 +64,7 @@ function validatePueJson(pduList: any, mainPower: any) {
 /**
  * FUNGSI GET: Mengambil semua konfigurasi PUE.
  */
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const auth = await getAuthFromCookie(request);
   if (!auth) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
     // Parse JSON strings back to objects untuk frontend
     const parsedConfigs = pueConfigs.map((config) => ({
       ...config,
-      pduList: config.pduList ? JSON.parse(config.pduList) : [],
-      mainPower: config.mainPower ? JSON.parse(config.mainPower) : {},
+      pduList: config.pduList ? JSON.parse(config.pduList as string) : [],
+      mainPower: config.mainPower ? JSON.parse(config.mainPower as string) : {},
     }));
 
     return NextResponse.json(parsedConfigs);
@@ -97,10 +97,10 @@ export async function GET(request: NextRequest) {
 /**
  * FUNGSI POST: Membuat konfigurasi PUE baru.
  */
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -166,8 +166,8 @@ export async function POST(request: NextRequest) {
     // Parse response untuk frontend
     const responseConfig = {
       ...newPueConfig,
-      pduList: JSON.parse(newPueConfig.pduList || "[]"),
-      mainPower: JSON.parse(newPueConfig.mainPower || "{}"),
+      pduList: JSON.parse(newPueConfig.pduList as string || "[]"),
+      mainPower: JSON.parse(newPueConfig.mainPower as string || "{}"),
     };
 
     return NextResponse.json(responseConfig, { status: 201 });

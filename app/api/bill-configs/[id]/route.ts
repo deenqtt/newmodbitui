@@ -1,20 +1,19 @@
 // File: app/api/bill-configs/[id]/route.ts
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
 import { getAuthFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger"; // <-- IMPORT
+import { triggerMqttServiceUpdate } from "@/lib/mqtt-service-trigger";
 
 /**
  * FUNGSI PUT: Mengedit konfigurasi tagihan yang ada.
  */
 export async function PUT(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = params;
@@ -101,8 +100,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {

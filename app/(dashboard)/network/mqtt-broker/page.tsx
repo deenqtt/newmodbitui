@@ -26,47 +26,40 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2,
   Wifi,
   Settings,
-  FileText,
   Server,
   KeyRound,
+  Database,
+  Cpu,
 } from "lucide-react";
 
 // --- Type Definitions ---
-interface MqttConfig {
-  enable: boolean;
-  pub_interval: number;
+interface MqttConfigBase {
   broker_address: string;
   broker_port: number;
-  username?: string;
-  password?: string;
-  qos: number;
-  retain: boolean;
-  pub_topic: string;
-  mac: string;
+  username: string;
+  password: string;
+  mac_address?: string;
 }
 
-interface ModbusTopicsConfig {
-  sub_topic_system: string;
-  sub_topic_modbusRTU: string;
-  sub_topic_modbusTCP: string;
-  sub_topic_snmp: string;
-  publish_failed_data_modbusrtu: string;
+interface ConnectionStatus {
+  status: string;
+  response_time?: number;
+  message?: string;
 }
 
-type CombinedConfig = Partial<MqttConfig & ModbusTopicsConfig>;
+interface MqttConfigResponse {
+  status: string;
+  data: MqttConfigBase;
+  connection: ConnectionStatus;
+  timestamp: string;
+}
 
 // --- Helper Function ---
 const formatLabel = (key: string) => {
@@ -74,23 +67,16 @@ const formatLabel = (key: string) => {
 };
 
 // =================================================================
-// Sub-Component: DisplayField (Menampilkan satu baris info config)
+// Sub-Component: DisplayField
 // =================================================================
 const DisplayField = ({ label, value }: { label: string; value: any }) => {
   const renderValue = () => {
-    if (typeof value === "boolean") {
-      return (
-        <span
-          className={`font-semibold ${
-            value ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {value ? "Enabled" : "Disabled"}
-        </span>
-      );
-    }
     if (value === null || value === undefined || String(value).trim() === "") {
       return <span className="text-slate-400 italic">Not Set</span>;
+    }
+    // Mask password
+    if (label.toLowerCase().includes("password") && value) {
+      return <span className="font-semibold text-primary">••••••••</span>;
     }
     return <span className="font-semibold text-primary">{String(value)}</span>;
   };
@@ -104,11 +90,11 @@ const DisplayField = ({ label, value }: { label: string; value: any }) => {
 };
 
 // =================================================================
-// Sub-Component: ConfigSkeleton (Efek loading)
+// Sub-Component: ConfigSkeleton
 // =================================================================
 const ConfigSkeleton = () => (
   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    {Array.from({ length: 9 }).map((_, index) => (
+    {Array.from({ length: 6 }).map((_, index) => (
       <div
         key={index}
         className="flex flex-col space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50"
@@ -121,75 +107,111 @@ const ConfigSkeleton = () => (
 );
 
 // =================================================================
-// Sub-Component: ConfigDisplayCard
+// Sub-Component: ConnectionStatusBadge
 // =================================================================
-interface ConfigDisplayCardProps {
-  config: CombinedConfig;
-  connectionStatus: string;
+const ConnectionStatusBadge = ({
+  connection,
+}: {
+  connection: ConnectionStatus;
+}) => {
+  const isConnected = connection.status === "connected";
+
+  return (
+    <div className="flex items-center gap-2">
+      <Wifi
+        size={20}
+        className={isConnected ? "text-green-500" : "text-red-500"}
+      />
+      <div className="flex flex-col">
+        <span
+          className={`text-sm font-bold ${
+            isConnected ? "text-green-600" : "text-red-600"
+          }`}
+        >
+          {isConnected ? "Connected" : "Disconnected"}
+        </span>
+        {connection.response_time && (
+          <span className="text-xs text-muted-foreground">
+            Response: {connection.response_time}ms
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// =================================================================
+// Sub-Component: MqttConfigCard (Reusable untuk Modbus & Modular)
+// =================================================================
+interface MqttConfigCardProps {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  config: MqttConfigBase | null;
+  connection: ConnectionStatus | null;
   isLoading: boolean;
   onEditClick: () => void;
   isReady: boolean;
 }
 
-const ConfigDisplayCard = ({
+const MqttConfigCard = ({
+  title,
+  description,
+  icon,
   config,
-  connectionStatus,
+  connection,
   isLoading,
   onEditClick,
   isReady,
-}: ConfigDisplayCardProps) => {
-  const isConnected = connectionStatus === "Connected";
-
+}: MqttConfigCardProps) => {
   return (
     <Card className="shadow-sm">
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Wifi
-              size={28}
-              className={isConnected ? "text-green-500" : "text-red-500"}
-            />
+            {icon}
             <div>
-              <CardTitle className="text-xl">Current Configuration</CardTitle>
-              <CardDescription>
-                Connection Status:{" "}
-                <span
-                  className={`font-bold ${
-                    isConnected ? "text-green-600" : "text-yellow-600"
-                  }`}
-                >
-                  {connectionStatus}
-                </span>
-              </CardDescription>
+              <CardTitle className="text-xl">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
             </div>
           </div>
-          <Button
-            onClick={onEditClick}
-            disabled={isLoading || !isReady}
-            className="w-full sm:w-auto"
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            Change Configuration
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {connection && <ConnectionStatusBadge connection={connection} />}
+            <Button
+              onClick={onEditClick}
+              disabled={isLoading || !isReady}
+              className="w-full sm:w-auto"
+              size="sm"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <ConfigSkeleton />
-        ) : (
+        ) : config ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(config)
-              .filter(([key]) => key !== "mac") // Hide MAC from the main grid
+              .filter(([key]) => key !== "mac_address") // Hide MAC from grid
               .map(([key, value]) => (
                 <DisplayField key={key} label={key} value={value} />
               ))}
           </div>
+        ) : (
+          <div className="text-center text-muted-foreground py-8">
+            No configuration data available
+          </div>
         )}
       </CardContent>
-      {config.mac && !isLoading && (
+      {config?.mac_address && !isLoading && (
         <CardFooter className="flex-col items-start gap-1 border-t px-6 py-4">
           <p className="text-xs text-muted-foreground">Device MAC Address</p>
-          <p className="font-mono text-sm font-semibold">{config.mac}</p>
+          <p className="font-mono text-sm font-semibold">
+            {config.mac_address}
+          </p>
         </CardFooter>
       )}
     </Card>
@@ -202,169 +224,123 @@ const ConfigDisplayCard = ({
 interface ConfigEditDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  initialConfig: CombinedConfig;
-  onSave: (newConfig: CombinedConfig) => void;
+  title: string;
+  initialConfig: MqttConfigBase | null;
+  onSave: (newConfig: MqttConfigBase) => void;
   isSubmitting: boolean;
 }
 
 const ConfigEditDialog = ({
   isOpen,
   onOpenChange,
+  title,
   initialConfig,
   onSave,
   isSubmitting,
 }: ConfigEditDialogProps) => {
-  const [editableConfig, setEditableConfig] = useState(initialConfig);
+  const [editableConfig, setEditableConfig] = useState<MqttConfigBase>({
+    broker_address: "",
+    broker_port: 1883,
+    username: "",
+    password: "",
+  });
 
   useEffect(() => {
-    setEditableConfig(initialConfig);
+    if (initialConfig && isOpen) {
+      setEditableConfig({
+        broker_address: initialConfig.broker_address || "",
+        broker_port: initialConfig.broker_port || 1883,
+        username: initialConfig.username || "",
+        password: initialConfig.password || "",
+      });
+    }
   }, [initialConfig, isOpen]);
 
-  const handleChange = (key: string, value: string | boolean | number) => {
+  const handleChange = (key: keyof MqttConfigBase, value: string | number) => {
     setEditableConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSaveChangesClick = () => {
+  const handleSaveClick = () => {
     const finalConfig = {
       ...editableConfig,
-      enable: String(editableConfig.enable) === "true",
-      retain: String(editableConfig.retain) === "true",
       broker_port: Number(editableConfig.broker_port),
-      pub_interval: Number(editableConfig.pub_interval),
     };
     onSave(finalConfig);
   };
 
-  const renderFormField = (key: string, value: any) => {
-    const isReadOnly = ["mac", "pub_topic", "qos"].includes(key);
-
-    if (typeof value === "boolean") {
-      return (
-        <Select
-          value={String(value)}
-          onValueChange={(val) => handleChange(key, val === "true")}
-          disabled={isSubmitting}
-        >
-          <SelectTrigger id={`config-${key}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="true">Enable</SelectItem>
-            <SelectItem value="false">Disable</SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    }
-
-    return (
-      <Input
-        id={`config-${key}`}
-        value={value ?? ""}
-        onChange={(e) =>
-          handleChange(
-            key,
-            typeof value === "number"
-              ? parseFloat(e.target.value)
-              : e.target.value
-          )
-        }
-        type={typeof value === "number" ? "number" : "text"}
-        readOnly={isReadOnly}
-        disabled={isSubmitting}
-        className={
-          isReadOnly
-            ? "cursor-not-allowed bg-slate-100 focus-visible:ring-transparent dark:bg-slate-800"
-            : ""
-        }
-      />
-    );
-  };
-
-  // Group fields for better structure in the dialog
-  const brokerFields = [
-    "enable",
-    "broker_address",
-    "broker_port",
-    "pub_interval",
-  ];
-  const authFields = ["username", "password"];
-  const topicFields = Object.keys(initialConfig).filter(
-    (k) => !brokerFields.includes(k) && !authFields.includes(k)
-  );
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Edit Configuration</DialogTitle>
+          <DialogTitle className="text-2xl">Edit {title}</DialogTitle>
           <DialogDescription>
-            Update your MQTT broker connection details. Changes will require a
-            service restart.
+            Update MQTT broker connection details. Only modify broker address,
+            port, username, and password.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[65vh] space-y-6 overflow-y-auto p-1 pr-4">
-          {/* Section: Broker Settings */}
+        <div className="space-y-6 py-4">
+          {/* Broker Settings */}
           <div className="space-y-4">
             <h3 className="flex items-center gap-2 text-lg font-semibold">
               <Server size={20} /> Broker Settings
             </h3>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-6 rounded-md border p-4 sm:grid-cols-2">
-              {brokerFields
-                .filter((key) => key in editableConfig)
-                .map((key) => (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={`config-${key}`}>{formatLabel(key)}</Label>
-                    {renderFormField(
-                      key,
-                      editableConfig[key as keyof CombinedConfig]
-                    )}
-                  </div>
-                ))}
+            <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="broker_address">Broker Address</Label>
+                <Input
+                  id="broker_address"
+                  value={editableConfig.broker_address}
+                  onChange={(e) =>
+                    handleChange("broker_address", e.target.value)
+                  }
+                  disabled={isSubmitting}
+                  placeholder="localhost or IP address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="broker_port">Broker Port</Label>
+                <Input
+                  id="broker_port"
+                  type="number"
+                  value={editableConfig.broker_port}
+                  onChange={(e) => handleChange("broker_port", e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="1883"
+                />
+              </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Section: Authentication */}
+          {/* Authentication */}
           <div className="space-y-4">
             <h3 className="flex items-center gap-2 text-lg font-semibold">
               <KeyRound size={20} /> Authentication
             </h3>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-6 rounded-md border p-4 sm:grid-cols-2">
-              {authFields
-                .filter((key) => key in editableConfig)
-                .map((key) => (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={`config-${key}`}>{formatLabel(key)}</Label>
-                    {renderFormField(
-                      key,
-                      editableConfig[key as keyof CombinedConfig]
-                    )}
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Section: Topic Settings */}
-          <div className="space-y-4">
-            <h3 className="flex items-center gap-2 text-lg font-semibold">
-              <FileText size={20} /> Topic Settings
-            </h3>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-6 rounded-md border p-4 sm:grid-cols-2">
-              {topicFields
-                .filter((key) => key in editableConfig)
-                .map((key) => (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={`config-${key}`}>{formatLabel(key)}</Label>
-                    {renderFormField(
-                      key,
-                      editableConfig[key as keyof CombinedConfig]
-                    )}
-                  </div>
-                ))}
+            <div className="grid grid-cols-1 gap-4 rounded-md border p-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  value={editableConfig.username}
+                  onChange={(e) => handleChange("username", e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="Leave empty if not required"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={editableConfig.password}
+                  onChange={(e) => handleChange("password", e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="Leave empty if not required"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -377,9 +353,9 @@ const ConfigEditDialog = ({
           >
             Cancel
           </Button>
-          <Button onClick={handleSaveChangesClick} disabled={isSubmitting}>
+          <Button onClick={handleSaveClick} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save & Restart
+            Save Changes
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -394,163 +370,203 @@ function MqttBrokerPage() {
   const { isReady, connectionStatus, publish, subscribe, unsubscribe } =
     useMqtt();
 
-  const [config, setConfig] = useState<CombinedConfig>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // State untuk Modbus Config
+  const [modbusConfig, setModbusConfig] = useState<MqttConfigBase | null>(null);
+  const [modbusConnection, setModbusConnection] =
+    useState<ConnectionStatus | null>(null);
+  const [isModbusLoading, setIsModbusLoading] = useState(true);
+  const [isModbusModalOpen, setIsModbusModalOpen] = useState(false);
+
+  // State untuk Modular Config
+  const [modularConfig, setModularConfig] = useState<MqttConfigBase | null>(
+    null
+  );
+  const [modularConnection, setModularConnection] =
+    useState<ConnectionStatus | null>(null);
+  const [isModularLoading, setIsModularLoading] = useState(true);
+  const [isModularModalOpen, setIsModularModalOpen] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const requestConfiguration = useCallback(() => {
-    if (isReady) {
-      console.log("Requesting configurations from MQTT...");
-      publish("mqtt_config/request", JSON.stringify({ action: "read" }));
-      publish("mqtt_config_modbus/request", JSON.stringify({ action: "read" }));
-    }
-  }, [isReady, publish]);
-
+  // Subscribe to response topics
   useEffect(() => {
-    const handleMessage = (topic: string, payloadStr: string) => {
-      try {
-        const receivedData = JSON.parse(payloadStr);
+    if (!isReady) return;
 
-        if (topic === "mqtt_config" || topic === "mqtt_config_modbus") {
-          setConfig((prev) => ({ ...prev, ...receivedData }));
-          setIsLoading(false);
-        } else if (topic === "service/response" && receivedData.result) {
-          Swal.close(); // Close loading alert
-          Swal.fire({
-            icon: receivedData.result,
-            title: receivedData.result === "success" ? "Success!" : "Error!",
-            text: receivedData.message,
-            timer: 3000,
-            showConfirmButton: false,
-          });
+    const handleModbusResponse = (topic: string, payloadStr: string) => {
+      try {
+        const response: MqttConfigResponse = JSON.parse(payloadStr);
+        console.log("Modbus response:", response);
+
+        if (response.status === "success" && response.data) {
+          setModbusConfig(response.data);
+          setModbusConnection(response.connection);
         }
+        setIsModbusLoading(false);
       } catch (error) {
-        console.error("Error parsing MQTT message:", error);
+        console.error("Error parsing Modbus MQTT response:", error);
+        setIsModbusLoading(false);
       }
     };
 
-    if (isReady) {
-      const topics = ["mqtt_config", "mqtt_config_modbus", "service/response"];
-      topics.forEach((topic) => subscribe(topic, handleMessage));
-      requestConfiguration();
+    const handleModularResponse = (topic: string, payloadStr: string) => {
+      try {
+        const response: MqttConfigResponse = JSON.parse(payloadStr);
+        console.log("Modular response:", response);
 
-      // Set a timeout to stop loading if no data is received
-      const timer = setTimeout(() => {
-        if (isLoading) {
-          setIsLoading(false);
-          console.warn("Timeout: No configuration data received.");
+        if (response.status === "success" && response.data) {
+          setModularConfig(response.data);
+          setModularConnection(response.connection);
         }
-      }, 5000); // 5 seconds timeout
+        setIsModularLoading(false);
+      } catch (error) {
+        console.error("Error parsing Modular MQTT response:", error);
+        setIsModularLoading(false);
+      }
+    };
 
-      return () => {
-        clearTimeout(timer);
-        topics.forEach((topic) => unsubscribe(topic, handleMessage));
-      };
-    }
-  }, [isReady, subscribe, unsubscribe, requestConfiguration, isLoading]);
+    // Subscribe to both response topics
+    subscribe("mqtt_config/modbus/response", handleModbusResponse);
+    subscribe("mqtt_config/modular/response", handleModularResponse);
 
-  const restartServices = () => {
-    const services = [
-      "MODBUS_SNMP.service",
-      "mqtt_config.service",
-      "modular_i2c.service",
-    ];
-    publish("service/command", JSON.stringify({ action: "restart", services }));
+    // Set timeout untuk loading
+    const timer = setTimeout(() => {
+      setIsModbusLoading(false);
+      setIsModularLoading(false);
+    }, 8000);
 
-    Swal.fire({
-      title: "Restarting Services",
-      text: "Please wait while services are being restarted...",
-      icon: "info",
-      allowOutsideClick: false,
-      showConfirmButton: false,
-      didOpen: () => Swal.showLoading(),
-    });
-  };
+    return () => {
+      clearTimeout(timer);
+      unsubscribe("mqtt_config/modbus/response", handleModbusResponse);
+      unsubscribe("mqtt_config/modular/response", handleModularResponse);
+    };
+  }, [isReady, subscribe, unsubscribe]);
 
-  const handleSaveChanges = (newConfig: CombinedConfig) => {
+  // Handle save Modbus config
+  const handleSaveModbus = (newConfig: MqttConfigBase) => {
     setIsSubmitting(true);
 
-    // Split config to publish to respective topics
-    const mqttConfigKeys: (keyof MqttConfig)[] = [
-      "enable",
-      "pub_interval",
-      "broker_address",
-      "broker_port",
-      "username",
-      "password",
-      "qos",
-      "retain",
-      "pub_topic",
-      "mac",
-    ];
-    const modbusTopicKeys: (keyof ModbusTopicsConfig)[] = [
-      "sub_topic_system",
-      "sub_topic_modbusRTU",
-      "sub_topic_modbusTCP",
-      "sub_topic_snmp",
-      "publish_failed_data_modbusrtu",
-    ];
+    const payload = {
+      command: "updateMqttModbus",
+      data: {
+        broker_address: newConfig.broker_address,
+        broker_port: newConfig.broker_port,
+        username: newConfig.username,
+        password: newConfig.password,
+      },
+    };
 
-    const mqttConfigPayload: Partial<MqttConfig> = {};
-    const modbusTopicsPayload: Partial<ModbusTopicsConfig> = {};
+    publish("mqtt_config/modbus/command", JSON.stringify(payload));
 
-    Object.keys(newConfig).forEach((key) => {
-      if (mqttConfigKeys.includes(key as keyof MqttConfig)) {
-        mqttConfigPayload[key as keyof MqttConfig] = newConfig[
-          key as keyof CombinedConfig
-        ] as any;
-      }
-      if (modbusTopicKeys.includes(key as keyof ModbusTopicsConfig)) {
-        modbusTopicsPayload[key as keyof ModbusTopicsConfig] = newConfig[
-          key as keyof CombinedConfig
-        ] as any;
-      }
-    });
-
-    publish("mqtt_config/update", JSON.stringify(mqttConfigPayload));
-    publish("mqtt_config_modbus/update", JSON.stringify(modbusTopicsPayload));
-
-    setIsModalOpen(false);
+    setIsModbusModalOpen(false);
     setIsSubmitting(false);
 
     Swal.fire({
-      icon: "info",
-      title: "Configuration Sent!",
-      text: "The update command has been sent. Services will now restart.",
-      showConfirmButton: true,
-      timer: 2500,
-    }).then(() => {
-      restartServices();
+      icon: "success",
+      title: "Modbus Config Updated!",
+      text: "MQTT configuration has been updated successfully.",
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  };
+
+  // Handle save Modular config
+  const handleSaveModular = (newConfig: MqttConfigBase) => {
+    setIsSubmitting(true);
+
+    const payload = {
+      command: "updateMqttModular",
+      data: {
+        broker_address: newConfig.broker_address,
+        broker_port: newConfig.broker_port,
+        username: newConfig.username,
+        password: newConfig.password,
+      },
+    };
+
+    publish("mqtt_config/modular/command", JSON.stringify(payload));
+
+    setIsModularModalOpen(false);
+    setIsSubmitting(false);
+
+    Swal.fire({
+      icon: "success",
+      title: "Modular Config Updated!",
+      text: "MQTT configuration has been updated successfully.",
+      timer: 2000,
+      showConfirmButton: false,
     });
   };
 
   return (
-    <div className=" p-4 md:p-6 lg:p-8">
+    <div className="p-4 md:p-6 lg:p-8">
       <div className="mb-6 space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">MQTT Broker</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          MQTT Broker Configuration
+        </h1>
         <p className="text-muted-foreground">
-          View and manage MQTT broker settings for your services.
+          Manage MQTT broker settings for Modbus and Modular services.
         </p>
       </div>
 
-      <div className="space-y-6">
-        <ConfigDisplayCard
-          config={config}
-          connectionStatus={connectionStatus}
-          isLoading={isLoading}
-          isReady={isReady ?? false}
-          onEditClick={() => setIsModalOpen(true)}
-        />
+      <Tabs defaultValue="modbus" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsTrigger value="modbus" className="flex items-center gap-2">
+            <Database size={16} />
+            Modbus SNMP
+          </TabsTrigger>
+          <TabsTrigger value="modular" className="flex items-center gap-2">
+            <Cpu size={16} />
+            Modular I2C
+          </TabsTrigger>
+        </TabsList>
 
-        <ConfigEditDialog
-          isOpen={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          initialConfig={config}
-          onSave={handleSaveChanges}
-          isSubmitting={isSubmitting}
-        />
-      </div>
+        {/* Modbus Tab */}
+        <TabsContent value="modbus" className="space-y-4">
+          <MqttConfigCard
+            title="Modbus SNMP MQTT Configuration"
+            description="MQTT broker settings for Modbus and SNMP devices"
+            icon={<Database size={28} className="text-blue-500" />}
+            config={modbusConfig}
+            connection={modbusConnection}
+            isLoading={isModbusLoading}
+            isReady={isReady ?? false}
+            onEditClick={() => setIsModbusModalOpen(true)}
+          />
+        </TabsContent>
+
+        {/* Modular Tab */}
+        <TabsContent value="modular" className="space-y-4">
+          <MqttConfigCard
+            title="Modular I2C MQTT Configuration"
+            description="MQTT broker settings for I2C modular devices"
+            icon={<Cpu size={28} className="text-green-500" />}
+            config={modularConfig}
+            connection={modularConnection}
+            isLoading={isModularLoading}
+            isReady={isReady ?? false}
+            onEditClick={() => setIsModularModalOpen(true)}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Dialogs */}
+      <ConfigEditDialog
+        isOpen={isModbusModalOpen}
+        onOpenChange={setIsModbusModalOpen}
+        title="Modbus SNMP Configuration"
+        initialConfig={modbusConfig}
+        onSave={handleSaveModbus}
+        isSubmitting={isSubmitting}
+      />
+
+      <ConfigEditDialog
+        isOpen={isModularModalOpen}
+        onOpenChange={setIsModularModalOpen}
+        title="Modular I2C Configuration"
+        initialConfig={modularConfig}
+        onSave={handleSaveModular}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }

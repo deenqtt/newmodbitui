@@ -12,8 +12,8 @@ export async function POST(
   { params }: { params: { id: string; uid: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return new NextResponse("Forbidden", { status: 403 });
+  if (!auth) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {

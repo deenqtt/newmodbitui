@@ -324,7 +324,7 @@ function UserManagementContent() {
 
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen bg-muted/10">
         <div className="container mx-auto p-4 md:p-8">
           <div className="flex flex-col items-center justify-center h-96 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -339,8 +339,8 @@ function UserManagementContent() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className=" p-4 md:p-6 space-y-8">
+      <div className="min-h-screen">
+        <div className="container mx-auto p-4 md:p-6 space-y-8">
           {/* Header Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -360,7 +360,7 @@ function UserManagementContent() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -376,7 +376,7 @@ function UserManagementContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -394,7 +394,7 @@ function UserManagementContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -412,7 +412,7 @@ function UserManagementContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+            <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -439,8 +439,8 @@ function UserManagementContent() {
           </div>
 
           {/* Main Content Card */}
-          <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-            <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+          <Card>
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <CardTitle className="text-xl">User Accounts</CardTitle>

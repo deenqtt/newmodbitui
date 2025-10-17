@@ -1461,22 +1461,22 @@ const AutomationLogicControl = () => {
                                 </div>
                               )}
                               {action.description && (
-                                <div className="md:col-span-2">
-                                  <Label className="text-xs text-muted-foreground">
-                                    Description
-                                  </Label>
-                                  <p>{action.description}</p>
-                                </div>
-                              )}
-                              {((action.delay_on ?? 0) > 0 || (action.delay_off ?? 0) > 0) && (
-                                <div className="md:col-span-2">
-                                  <Label className="text-xs text-muted-foreground">
-                                    Delay Settings
-                                  </Label>
-                                  <p className="text-orange-600">
-                                    ON Delay: {action.delay_on ?? 0}s, OFF Delay: {action.delay_off ?? 0}s
-                                  </p>
-                                </div>
+                          <div className="md:col-span-2">
+                            <Label className="text-xs">Message Content *</Label>
+                            <Textarea
+                              value={action.message || ""}
+                              onChange={(e) =>
+                                updateAction(actionIdx, {
+                                  ...action,
+                                  message_type: "whatsapp", // Always set to whatsapp
+                                  message: e.target.value,
+                                })
+                              }
+                              placeholder="Enter WhatsApp message content here"
+                              rows={2}
+                              required
+                            />
+                          </div>
                               )}
                             </div>
                           </div>

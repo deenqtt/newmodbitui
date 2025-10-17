@@ -94,12 +94,13 @@ async function seedMenu() {
       { name: 'devices', label: 'Devices', icon: 'Cpu', order: 2, isActive: true },
       { name: 'network', label: 'Network', icon: 'Network', order: 3, isActive: true },
       { name: 'security', label: 'Security', icon: 'Shield', order: 4, isActive: false },
-      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 5, isActive: false },
-      { name: 'payload', label: 'Payload', icon: 'FileText', order: 6, isActive: false, isDeveloper: true },
-      { name: 'system', label: 'System Config', icon: 'Settings', order: 7, isActive: true, isDeveloper: true },
-      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 8, isActive: false },
-      { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 9, isActive: true },
-      { name: 'tools', label: 'Tools', icon: 'Tool', order: 10, isActive: false, isDeveloper: true },
+      { name: 'vpn', label: 'VPN', icon: 'ShieldCheck', order: 5, isActive: true },
+      { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 6, isActive: false },
+      { name: 'payload', label: 'Payload', icon: 'FileText', order: 7, isActive: false, isDeveloper: true },
+      { name: 'system', label: 'System Config', icon: 'Settings', order: 8, isActive: true, isDeveloper: true },
+      { name: 'analytics', label: 'Analytics', icon: 'BarChart3', order: 9, isActive: false },
+      { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 10, isActive: true },
+      { name: 'tools', label: 'Tools', icon: 'Tool', order: 11, isActive: false, isDeveloper: true },
     ];
 
     const createdMenuGroups = {};
@@ -127,7 +128,7 @@ async function seedMenu() {
       { name: 'control-voice', label: 'Voice Control', path: '/control/voice', icon: 'Mic', order: 5, groupName: 'control', isActive: false, isDeveloper: false },
 
       // Devices Group
-      { name: 'devices-internal', label: 'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 0, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'devices-internal', label: 'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 0, groupName: 'devices', isActive: false, isDeveloper: false },
       { name: 'devices-external', label: 'External Devices', path: '/devices/devices-external', icon: 'Globe', order: 1, groupName: 'devices', isActive: true, isDeveloper: false },
       { name: 'logging-configs', label: 'Device Log Configs', path: '/devices/devices-for-logging', icon: 'Database', order: 2, groupName: 'devices', isActive: true, isDeveloper: false },
       { name: 'devices-access-controllers', label: 'Access Controllers', path: '/devices/access-controllers', icon: 'Shield', order: 3, groupName: 'devices', isActive: false, isDeveloper: false },
@@ -141,6 +142,11 @@ async function seedMenu() {
       // Security Group
       { name: 'security-access-control', label: 'Access Control', path: '/security-access/access-control', icon: 'Lock', order: 0, groupName: 'security', isActive: false, isDeveloper: false },
       { name: 'security-surveillance-cctv', label: 'CCTV Surveillance', path: '/security-access/surveillance-cctv', icon: 'Camera', order: 1, groupName: 'security', isActive: false, isDeveloper: false },
+
+      // VPN Group
+      { name: 'vpn-openvpn', label: 'OpenVPN', path: '/vpn/openvpn', icon: 'Lock', order: 0, groupName: 'vpn', isActive: true, isDeveloper: false },
+      { name: 'vpn-wireguard', label: 'WireGuard', path: '/vpn/wireguard', icon: 'Shield', order: 1, groupName: 'vpn', isActive: false, isDeveloper: false },
+      { name: 'vpn-ikev2', label: 'IKEv2 VPN', path: '/vpn/ikev2', icon: 'Key', order: 2, groupName: 'vpn', isActive: false, isDeveloper: false },
 
       // LoRaWAN Group
       { name: 'lorawan-gateways', label: 'LoRaWAN Gateways', path: '/lo-ra-wan/gateways', icon: 'Router', order: 0, groupName: 'lorawan', isActive: false, isDeveloper: false },
@@ -167,7 +173,7 @@ async function seedMenu() {
 
       // Maintenance Group
       { name: 'maintenance-schedule-management', label: 'Maintenance Schedule', path: '/maintenance/schedule-management', icon: 'Wrench', order: 0, groupName: 'maintenance', isActive: true, isDeveloper: false },
-      { name: 'racks-management', label: 'Rack Management', path: '/racks', icon: 'Archive', order: 1, groupName: 'maintenance', isActive: true, isDeveloper: false },
+      { name: 'racks-management', label: 'Rack Management', path: '/racks', icon: 'Archive', order: 1, groupName: 'maintenance', isActive: false, isDeveloper: false },
       { name: 'info-system-info', label: 'System Information', path: '/info', icon: 'Info', order: 100, groupName: 'maintenance', isActive: true, isDeveloper: false },
 
       // Tools Group (Developer)

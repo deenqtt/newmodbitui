@@ -64,7 +64,7 @@ function validatePueJson(pduList: any, mainPower: any) {
  * FUNGSI GET: Mengambil konfigurasi PUE berdasarkan ID.
  */
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
@@ -89,8 +89,8 @@ export async function GET(
     // Parse JSON strings back to objects untuk frontend
     const parsedConfig = {
       ...pueConfig,
-      pduList: pueConfig.pduList ? JSON.parse(pueConfig.pduList) : [],
-      mainPower: pueConfig.mainPower ? JSON.parse(pueConfig.mainPower) : {},
+      pduList: pueConfig.pduList ? JSON.parse(pueConfig.pduList as string) : [],
+      mainPower: pueConfig.mainPower ? JSON.parse(pueConfig.mainPower as string) : {},
     };
 
     return NextResponse.json(parsedConfig);
@@ -107,12 +107,12 @@ export async function GET(
  * FUNGSI PUT: Memperbarui konfigurasi PUE dan DeviceExternal terkait jika customName berubah.
  */
 export async function PUT(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = params;
@@ -232,8 +232,8 @@ export async function PUT(
     // Parse response untuk frontend
     const responseConfig = {
       ...updatedPueConfig,
-      pduList: JSON.parse(updatedPueConfig.pduList || "[]"),
-      mainPower: JSON.parse(updatedPueConfig.mainPower || "{}"),
+      pduList: JSON.parse(updatedPueConfig.pduList as string || "[]"),
+      mainPower: JSON.parse(updatedPueConfig.mainPower as string || "{}"),
     };
 
     return NextResponse.json(responseConfig);
@@ -250,12 +250,12 @@ export async function PUT(
  * FUNGSI DELETE: Menghapus konfigurasi PUE dan DeviceExternal terkait.
  */
 export async function DELETE(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = params;

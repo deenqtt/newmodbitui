@@ -24,6 +24,8 @@ DEFAULT_ENABLE_MENU=true
 DEFAULT_ENABLE_DASHBOARD=true
 DEFAULT_ENABLE_DEVICES=true
 DEFAULT_ENABLE_LAYOUT2D=true
+DEFAULT_ENABLE_LOGGING_CONFIGS=true
+DEFAULT_ENABLE_MAINTENANCE=true
 
 # Logging function
 log() {
@@ -106,6 +108,9 @@ ENABLE_USERS=$DEFAULT_ENABLE_USERS
 ENABLE_MENU=$DEFAULT_ENABLE_MENU
 ENABLE_DASHBOARD=$DEFAULT_ENABLE_DASHBOARD
 ENABLE_DEVICES=$DEFAULT_ENABLE_DEVICES
+ENABLE_LAYOUT2D=$DEFAULT_ENABLE_LAYOUT2D
+ENABLE_LOGGING_CONFIGS=$DEFAULT_ENABLE_LOGGING_CONFIGS
+ENABLE_MAINTENANCE=$DEFAULT_ENABLE_MAINTENANCE
 DO_DB_RESET=true
 DO_DB_BACKUP=false
 
@@ -311,6 +316,9 @@ run_seeders() {
     [ "$ENABLE_MENU" = false ] && seeder_env_vars="$seeder_env_vars SEED_MENU=false"
     [ "$ENABLE_DASHBOARD" = false ] && seeder_env_vars="$seeder_env_vars SEED_DASHBOARD=false"
     [ "$ENABLE_DEVICES" = false ] && seeder_env_vars="$seeder_env_vars SEED_DEVICES=false"
+    [ "$ENABLE_LAYOUT2D" = false ] && seeder_env_vars="$seeder_env_vars SEED_LAYOUT2D=false"
+    [ "$ENABLE_LOGGING_CONFIGS" = false ] && seeder_env_vars="$seeder_env_vars SEED_LOGGING_CONFIGS=false"
+    [ "$ENABLE_MAINTENANCE" = false ] && seeder_env_vars="$seeder_env_vars SEED_MAINTENANCE=false"
 
     log "Running seed command with environment: $seeder_env_vars"
 
@@ -417,6 +425,18 @@ show_completion_summary() {
 
     if [ "$ENABLE_DEVICES" = true ]; then
         echo -e "   ✅ IoT Devices seeded (11 devices)"
+    fi
+
+    if [ "$ENABLE_LAYOUT2D" = true ]; then
+        echo -e "   ✅ Layout 2D seeded (Wastewater monitoring)"
+    fi
+
+    if [ "$ENABLE_LOGGING_CONFIGS" = true ]; then
+        echo -e "   ✅ Logging Configs seeded (8 configs)"
+    fi
+
+    if [ "$ENABLE_MAINTENANCE" = true ]; then
+        echo -e "   ✅ Maintenance seeded (2 schedules)"
     fi
 
     echo ""

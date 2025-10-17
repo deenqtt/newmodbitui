@@ -21,10 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import Swal from "sweetalert2";
+import { toast } from "sonner";
 import { useMqtt } from "@/contexts/MqttContext";
-import { iconLibrary } from "@/lib/icon-library";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { iconList } from "@/components/layout2d/IconPicker";
+import { PlusCircle, Trash2, List } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -175,7 +175,11 @@ const ItemForm = ({
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={isWaitingForKey ? "Waiting..." : "Select a key"}
+                placeholder={
+                  isWaitingForKey
+                    ? "Waiting for device data..."
+                    : "Select a key"
+                }
               />
             </SelectTrigger>
             <SelectContent>
@@ -186,6 +190,31 @@ const ItemForm = ({
               ))}
             </SelectContent>
           </Select>
+          {item.deviceUniqId && (
+            <div className="text-xs mt-1 flex items-center gap-1">
+              {isWaitingForKey ? (
+                <>
+                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 animate-pulse">
+                    <div className="w-3 h-3 border-2 border-blue-600/30 dark:border-blue-400/30 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin"></div>
+                    <span>Waiting for real-time data...</span>
+                  </div>
+                </>
+              ) : availableKeys.length === 0 ? (
+                <p className="text-yellow-600 dark:text-yellow-400">
+                  No data available from this device
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span>{availableKeys.length} keys available</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="grid gap-2">
           <Label>Units</Label>
@@ -202,17 +231,17 @@ const ItemForm = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
           <div className="grid gap-2 sm:col-span-3">
             <div className="grid grid-cols-6 sm:grid-cols-8 gap-1">
-              {iconLibrary.map(({ name, icon: Icon }) => (
+              {iconList.map(({ name, icon: Icon }) => (
                 <button
                   key={name}
                   onClick={() => updateItem(item.id, "selectedIcon", name)}
                   className={`flex items-center justify-center p-2 rounded-md transition-all ${
                     item.selectedIcon === name
-                      ? "ring-2 ring-blue-500 bg-blue-100"
-                      : "bg-gray-100 hover:bg-gray-200"
+                      ? "ring-2 ring-primary bg-primary/10 dark:bg-primary/20"
+                      : "bg-muted hover:bg-muted/80 dark:bg-muted dark:hover:bg-muted/70"
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5 text-foreground dark:text-foreground" />
                 </button>
               ))}
             </div>
@@ -270,7 +299,7 @@ export const GroupedIconStatusConfigModal = ({
           if (!response.ok) throw new Error("Failed to fetch devices");
           setDevices(await response.json());
         } catch (error: any) {
-          Swal.fire("Error", error.message, "error");
+          toast.error("Failed to load devices: " + error.message);
           onClose();
         } finally {
           setIsLoadingDevices(false);
@@ -309,22 +338,12 @@ export const GroupedIconStatusConfigModal = ({
 
   const handleSave = () => {
     if (!widgetTitle || items.length === 0) {
-      Swal.fire(
-        "Incomplete",
-        "Widget title and at least one item are required.",
-        "warning"
-      );
+      toast.error("Widget title and at least one item are required.");
       return;
     }
     for (const item of items) {
       if (!item.customName || !item.deviceUniqId || !item.selectedKey) {
-        Swal.fire(
-          "Incomplete",
-          `Please complete all fields for item: "${
-            item.customName || "Untitled"
-          }"`,
-          "warning"
-        );
+        toast.error(`Please complete all fields for item: "${item.customName || "Untitled"}"`);
         return;
       }
     }
@@ -350,6 +369,12 @@ export const GroupedIconStatusConfigModal = ({
           </DialogDescription>
         </DialogHeader>
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          {items.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <List className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm">No items added yet. Click "Add Another Item" to get started.</p>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="widgetTitle">Widget Title</Label>
             <Input

@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import Swal from "sweetalert2";
+import { toast } from "sonner";
 import { useMqtt } from "@/contexts/MqttContext";
-import { iconLibrary } from "@/lib/icon-library";
+import { iconList } from "@/components/layout2d/IconPicker";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -31,6 +31,12 @@ interface DeviceForSelection {
   uniqId: string;
   name: string;
   topic: string;
+}
+
+interface IconItem {
+  name: string;
+  icon: React.ComponentType<any>;
+  category: string;
 }
 
 interface Props {
@@ -86,7 +92,7 @@ export const IconStatusCardConfigModal = ({
           if (!response.ok) throw new Error("Failed to fetch devices");
           setDevices(await response.json());
         } catch (error: any) {
-          Swal.fire("Error", error.message, "error");
+          toast.error("Failed to load devices: " + error.message);
           onClose();
         } finally {
           setIsLoadingDevices(false);
@@ -160,7 +166,7 @@ export const IconStatusCardConfigModal = ({
 
   const handleSave = () => {
     if (!customName || !selectedDeviceUniqId || !selectedKey || !selectedIcon) {
-      Swal.fire("Incomplete", "Please fill all required fields.", "warning");
+      toast.error("Please fill in all required fields.");
       return;
     }
     onSave({
@@ -244,6 +250,31 @@ export const IconStatusCardConfigModal = ({
                   ))}
                 </SelectContent>
               </Select>
+              {selectedDeviceUniqId && (
+                <div className="text-xs mt-1 flex items-center gap-1">
+                  {isWaitingForKey ? (
+                    <>
+                      <div className="flex items-center gap-2 text-blue-600 animate-pulse">
+                        <div className="w-3 h-3 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></div>
+                        <span>Waiting for real-time data...</span>
+                      </div>
+                    </>
+                  ) : availableKeys.length === 0 ? (
+                    <p className="text-yellow-600 dark:text-yellow-400">
+                      No data available from this device
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                        <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>{availableKeys.length} keys available</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -272,17 +303,17 @@ export const IconStatusCardConfigModal = ({
             <div>
               <Label>Icon</Label>
               <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 border p-3 rounded-md mt-2">
-                {iconLibrary.map(({ name, icon: Icon }) => (
+                {iconList.map(({ name, icon: Icon }) => (
                   <button
                     key={name}
                     onClick={() => setSelectedIcon(name)}
                     className={`flex items-center justify-center p-2 rounded-md transition-all ${
                       selectedIcon === name
-                        ? "ring-2 ring-blue-500 bg-blue-100"
-                        : "bg-gray-100 hover:bg-gray-200"
+                        ? "ring-2 ring-primary bg-primary/10 dark:bg-primary/20"
+                        : "bg-muted hover:bg-muted/80 dark:bg-muted dark:hover:bg-muted/70"
                     }`}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-5 w-5 text-foreground dark:text-foreground" />
                   </button>
                 ))}
               </div>

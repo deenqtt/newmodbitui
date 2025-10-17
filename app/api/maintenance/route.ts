@@ -3,9 +3,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromCookie } from "@/lib/auth";
-import { Role } from "@prisma/client";
-import { whatsappService } from "@/lib/services/whatsapp-service";
-import { format } from "date-fns";
+
+
+
 
 /**
  * GET: Mengambil semua jadwal maintenance.
@@ -51,13 +51,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
   if (!auth) {
+    console.log("[Maintenance POST] No auth found");
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
+
+  console.log("[Maintenance POST] Auth found:", auth.email);
+  console.log("[Maintenance POST] Starting POST request");
 
   // Removed admin-only role protection - all authenticated users can create maintenance schedules
 
   try {
     const body = await request.json();
+    console.log("[Maintenance POST] Received body:", body);
     const {
       name,
       description,
@@ -68,6 +73,7 @@ export async function POST(request: NextRequest) {
       targetId,
       status,
     } = body;
+    console.log("[Maintenance POST] Parsed fields:", { name, assignTo, targetType, targetId, status });
 
     // Pastikan targetId ada dan merupakan string yang valid
     if (!targetId) {
@@ -92,13 +98,13 @@ export async function POST(request: NextRequest) {
 
     // If targetType is Device, validate that the device exists and set the relation
     if (targetType === "Device") {
-      // Check if the device exists in DeviceExternal
+      // Check if the device exists in DeviceExternal (using uniqId as targetId)
       const deviceExists = await prisma.deviceExternal.findUnique({
-        where: { id: String(targetId) },
+        where: { uniqId: String(targetId) },
       });
 
       if (deviceExists) {
-        maintenanceData.deviceTargetId = String(targetId);
+        maintenanceData.deviceTargetId = deviceExists.id; // Use the primary id for relation
       } else {
         return NextResponse.json(
           { message: "Device not found." },
@@ -127,57 +133,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send WhatsApp notification if user has phone number
-    try {
-      if (newMaintenance.assignedTo.phoneNumber) {
-        const deviceName =
-          newMaintenance.deviceTarget?.name || `${targetType} (${targetId})`;
 
-        const notificationData = {
-          userName: newMaintenance.assignedTo.email.split("@")[0],
-          taskName: newMaintenance.name,
-          deviceName,
-          startTime: format(new Date(newMaintenance.startTask), "PPpp"),
-          endTime: format(new Date(newMaintenance.endTask), "PPpp"),
-          status: newMaintenance.status,
-          description: newMaintenance.description || undefined,
-        };
-
-        const whatsappResult =
-          await whatsappService.sendMaintenanceNotification(
-            newMaintenance.assignedTo.phoneNumber,
-            notificationData
-          );
-
-        if (whatsappResult.success) {
-          console.log(
-            `[Maintenance API] WhatsApp notification sent to ${newMaintenance.assignedTo.phoneNumber}`
-          );
-
-          // Log notification in database
-          await prisma.notification.create({
-            data: {
-              message: `WhatsApp notification sent for new maintenance task: ${newMaintenance.name}`,
-              userId: newMaintenance.assignTo,
-            },
-          });
-        } else {
-          console.warn(
-            `[Maintenance API] WhatsApp notification failed: ${whatsappResult.message}`
-          );
-        }
-      } else {
-        console.log(
-          `[Maintenance API] No phone number for user ${newMaintenance.assignedTo.email}, skipping WhatsApp notification`
-        );
-      }
-    } catch (whatsappError) {
-      console.error(
-        "[Maintenance API] WhatsApp notification error:",
-        whatsappError
-      );
-      // Don't fail the maintenance creation if WhatsApp fails
-    }
 
     return NextResponse.json(newMaintenance, { status: 201 });
   } catch (error: any) {
@@ -243,15 +199,18 @@ export async function PUT(request: NextRequest) {
 
     // Handle device relation logic
     if (data.targetType === "Device" && data.targetId) {
-      // Check if device exists
+      // Check if device exists (using uniqId)
       const deviceExists = await prisma.deviceExternal.findUnique({
-        where: { id: String(data.targetId) },
+        where: { uniqId: String(data.targetId) },
       });
 
       if (deviceExists) {
-        updateData.deviceTargetId = String(data.targetId);
+        updateData.deviceTargetId = deviceExists.id; // Use primary id for relation
       } else {
-        updateData.deviceTargetId = null;
+        return NextResponse.json(
+          { message: "Device not found." },
+          { status: 400 }
+        );
       }
     } else {
       // For Rack or when no device, clear the device relation

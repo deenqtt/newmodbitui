@@ -41,10 +41,14 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   const listenersRef = useRef<Map<string, MqttListener[]>>(new Map());
 
   const publish = useCallback((topic: string, payload: string) => {
-    if (clientRef.current && clientRef.current.isConnected()) {
-      const message = new Paho.Message(payload);
-      message.destinationName = topic;
-      clientRef.current.send(message);
+    if (clientRef.current && typeof clientRef.current.isConnected === 'function' && clientRef.current.isConnected()) {
+      try {
+        const message = new Paho.Message(payload);
+        message.destinationName = topic;
+        clientRef.current.send(message);
+      } catch (err) {
+        console.warn(`MQTT publish failed for topic ${topic}:`, err);
+      }
     }
   }, []);
 
@@ -53,9 +57,19 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     if (!topicListeners.includes(listener)) {
       listenersRef.current.set(topic, [...topicListeners, listener]);
     }
-    if (clientRef.current && clientRef.current.isConnected()) {
-      clientRef.current.subscribe(topic);
-    }
+    // Defer subscription to avoid constructor issues during React mount
+    setTimeout(() => {
+      if (clientRef.current && typeof clientRef.current.isConnected === 'function' && clientRef.current.isConnected()) {
+        try {
+          clientRef.current.subscribe(topic);
+          console.log(`MQTT successfully subscribed to topic: ${topic}`);
+        } catch (err) {
+          console.warn(`MQTT subscribe failed for topic ${topic}:`, err);
+        }
+      } else {
+        console.warn(`MQTT client not ready for subscription to topic: ${topic}`);
+      }
+    }, 1000); // Wait 1 second after connection is established
   }, []);
 
   const unsubscribe = useCallback((topic: string, listener: MqttListener) => {
@@ -65,8 +79,12 @@ export function MqttProvider({ children }: { children: ReactNode }) {
       listenersRef.current.set(topic, newListeners);
     } else {
       listenersRef.current.delete(topic);
-      if (clientRef.current && clientRef.current.isConnected()) {
-        clientRef.current.unsubscribe(topic);
+      if (clientRef.current && typeof clientRef.current.isConnected === 'function' && clientRef.current.isConnected()) {
+        try {
+          clientRef.current.unsubscribe(topic);
+        } catch (err) {
+          console.warn(`MQTT unsubscribe failed for topic ${topic}:`, err);
+        }
       }
     }
   }, []);

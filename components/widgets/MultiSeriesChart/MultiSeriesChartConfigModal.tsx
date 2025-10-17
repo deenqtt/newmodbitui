@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import Swal from "sweetalert2";
 import { PlusCircle, Trash2 } from "lucide-react";
+import { showToast } from "@/lib/toast-utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -80,7 +80,7 @@ export const MultiSeriesChartConfigModal = ({
             throw new Error("Failed to fetch logging configurations");
           setLoggingConfigs(await response.json());
         } catch (error: any) {
-          Swal.fire("Error", error.message, "error");
+          showToast.error("Error", error.message);
           onClose();
         } finally {
           setIsLoading(false);
@@ -121,19 +121,17 @@ export const MultiSeriesChartConfigModal = ({
 
   const handleSave = () => {
     if (!widgetTitle || series.length === 0) {
-      Swal.fire(
+      showToast.warning(
         "Incomplete",
-        "Widget title and at least one data series are required.",
-        "warning"
+        "Widget title and at least one data series are required."
       );
       return;
     }
     for (const s of series) {
       if (!s.name || !s.loggingConfigId) {
-        Swal.fire(
+        showToast.warning(
           "Incomplete",
-          `Please complete all fields for all data series.`,
-          "warning"
+          "Please complete all fields for all data series."
         );
         return;
       }

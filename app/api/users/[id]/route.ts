@@ -10,14 +10,14 @@ import { getAuthFromCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 // highlight-end
 
-// PUT (update) pengguna (hanya Admin)
+// PUT (update) pengguna
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -56,14 +56,14 @@ export async function PUT(
   }
 }
 
-// DELETE pengguna (hanya Admin)
+// DELETE pengguna
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   const auth = await getAuthFromCookie(request);
-  if (!auth || auth.role !== Role.ADMIN) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   if (auth.userId === params.id) {

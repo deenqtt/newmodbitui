@@ -55,350 +55,352 @@ interface MainWidgetCategory {
   description: string;
 }
 
-// Kategori utama widget dengan ikon dan deskripsi yang lebih spesifik
-// Urutan disusun berdasarkan logika aplikasi: monitoring dasar, visualisasi, kontrol, notifikasi, feeds, IoT, 3D, utilities, management, process
+// Main widget categories organized by dashboard priority:
+// 1. Critical monitoring (safety, power, temperature - show system health)
+// 2. Control systems (buttons, switches - enable active intervention)
+// 3. Data visualization (charts, trends - understand system behavior)
+// 4. System communication (alarms, cameras - external monitoring)
+// 5. Operational management (schedules, maintenance - long-term operations)
+// 6. Advanced visualization (3D views - specialized insights)
 export const mainWidgets: MainWidgetCategory[] = [
   {
-    name: "Monitoring Cards",
+    name: "Critical Monitoring",
     category: "Monitoring",
     icon: Gauge,
-    description: "Kartu untuk memonitor nilai dan status.",
+    description: "Monitor critical system parameters and real-time status indicators.",
   },
   {
-    name: "Chart Widgets",
-    category: "Chart",
-    icon: AreaChart,
-    description: "Visualisasi data dalam bentuk grafik dan chart.",
-  },
-  {
-    name: "Control Widgets",
-    category: "Toggle Control",
+    name: "Control Systems",
+    category: "Controls",
     icon: SlidersHorizontal,
-    description: "Tombol interaktif dan saklar kontrol.",
+    description: "Interactive controls and switches for system management.",
   },
   {
-    name: "Alarm & Events",
-    category: "Alarms",
+    name: "Data Visualization",
+    category: "Charts",
+    icon: AreaChart,
+    description: "Charts and graphs for data analysis and trend monitoring.",
+  },
+  {
+    name: "System Communication",
+    category: "Communication",
     icon: AlertTriangle,
-    description: "Notifikasi dan log untuk alarm.",
+    description: "Alarms, notifications, and camera feeds for system awareness.",
   },
   {
-    name: "Camera Feeds",
-    category: "Camera",
-    icon: Camera,
-    description: "Tampilan gambar dan snapshot dari CCTV.",
-  },
-  {
-    name: "IoT Devices",
+    name: "Network & IoT",
     category: "IoT",
     icon: Zap,
-    description: "Monitor and control IoT devices across different protocols.",
+    description: "IoT device monitoring and control across different protocols.",
   },
   {
-    name: "3D Visualization",
-    category: "3Dimensi",
-    icon: Box,
-    description: "Widget untuk visualisasi objek 3D.",
-  },
-  {
-    name: "Dashboard Utilities",
-    category: "Dashboard",
-    icon: LayoutPanelLeft,
-    description: "Grup dan pintasan antar dashboard.",
-  },
-  {
-    name: "Maintenance Management",
-    category: "Maintenance",
+    name: "Operational Management",
+    category: "Management",
     icon: Wrench,
-    description: "Widget untuk manajemen dan monitoring maintenance tasks.",
+    description: "Maintenance scheduling, logging, and operational oversight.",
+  },
+  {
+    name: "Advanced Visualization",
+    category: "Advanced",
+    icon: Box,
+    description: "3D visualizations and specialized dashboard utilities.",
   },
 ];
 
-// Daftar semua widget dengan ikon dan deskripsi unik untuk setiap widget
-// Urutan kategori disesuaikan dengan mainWidgets untuk konsistensi
+// All widgets organized by dashboard priority for better user workflow
 export const widgets: Widget[] = [
-  // --- Monitoring ---
+  // === CRITICAL MONITORING (Priority 1: System Health) ===
+  // Essential status indicators that show if systems are operating safely
   {
     name: "Access Controller Status",
     category: "Monitoring",
     icon: Lock,
-    description: "Monitor status real-time dari Access Lock Controller.",
-  },
-  {
-    name: "Analog Gauges",
-    category: "Monitoring",
-    icon: Gauge,
-    description: "Indikator jarum untuk nilai analog.",
+    description: "Monitor real-time status of Access Lock Controller devices.",
   },
   {
     name: "Breaker Status",
     category: "Monitoring",
     icon: PowerOff,
-    description: "Status on/off untuk pemutus sirkuit.",
-  },
-  {
-    name: "Calculated Parameter Card",
-    category: "Monitoring",
-    icon: Sigma,
-    description: "Menampilkan hasil kalkulasi dari beberapa nilai.",
-  },
-  {
-    name: "Energy Target Gap",
-    category: "Monitoring",
-    icon: TrendingUp,
-    description: "Selisih antara target dan realisasi energi.",
-  },
-  {
-    name: "Energy Usage – Current Month",
-    category: "Monitoring",
-    icon: BatteryCharging,
-    description: "Total konsumsi energi bulan berjalan.",
-  },
-  {
-    name: "Energy Usage – Last Month",
-    category: "Monitoring",
-    icon: BatteryCharging,
-    description: "Total konsumsi energi bulan lalu.",
-  },
-  {
-    name: "Grouped Icon Status",
-    category: "Monitoring",
-    icon: List,
-    description: "Menampilkan beberapa status ikon dalam satu grup.",
+    description: "Circuit breaker on/off status monitoring.",
   },
   {
     name: "Icon Status Card",
     category: "Monitoring",
     icon: ShieldCheck,
-    description: "Menampilkan nilai dengan sebuah ikon status.",
-  },
-  {
-    name: "Multi-Protocol Monitor",
-    category: "Monitoring",
-    icon: RadioTower,
-    description: "Monitor perangkat dengan berbagai protokol.",
-  },
-  {
-    name: "Running Hours Log",
-    category: "Monitoring",
-    icon: Clock,
-    description: "Mencatat total jam operasional perangkat.",
+    description: "Display values with status icons for quick system overview.",
   },
   {
     name: "Single Value Card",
     category: "Monitoring",
     icon: ChevronRightSquare,
-    description: "Menampilkan satu nilai penting dari sensor.",
+    description: "Display individual sensor readings or critical parameters.",
+  },
+  {
+    name: "Grouped Icon Status",
+    category: "Monitoring",
+    icon: List,
+    description: "Display multiple status icons in a single organized group.",
   },
   {
     name: "Temperature Indicator Bar",
     category: "Monitoring",
     icon: Thermometer,
-    description: "Bar indikator untuk memantau suhu.",
+    description: "Temperature monitoring with visual indicator bars.",
+  },
+  {
+    name: "Analog Gauges",
+    category: "Monitoring",
+    icon: Gauge,
+    description: "Traditional analog-style gauges for pressure, flow, or other metrics.",
+  },
+  {
+    name: "Running Hours Log",
+    category: "Monitoring",
+    icon: Clock,
+    description: "Track total operational hours for equipment monitoring.",
+  },
+  {
+    name: "Calculated Parameter Card",
+    category: "Monitoring",
+    icon: Sigma,
+    description: "Display calculated values derived from multiple sensor inputs.",
+  },
+  {
+    name: "Multi-Protocol Monitor",
+    category: "Monitoring",
+    icon: RadioTower,
+    description: "Monitor devices across multiple communication protocols.",
   },
 
-  {
-    name: "Thermal Camera",
-    category: "IoT",
-    icon: Thermometer,
-    description:
-      "Real-time thermal camera heatmap visualization with temperature monitoring.",
-  },
-
-  // --- Chart ---
-  {
-    name: "Basic Trend Chart",
-    category: "Chart",
-    icon: LineChart,
-    description: "Grafik tren sederhana untuk satu nilai.",
-  },
-  {
-    name: "Chart Bar",
-    category: "Chart",
-    icon: BarChart,
-    description: "Membandingkan nilai antar kategori.",
-  },
-  {
-    name: "Chart Line",
-    category: "Chart",
-    icon: LineChart,
-    description: "Menampilkan data tren dari waktu ke waktu.",
-  },
-  {
-    name: "Energy Target Chart",
-    category: "Chart",
-    icon: TrendingUp,
-    description: "Perbandingan target dan realisasi energi.",
-  },
-  {
-    name: "Multi-Series Chart",
-    category: "Chart",
-    icon: PieChart,
-    description: "Grafik dengan beberapa set data.",
-  },
-  {
-    name: "Power Analyzer Chart",
-    category: "Chart",
-    icon: PieChart,
-    description: "Chart khusus untuk data dari Power Analyzer.",
-  },
-  {
-    name: "Power Generate Chart",
-    category: "Chart",
-    icon: Wind,
-    description: "Grafik real-time produksi daya.",
-  },
-
+  // === CONTROL SYSTEMS (Priority 2: Active Intervention) ===
+  // Controls that allow operators to actively manage systems
   {
     name: "Button Control Modbus",
-    category: "Toggle Control",
+    category: "Controls",
     icon: Plug,
-    description: "Tombol kontrol untuk perangkat Modbus.",
+    description: "Interactive buttons for Modbus device control.",
   },
   {
     name: "Button Control Modbit",
-    category: "Toggle Control",
+    category: "Controls",
     icon: Plug,
-    description: "Tombol kontrol untuk perangkat Modbit.",
+    description: "Interactive buttons for Modbit device control.",
   },
   {
     name: "Button Control Modular",
-    category: "Toggle Control",
+    category: "Controls",
     icon: Plug,
-    description: "Tombol kontrol untuk perangkat modular.",
+    description: "Interactive buttons for modular device control systems.",
   },
   {
     name: "Lock Access Control",
-    category: "Toggle Control",
+    category: "Controls",
     icon: Plug,
-    description: "Tombol kontrol untuk Lock Access.",
+    description: "Access control buttons for lock management systems.",
   },
 
-  // --- Alarms ---
+  // === DATA VISUALIZATION (Priority 3: Understanding Behavior) ===
+  // Charts and graphs to understand system performance and trends
   {
-    name: "Alarm Log List",
-    category: "Alarms",
-    icon: HardDrive,
-    description: "Daftar log historis kejadian alarm.",
+    name: "Basic Trend Chart",
+    category: "Charts",
+    icon: LineChart,
+    description: "Simple trending charts for single value analysis.",
   },
+  {
+    name: "Chart Line",
+    category: "Charts",
+    icon: LineChart,
+    description: "Display data trends over time periods.",
+  },
+  {
+    name: "Chart Bar",
+    category: "Charts",
+    icon: BarChart,
+    description: "Compare values across different categories or time periods.",
+  },
+  {
+    name: "Multi-Series Chart",
+    category: "Charts",
+    icon: PieChart,
+    description: "Display multiple data series on a single chart.",
+  },
+  {
+    name: "Power Analyzer Chart",
+    category: "Charts",
+    icon: PieChart,
+    description: "Specialized charts for Power Analyzer data analysis.",
+  },
+  {
+    name: "Power Generate Chart",
+    category: "Charts",
+    icon: Wind,
+    description: "Real-time power generation monitoring charts.",
+  },
+  {
+    name: "Energy Target Chart",
+    category: "Charts",
+    icon: TrendingUp,
+    description: "Compare energy targets versus actual consumption.",
+  },
+
+  // === SYSTEM COMMUNICATION (Priority 4: External Awareness) ===
+  // Alarms and notifications that communicate system status externally
   {
     name: "Alarm Summary",
-    category: "Alarms",
+    category: "Communication",
     icon: Bell,
-    description: "Ringkasan jumlah alarm aktif.",
+    description: "Summary of active alarm count and priority levels.",
   },
-
-  // --- Camera ---
+  {
+    name: "Alarm Log List",
+    category: "Communication",
+    icon: HardDrive,
+    description: "Historical log of all alarm events and actions.",
+  },
   {
     name: "Camera Last Snapshot",
-    category: "Camera",
+    category: "Communication",
     icon: Video,
-    description: "Menampilkan gambar terakhir dari kamera.",
+    description: "Display the latest camera snapshot image.",
   },
   {
     name: "CCTV Live Stream",
-    category: "Camera",
+    category: "Communication",
     icon: MonitorPlay,
-    description:
-      "Tampilkan live streaming dari monitor CCTV dengan kontrol video.",
+    description: "Live CCTV streaming with video controls.",
   },
   {
     name: "CCTV Monitor Videos",
-    category: "Camera",
+    category: "Communication",
     icon: Video,
-    description:
-      "Tampilkan daftar video recorded dari monitor CCTV dengan kontrol playback.",
+    description: "Browse recorded CCTV videos with playback controls.",
   },
 
-  // --- IoT ---
-  {
-    name: "LoRaWAN Device Data",
-    category: "IoT",
-    icon: Radio,
-    description: "Displays real-time data from a selected LoRaWAN device.",
-  },
+  // === NETWORK & IOT (Priority 5: Device Management) ===
+  // IoT and network device monitoring and control
   {
     name: "Zigbee Device",
     category: "IoT",
     icon: Zap,
-    description:
-      "Monitor and control Zigbee devices connected to your network.",
+    description: "Monitor and control Zigbee network devices.",
+  },
+  {
+    name: "LoRaWAN Device Data",
+    category: "IoT",
+    icon: Radio,
+    description: "Display real-time data from LoRaWAN devices.",
+  },
+  {
+    name: "Thermal Camera",
+    category: "IoT",
+    icon: Thermometer,
+    description: "Real-time thermal camera heatmap with temperature monitoring.",
   },
 
-  // --- 3Dimensi ---
+  // === OPERATIONAL MANAGEMENT (Priority 6: Long-term Operations) ===
+  // Maintenance, energy tracking, and operational oversight
   {
-    name: "3D Container View",
-    category: "3Dimensi",
-    icon: Container,
-    description: "Tampilan 3D dari sebuah kontainer.",
+    name: "Energy Target Gap",
+    category: "Management",
+    icon: TrendingUp,
+    description: "Track variance between energy targets and actual usage.",
   },
   {
-    name: "3D Containment View",
-    category: "3Dimensi",
-    icon: Building,
-    description:
-      "3D visualization of server containment with real-time status.",
+    name: "Energy Usage – Current Month",
+    category: "Management",
+    icon: BatteryCharging,
+    description: "Monitor total energy consumption for the current month.",
   },
   {
-    name: "3D Rack Server View",
-    category: "3Dimensi",
-    icon: Server,
-    description: "Visualisasi 3D dari rak server.",
+    name: "Energy Usage – Last Month",
+    category: "Management",
+    icon: BatteryCharging,
+    description: "Review energy consumption data from the previous month.",
   },
-  {
-    name: "3D Subrack View",
-    category: "3Dimensi",
-    icon: Server,
-    description:
-      "3D visualization of subrack devices with real-time status via MQTT.",
-  },
-  {
-    name: "Modular 3D Device View",
-    category: "3Dimensi",
-    icon: Move3D,
-    description: "3D visualization of modular devices with real-time status.",
-  },
-
-  // --- Dashboard ---
-  {
-    name: "Dashboard Shortcut",
-    category: "Dashboard",
-    icon: Table,
-    description: "Pintasan untuk navigasi ke dashboard lain.",
-  },
-
-  // --- Maintenance ---
   {
     name: "Maintenance Calendar",
-    category: "Maintenance",
+    category: "Management",
     icon: Calendar,
     description: "Calendar view of scheduled maintenance tasks and deadlines.",
   },
   {
     name: "Maintenance List",
-    category: "Maintenance",
+    category: "Management",
     icon: Wrench,
-    description:
-      "Displays recent maintenance tasks with status and scheduling information.",
+    description: "Recent maintenance tasks with status and scheduling information.",
   },
   {
     name: "Maintenance Statistics",
-    category: "Maintenance",
+    category: "Management",
     icon: BarChart,
-    description:
-      "Statistical overview of maintenance completion rates and performance metrics.",
+    description: "Overview of maintenance completion rates and performance metrics.",
+  },
+
+  // === ADVANCED VISUALIZATION (Priority 7: Specialized Insights) ===
+  // 3D views and advanced dashboard utilities
+  {
+    name: "3D Rack Server View",
+    category: "Advanced",
+    icon: Server,
+    description: "3D visualization of equipment racks and server layouts.",
+  },
+  {
+    name: "3D Containment View",
+    category: "Advanced",
+    icon: Building,
+    description: "3D visualization of server containment with real-time status.",
+  },
+  {
+    name: "3D Subrack View",
+    category: "Advanced",
+    icon: Server,
+    description: "3D visualization of subrack devices with MQTT connectivity.",
+  },
+  {
+    name: "Modular 3D Device View",
+    category: "Advanced",
+    icon: Move3D,
+    description: "3D visualization of modular devices with real-time monitoring.",
+  },
+  {
+    name: "3D Container View",
+    category: "Advanced",
+    icon: Container,
+    description: "3D view of containerized environments and equipment.",
+  },
+  {
+    name: "Dashboard Shortcut",
+    category: "Advanced",
+    icon: LayoutPanelLeft,
+    description: "Quick navigation shortcuts to other dashboard views.",
   },
 ];
 
 // --- Helper Functions ---
 
-// Fungsi untuk mendapatkan data widget berdasarkan nama widget dari ID uniknya
+// Function to get widget data by widget ID
 export const getWidgetData = (widgetId: string) => {
   const baseName = widgetId.split("-widget-")[0].replace(/-/g, " ");
   return widgets.find((w) => w.name.toLowerCase() === baseName.toLowerCase());
 };
 
-// Fungsi untuk menghitung jumlah widget dalam satu kategori
+// Function to count widgets in a specific category
 export const getWidgetCount = (category: string): number => {
   return widgets.filter((w) => w.category === category).length;
+};
+
+// Function to get widgets by priority order (for dashboard workflow)
+export const getWidgetsByPriority = () => {
+  return widgets.slice(); // Priority order already established in export
+};
+
+// Function to get widgets filtered by category
+export const getWidgetsByCategory = (category: string) => {
+  return widgets.filter((w) => w.category === category);
+};
+
+// Function to get main categories in priority order
+export const getMainCategoriesByPriority = () => {
+  return mainWidgets.slice();
 };

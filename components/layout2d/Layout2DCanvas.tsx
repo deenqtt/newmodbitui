@@ -370,23 +370,79 @@ export default function Layout2DCanvas({
     fetchDataPoints();
   }, [layoutId, refreshTrigger]); // Tambahkan refreshTrigger sebagai dependency
 
-  // MQTT message handler
+  // MQTT message handler - Enhanced with better error handling and logging
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
+      console.log(`📡 MQTT Message on topic ${topic}:`, payloadString);
+
       try {
         const payload = JSON.parse(payloadString);
-        const innerPayload =
-          typeof payload.value === "string"
-            ? JSON.parse(payload.value)
-            : payload.value || {};
+        console.log(`📦 Parsed outer payload for ${topic}:`, payload);
+
+        let innerPayload = {};
+
+        // Handle different payload formats
+        if (payload.value) {
+          if (typeof payload.value === "string") {
+            try {
+              innerPayload = JSON.parse(payload.value);
+              console.log(`🔧 Successfully parsed inner JSON for ${topic}:`, innerPayload);
+            } catch (parseError) {
+              console.warn(`⚠️  Failed to parse inner value as JSON, using as string:`, payload.value);
+              innerPayload = { raw_data: payload.value };
+            }
+          } else if (typeof payload.value === "object") {
+            innerPayload = payload.value;
+          } else {
+            innerPayload = { raw_value: payload.value };
+          }
+        } else {
+          // No value wrapper, use whole payload minus metadata
+          const { value, device_name, protocol_type, comport, modbus_address, ...data } = payload;
+          innerPayload = data;
+        }
+
+        // Debug specific topic data
+        if (topic.includes('flow1')) {
+          console.log(`🚰 Flow Meter Data Keys:`, Object.keys(innerPayload));
+          Object.entries(innerPayload).forEach(([key, val]) => {
+            console.log(`   ${key}: ${val} (${typeof val})`);
+          });
+        }
+
+        if (topic.includes('ph1')) {
+          console.log(`🧪 pH Sensor Data Keys:`, Object.keys(innerPayload));
+          Object.entries(innerPayload).forEach(([key, val]) => {
+            console.log(`   ${key}: ${val} (${typeof val})`);
+          });
+        }
 
         // Update data values untuk semua data points yang menggunakan topic ini
         setDataValues((prev) => ({
           ...prev,
           [topic]: innerPayload,
         }));
+
+        console.log(`✅ Successfully processed MQTT data for topic: ${topic}`);
+
       } catch (error) {
-        console.error("Failed to parse MQTT payload:", error);
+        console.error(`❌ Failed to parse MQTT payload for topic ${topic}:`, error);
+        console.error(`   Raw payload:`, payloadString);
+
+        // Try to salvage some information if possible
+        try {
+          const basicPayload = JSON.parse(payloadString);
+          setDataValues((prev) => ({
+            ...prev,
+            [topic]: {
+              error: "Parse failed",
+              device_name: basicPayload.device_name,
+              topic: topic
+            },
+          }));
+        } catch (fallbackError) {
+          console.error("❌ Even fallback parsing failed");
+        }
       }
     },
     []
@@ -1151,15 +1207,15 @@ export default function Layout2DCanvas({
             >
               <div
                 className={`
-                bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border
-                ${isSelected ? "ring-2 ring-blue-500" : ""}
+                bg-card/95 backdrop-blur-sm border border-border px-3 py-2 rounded-lg shadow-lg
+                ${isSelected ? "ring-2 ring-primary shadow-primary/20" : ""}
                 ${
                   isDragging && draggedDataPoint === dataPoint.id
                     ? "shadow-2xl scale-105"
                     : ""
                 }
                 transition-all duration-200 hover:shadow-xl
-                ${isManageMode ? "hover:ring-1 hover:ring-blue-300" : ""}
+                ${isManageMode ? "hover:ring-1 hover:ring-primary/50" : ""}
               `}
               >
                 {/* Header with icon and name */}
@@ -1171,7 +1227,7 @@ export default function Layout2DCanvas({
                     />
                   )}
                   <div
-                    className="font-medium text-gray-600"
+                    className="font-medium text-muted-foreground"
                     style={{
                       fontSize: `${(dataPoint.fontSize || 14) * 0.7}px`,
                     }}
