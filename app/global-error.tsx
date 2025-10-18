@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Home, RotateCcw, Shield, Zap, Bug } from "lucide-react";
+import { AlertTriangle, Home, RotateCcw, Shield, Bug } from "lucide-react";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -91,8 +91,8 @@ export default function GlobalError({
                 </div>
               </div>
 
-              {/* System Status Cards */}
-              <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+              {/* System Status Card */}
+              <div className="max-w-md mx-auto">
                 <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-white/20 dark:border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="w-4 h-4 text-green-500" />
@@ -100,15 +100,6 @@ export default function GlobalError({
                   </div>
                   <div className="text-lg font-bold text-green-600 dark:text-green-400">Online</div>
                   <div className="text-xs text-muted-foreground">Monitoring active</div>
-                </div>
-
-                <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg p-4 border border-white/20 dark:border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4 text-blue-500" />
-                    <span className="font-medium text-sm">Last Backup</span>
-                  </div>
-                  <div className="text-lg font-bold text-blue-600 dark:text-blue-400">2h ago</div>
-                  <div className="text-xs text-muted-foreground">Auto-scheduled</div>
                 </div>
               </div>
 

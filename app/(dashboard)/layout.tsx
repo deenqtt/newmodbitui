@@ -42,6 +42,7 @@ function generateTitleFromPathname(pathname: string): string {
     "maintenance": "Maintenance",
     "manage-dashboard": "Manage Dashboards",
     "manage-menu": "Menu Management",
+    "backup-management": "Backup Management",
     "network": "Network",
     "payload": "Payload Data",
     "racks": "Racks",

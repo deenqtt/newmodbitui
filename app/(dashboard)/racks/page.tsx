@@ -630,6 +630,151 @@ export default function RacksPage() {
 
                 {/* Table View */}
                 <div className="rounded-md border mt-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[200px]">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSort('name')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                          >
+                            Rack Name
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSort('location')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                          >
+                            Location
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSort('capacityU')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                          >
+                            Capacity
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSort('utilizationPercent')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                          >
+                            Utilization
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSort('devices.length')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                          >
+                            Devices
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedRacks.map((rack) => (
+                        <TableRow key={rack.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{rack.name}</span>
+                              {rack.notes && (
+                                <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                  {rack.notes}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={rack.location ? '' : 'text-muted-foreground italic'}>
+                              {rack.location || 'Not specified'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="font-mono">
+                              {rack.capacityU}U
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`font-medium ${getUtilizationColor(rack.utilizationPercent)}`}>
+                                {rack.utilizationPercent.toFixed(1)}%
+                              </span>
+                              <div className="w-full bg-muted rounded-full h-1.5 max-w-[60px]">
+                                <div
+                                  className="bg-primary h-1.5 rounded-full transition-all"
+                                  style={{ width: `${Math.min(rack.utilizationPercent, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <Badge variant="secondary" className="min-w-[24px]">
+                                {rack.devices.length}
+                              </Badge>
+                              {rack.devices.length > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {rack.usedU}U used
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => router.push(`/racks/${rack.id}`)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openEditDialog(rack)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setRackToDelete(rack);
+                                    setIsDeleteDialogOpen(true);
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                  disabled={rack.devices.length > 0}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  {rack.devices.length > 0 ? 'Cannot Delete' : 'Delete'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             )}

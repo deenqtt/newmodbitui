@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import MqttStatus from "@/components/ui/mqtt-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +19,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Server, Cpu, Database, Router, HardDrive, MonitorSpeaker, Zap, Wrench, AlertCircle, CheckCircle, XCircle, Minus, Plus } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ArrowLeft, Server, HardDrive, Activity, Building, Search, CheckCircle, XCircle, Wrench, TrendingUp, HardDriveUpload, Plus, AlertCircle, MonitorSpeaker, Cpu, Database as DatabaseIcon, Router, HardDrive as HardDriveIcon } from "lucide-react";
 
 interface Device {
   id: string;
@@ -60,22 +73,15 @@ interface Rack {
   };
 }
 
-interface RackUnit {
-  position: number; // 1 to capacityU (top is 1, bottom is capacityU)
-  device: Device | null;
-  isOccupied: boolean;
-  installedDevices: Device[]; // For multi-U devices
-}
-
 export default function RackDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const [rack, setRack] = useState<Rack | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [rackUnits, setRackUnits] = useState<RackUnit[]>([]);
+  const [rackUnits, setRackUnits] = useState<any[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<number | null>(null);
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false);
 
   // New Device Form State
@@ -93,6 +99,12 @@ export default function RackDetailPage() {
   });
 
   const rackId = params?.id as string;
+
+  const filteredDevices = rack?.devices.filter(device =>
+    device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    device.deviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    device.ipAddress?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
   // Fetch rack data
   const fetchRack = async () => {
@@ -123,7 +135,7 @@ export default function RackDetailPage() {
 
   // Generate rack units for 2D visualization
   const generateRackUnits = (rackData: Rack) => {
-    const units: RackUnit[] = [];
+    const units: any[] = [];
     const deviceMap = new Map<number, Device[]>();
 
     // Group devices by their position
@@ -138,14 +150,14 @@ export default function RackDetailPage() {
       }
     });
 
-    // Generate units from top (U=1) to bottom (U=capacityU)
+    // Generate units from top (capacityU) to bottom (1)
     for (let pos = rackData.capacityU; pos >= 1; pos--) {
       const installedDevices = deviceMap.get(pos) || [];
       const isOccupied = installedDevices.length > 0;
 
       units.push({
         position: pos,
-        device: isOccupied ? installedDevices[0] : null, // Primary device for display
+        device: isOccupied ? installedDevices[0] : null,
         isOccupied,
         installedDevices,
       });
@@ -164,18 +176,15 @@ export default function RackDetailPage() {
         return Cpu;
       case "storage":
       case "nas":
-        return Database;
+        return DatabaseIcon;
       case "network":
       case "switch":
       case "router":
         return Router;
       case "storage":
-        return HardDrive;
+        return HardDriveIcon;
       case "monitor":
         return MonitorSpeaker;
-      case "ups":
-      case "power":
-        return Zap;
       default:
         return Server;
     }
@@ -203,8 +212,26 @@ export default function RackDetailPage() {
       case "maintenance":
         return Wrench;
       default:
-        return Minus;
+        return AlertCircle;
     }
+  };
+
+  const getCapacityUtilizationColor = (usedU: number, totalU: number) => {
+    if (totalU === 0) return "text-muted-foreground";
+    const percentage = (usedU / totalU) * 100;
+    if (percentage >= 90) return "text-red-600 dark:text-red-400";
+    if (percentage >= 75) return "text-orange-600 dark:text-orange-400";
+    if (percentage >= 50) return "text-yellow-600 dark:text-yellow-400";
+    return "text-green-600 dark:text-green-400";
+  };
+
+  const getCapacityUtilizationBadge = (usedU: number, totalU: number) => {
+    if (totalU === 0) return <Badge variant="secondary">No Capacity</Badge>;
+    const percentage = (usedU / totalU) * 100;
+    if (percentage >= 90) return <Badge variant="destructive">Critical</Badge>;
+    if (percentage >= 75) return <Badge className="bg-orange-500 dark:bg-orange-600 text-white">High</Badge>;
+    if (percentage >= 50) return <Badge className="bg-yellow-500 dark:bg-yellow-600 text-white dark:text-gray-900">Medium</Badge>;
+    return <Badge className="bg-green-500 dark:bg-green-600 text-white">Low</Badge>;
   };
 
   // Initialize
@@ -289,7 +316,7 @@ export default function RackDetailPage() {
         <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
           <Card>
             <CardContent className="pt-6">
-              <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-center">Rack not found</h2>
               <p className="text-center text-muted-foreground mt-2">
                 The requested rack could not be found.
@@ -312,404 +339,332 @@ export default function RackDetailPage() {
       {/* Header */}
       <header className="flex h-16 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push("/racks")}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Racks
-          </button>
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Server className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">{rack.name}</h1>
-          {rack.location && (
-            <Badge variant="secondary" className="ml-2">
-              {rack.location}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
           <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={fetchRack}
-            disabled={isLoading}
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/racks")}
+            className="mr-2"
           >
-            <Database className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 mr-1" />
           </Button>
-          <Button onClick={() => setIsAddDeviceOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Device
-          </Button>
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <HardDriveUpload className="h-5 w-5" />
+          <h1 className="text-lg font-semibold">
+            Rack Details: {rack.name}
+            {rack.location && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                - {rack.location}
+              </span>
+            )}
+          </h1>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
-              <HardDrive className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rack.capacityU}U</div>
-              <p className="text-xs text-muted-foreground">
-                Server rack size
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Used Space</CardTitle>
-              <Server className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rack.usedU}U</div>
-              <p className="text-xs text-muted-foreground">
-                Rack units occupied
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Available Space</CardTitle>
-              <Database className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rack.availableU}U</div>
-              <p className="text-xs text-muted-foreground">
-                Free rack units
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Utilization</CardTitle>
-              <MonitorSpeaker className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rack.utilizationPercent}%</div>
-              <p className="text-xs text-muted-foreground">
-                {rack.devices.length} device{rack.devices.length !== 1 ? "s" : ""} installed
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 2D Rack Visualization */}
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 m-4">
         <Card>
-          <CardHeader>
-            <CardTitle>2D Rack Layout</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Visual representation of rack unit allocation
-            </p>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
+            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <HardDriveUpload className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex">
-              {/* Rack Side View */}
-              <div className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50/50">
-                {/* Rack Title */}
-                <div className="text-center mb-4">
-                  <h3 className="font-semibold text-sm">{rack.name}</h3>
-                  <p className="text-xs text-muted-foreground">{rack.capacityU}U Rack</p>
-                </div>
-
-                {/* Rack Units */}
-                <div className="space-y-1" style={{ width: '280px' }}>
-                  {rackUnits.map((unit) => (
-                    <div
-                      key={unit.position}
-                      className={`
-                        relative border border-gray-200 rounded-sm transition-all duration-200
-                        ${unit.isOccupied
-                          ? 'bg-blue-600 border-blue-700 hover:bg-blue-500 cursor-pointer'
-                          : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
-                        }
-                      `}
-                      style={{ height: '40px', width: '100%' }}
-                      onClick={() => setSelectedUnit(unit.position)}
-                    >
-                      {/* Unit Position Label */}
-                      <div className={`absolute -left-8 top-1/2 transform -translate-y-1/2 text-xs font-medium w-6 text-center ${
-                        unit.isOccupied ? 'text-blue-700' : 'text-gray-500'
-                      }`}>
-                        U{unit.position}
-                      </div>
-
-                      {/* Unit Content */}
-                      {unit.isOccupied ? (
-                        <>
-                          {/* Device Indicator */}
-                          <div className="h-full flex items-center justify-center p-1">
-                            <div className="flex items-center gap-2 text-white text-xs">
-                              {(() => {
-                                const Icon = getDeviceIcon(unit.device?.deviceType || "server");
-                                const StatusIcon = getDeviceStatusIcon(unit.device?.status || "offline");
-                                return (
-                                  <>
-                                    <Icon className="h-3 w-3 flex-shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="truncate font-medium">
-                                        {unit.device?.name || "Unknown"}
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <StatusIcon className="h-2 w-2" />
-                                        {unit.device?.sizeU && unit.device.sizeU > 1 && (
-                                          <span className="text-xs opacity-75">
-                                            {unit.device.sizeU}U
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Multiple devices indicator */}
-                          {unit.installedDevices.length > 1 && (
-                            <div className="absolute -top-1 -right-1 bg-orange-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-                              {unit.installedDevices.length}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        /* Empty unit indicator */
-                        <div className="h-full flex items-center justify-center">
-                          <div className="text-gray-400 text-xs">Empty</div>
-                        </div>
-                      )}
-
-                      {/* Selected indicator */}
-                      {selectedUnit === unit.position && (
-                        <div className="absolute inset-0 border-2 border-yellow-400 rounded-sm"></div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Rack Footer */}
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    Click on any unit for details
-                  </p>
-                </div>
-              </div>
-
-              {/* Selected Unit Details */}
-              <div className="ml-6 flex-1">
-                {selectedUnit ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Unit U{selectedUnit}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {rackUnits.find(u => u.position === selectedUnit)?.isOccupied ? "Occupied" : "Available"}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      {(() => {
-                        const unit = rackUnits.find(u => u.position === selectedUnit);
-                        if (!unit) return null;
-
-                        return unit.isOccupied ? (
-                          <div className="space-y-4">
-                            {unit.installedDevices.map((device, index) => (
-                              <div key={device.id} className="border rounded-lg p-4">
-                                <div className="flex items-start justify-between mb-3">
-                                  <div className="flex items-center gap-3">
-                                    {(() => {
-                                      const Icon = getDeviceIcon(device.deviceType);
-                                      const StatusIcon = getDeviceStatusIcon(device.status);
-                                      return (
-                                        <>
-                                          <Icon className="h-5 w-5 text-blue-600" />
-                                          <div>
-                                            <h4 className="font-semibold">{device.name}</h4>
-                                            <div className="flex items-center gap-2 mt-1">
-                                              <Badge className={getDeviceStatusColor(device.status)}>
-                                                <StatusIcon className="h-3 w-3 mr-1" />
-                                                {device.status}
-                                              </Badge>
-                                              {device.sizeU > 1 && (
-                                                <Badge variant="outline">
-                                                  {device.sizeU}U Device
-                                                </Badge>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                  {unit.installedDevices.length > 1 && index === 0 && (
-                                    <Badge variant="secondary">
-                                      Primary Device
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 mt-4">
-                                  <div className="space-y-2">
-                                    <div className="text-sm">
-                                      <span className="font-medium text-muted-foreground">Type:</span>{" "}
-                                      {device.deviceType}
-                                    </div>
-                                    {device.manufacturer && (
-                                      <div className="text-sm">
-                                        <span className="font-medium text-muted-foreground">Manufacturer:</span>{" "}
-                                        {device.manufacturer}
-                                      </div>
-                                    )}
-                                    {device.modelId && (
-                                      <div className="text-sm">
-                                        <span className="font-medium text-muted-foreground">Model:</span>{" "}
-                                        {device.modelId}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="space-y-2">
-                                    {device.ipAddress && (
-                                      <div className="text-sm">
-                                        <span className="font-medium text-muted-foreground">IP:</span>{" "}
-                                        {device.ipAddress}
-                                      </div>
-                                    )}
-                                    {device.powerWatt && (
-                                      <div className="text-sm">
-                                        <span className="font-medium text-muted-foreground">Power:</span>{" "}
-                                        {device.powerWatt}W
-                                      </div>
-                                    )}
-                                    {device.lastSeen && (
-                                      <div className="text-sm">
-                                        <span className="font-medium text-muted-foreground">Last Seen:</span>{" "}
-                                        {new Date(device.lastSeen).toLocaleString()}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {device.notes && (
-                                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                    <h5 className="text-sm font-medium text-muted-foreground mb-1">Notes</h5>
-                                    <p className="text-sm">{device.notes}</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <Server className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                            <h3 className="font-semibold text-lg">Available Unit</h3>
-                            <p className="text-muted-foreground text-sm mb-4">
-                              This rack unit is currently empty and available for device installation.
-                            </p>
-                            <Button onClick={() => setIsAddDeviceOpen(true)}>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Install Device
-                            </Button>
-                          </div>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center text-muted-foreground">
-                        <Server className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>Select a rack unit to view details</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
+            <div className="text-2xl font-bold">{rack.capacityU}U</div>
+            <p className="text-xs text-muted-foreground">
+              Rack size
+            </p>
           </CardContent>
         </Card>
 
-        {/* Device List */}
         <Card>
-          <CardHeader>
-            <CardTitle>Installed Devices ({rack.devices.length})</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              All devices currently installed in this rack
-            </p>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Used Capacity</CardTitle>
+            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+              <HardDrive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            {rack.devices.length === 0 ? (
-              <div className="text-center py-8">
-                <Server className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No devices installed</h3>
-                <p className="text-muted-foreground mb-4">
-                  This rack doesn't have any devices installed yet. Add your first device below.
-                </p>
-                <Button onClick={() => setIsAddDeviceOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Install First Device
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {rack.devices
-                  .sort((a, b) => (b.positionU || 0) - (a.positionU || 0)) // Sort by position (highest first)
-                  .map((device) => {
-                    const Icon = getDeviceIcon(device.deviceType);
-                    const StatusIcon = getDeviceStatusIcon(device.status);
+            <div className="text-2xl font-bold">{rack.usedU} U</div>
+            <p className="text-xs text-muted-foreground">Units occupied</p>
+          </CardContent>
+        </Card>
 
-                    return (
-                      <div
-                        key={device.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-50 rounded-lg">
-                            <Icon className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold">{device.name}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge className={getDeviceStatusColor(device.status)}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {device.status}
-                              </Badge>
-                              <Badge variant="outline">
-                                U{device.positionU || "?"}-{device.sizeU > 1 ? (device.positionU! + device.sizeU - 1) : device.positionU}
-                              </Badge>
-                              <Badge variant="secondary">
-                                {device.deviceType}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Available Capacity</CardTitle>
+            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+              <Building className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{rack.availableU} U</div>
+            <p className="text-xs text-muted-foreground">Units remaining</p>
+          </CardContent>
+        </Card>
 
-                        <div className="text-right text-sm">
-                          {device.powerWatt && (
-                            <div className="text-muted-foreground">
-                              {device.powerWatt}W
-                            </div>
-                          )}
-                          {device.ipAddress && (
-                            <div className="text-muted-foreground">
-                              {device.ipAddress}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Devices</CardTitle>
+            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+              <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{rack.devices.length}</div>
+            <p className="text-xs text-muted-foreground">Installed devices</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Utilization</CardTitle>
+            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+              <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{rack.utilizationPercent}%</div>
+            <p className="text-xs text-muted-foreground">
+              {rack.utilizationPercent > 90 ? 'Critical' : rack.utilizationPercent > 70 ? 'High' : 'Normal'}
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* 2D Rack Capacity View */}
+      <Card className="m-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Server className="h-5 w-5" />
+            Rack Layout - {rack.name}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Device positions and capacity utilization
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-muted/30 p-3 rounded-lg border">
+            {/* Rack Header */}
+            <div className="bg-card border rounded-t-md p-2 mb-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-sm">{rack.name}</div>
+                  <div className="text-xs text-muted-foreground">{rack.capacityU}U Server Rack</div>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {rack.utilizationPercent}% Used
+                </Badge>
+              </div>
+            </div>
+
+            {/* Rack Units Grid - Compact */}
+            <div className="bg-background border border-border rounded-b-md min-h-48 p-3 relative">
+              {/* Rack Frame */}
+              <div className="absolute inset-y-0 left-2 right-2 top-1 bottom-1 border-l-2 border-r-2 border-border"></div>
+
+              {/* Units Display - Smaller */}
+              <div className="relative space-y-0.5 px-3 py-1">
+                {rackUnits.slice().reverse().map((unit) => {
+                  return (
+                    <div key={unit.position} className="relative">
+                      <div
+                        className={`
+                          relative cursor-pointer border transition-colors
+                          ${unit.isOccupied
+                            ? 'bg-primary/10 border-primary/30 text-foreground'
+                            : 'bg-background border-border hover:bg-muted/50'
+                          }
+                        `}
+                        style={{ height: '20px' }}
+                      >
+                        {/* Unit Position Label - Small */}
+                        <div className={`absolute -left-8 top-1/2 transform -translate-y-1/2 text-xs font-medium bg-background border border-border px-1 rounded`}>
+                          U{unit.position}
+                        </div>
+
+                        {/* Unit Content - Compact */}
+                        {unit.isOccupied ? (
+                          <div className="h-full flex items-center justify-center px-1 overflow-hidden rounded-full">
+                            {unit.installedDevices.map((device: Device) => {
+                              const Icon = getDeviceIcon(device.deviceType);
+
+                              return (
+                                <div key={device.id} className="flex items-center gap-1 min-w-0 flex-1">
+                                  <Icon className="h-3 w-3 flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-xs font-medium">
+                                      {device.name}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Available</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Rack Base - Simple */}
+              <div className="absolute bottom-0 left-0 right-0 h-4 bg-muted border-t flex justify-center items-center">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                  Power
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                  Cool
+                </div>
+              </div>
+            </div>
+
+            {/* Capacity Stats - Simple */}
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 p-2 rounded border">
+                <div className="flex items-center gap-1 mb-1">
+                  <CheckCircle className="h-3 w-3" />
+                  <span className="text-xs font-medium">Free</span>
+                </div>
+                <div className="text-sm font-bold">{rack.availableU}U</div>
+              </div>
+
+              <div className="bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-2 rounded border">
+                <div className="flex items-center gap-1 mb-1">
+                  <Server className="h-3 w-3" />
+                  <span className="text-xs font-medium">Used</span>
+                </div>
+                <div className="text-sm font-bold">{rack.usedU}U</div>
+              </div>
+
+              <div className={`p-2 rounded border ${
+                rack.utilizationPercent > 90 ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300' :
+                rack.utilizationPercent > 70 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300' :
+                'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-300'
+              }`}>
+                <div className="flex items-center gap-1 mb-1">
+                  <TrendingUp className="h-3 w-3" />
+                  <span className="text-xs font-medium">Usage</span>
+                </div>
+                <div className="text-sm font-bold">{rack.utilizationPercent}%</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Device Management Table */}
+      <Card className="m-4">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Device Management Summary ({filteredDevices.length})</CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 h-4 w-4 transform -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search devices..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-8 w-64"
+                />
+              </div>
+              <Button onClick={() => setIsAddDeviceOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Device
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredDevices.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Device</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Capacity</TableHead>
+                  <TableHead>IP Address</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDevices.map((device) => (
+                  <TableRow key={device.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded">
+                          <Server className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        {device.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{device.deviceType}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`font-bold ${getCapacityUtilizationColor(device.positionU || 0, rack.capacityU)}`}>
+                        U{device.positionU || "?"}
+                        {device.sizeU > 1 && `-${(device.positionU || 0) + device.sizeU - 1}`}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className={`flex items-center gap-1 ${
+                        device.status.toLowerCase() === 'online' ? 'text-green-600 dark:text-green-400' :
+                        device.status.toLowerCase() === 'offline' ? 'text-red-600 dark:text-red-400' :
+                        device.status.toLowerCase() === 'maintenance' ? 'text-orange-600 dark:text-orange-400' :
+                        'text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {device.status.toLowerCase() === 'online' && <CheckCircle className="h-4 w-4" />}
+                        {device.status.toLowerCase() === 'offline' && <XCircle className="h-4 w-4" />}
+                        {device.status.toLowerCase() === 'maintenance' && <Wrench className="h-4 w-4" />}
+                        <span className="capitalize">{device.status}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{device.sizeU}U</TableCell>
+                    <TableCell>
+                      {device.ipAddress ? (
+                        <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
+                          {device.ipAddress}
+                        </code>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">N/A</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm">
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-12">
+              <Server className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery ? "No devices found matching your search" : "No devices installed"}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery
+                  ? "Try adjusting your search terms"
+                  : "Get started by adding your first device to this rack"
+                }
+              </p>
+              {!searchQuery && (
+                <Button onClick={() => setIsAddDeviceOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Device
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Add Device Dialog */}
       <Dialog open={isAddDeviceOpen} onOpenChange={setIsAddDeviceOpen}>
