@@ -74,9 +74,7 @@ export async function POST(
     const flowIndicator = await prisma.layout2DFlowIndicator.create({
       data: {
         layoutId: params.id,
-        device: {
-          connect: { uniqId: deviceUniqId }
-        },
+        deviceUniqId,
         selectedKey,
         customName,
         positionX: positionX || 50,

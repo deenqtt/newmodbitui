@@ -27,6 +27,7 @@ interface Props {
     selectedKey: string;
     multiply?: number;
     units?: string;
+    responsiveSettings?: import("@/hooks/useResponsiveWidget").ResponsiveWidgetSettings;
   };
 }
 
@@ -52,8 +53,10 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   const [valueFontSize, setValueFontSize] = useState(24);
   const [unitFontSize, setUnitFontSize] = useState(12);
 
-  // Enhanced responsive calculation with better proportions
+  // Use responsive settings for sizing
   useLayoutEffect(() => {
+    if (!config.responsiveSettings) return;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -62,30 +65,37 @@ export const SingleValueCardWidget = ({ config }: Props) => {
       const { width, height } = rect;
       setDimensions({ width, height });
 
-      // Improved scaling algorithm
-      const minDimension = Math.min(width, height);
-      const maxDimension = Math.max(width, height);
-      const area = width * height;
+      const responsive = config.responsiveSettings!;
 
-      // Dynamic font scaling based on container size
-      const scaleFactor = Math.sqrt(area) / 120;
-      const minScaleFactor = Math.min(width / 180, height / 120);
-      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
+      // Use responsive settings for font scaling
+      const baseFontSize = responsive.isMobile
+        ? responsive.fontSizeScale * 20
+        : responsive.isTablet
+        ? responsive.fontSizeScale * 26
+        : responsive.fontSizeScale * 32;
 
-      // Better proportioned font sizes
-      const baseValueSize = Math.max(minDimension * 0.15, 18);
-      const maxValueSize = Math.min(width * 0.3, height * 0.4);
-      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
+      // Responsive font sizes based on device type
+      const valueSize = responsive.isMobile
+        ? Math.min(baseFontSize * 0.7, width * 0.25)
+        : responsive.isTablet
+        ? Math.min(baseFontSize * 0.9, width * 0.3)
+        : Math.min(baseFontSize, width * 0.35);
 
-      const newTitleSize = Math.max(
-        Math.min(newValueSize * 0.45, width * 0.08),
-        12
-      );
-      const newUnitSize = Math.max(newValueSize * 0.4, 10);
+      const titleSize = responsive.isMobile
+        ? Math.max(valueSize * 0.5, 11)
+        : responsive.isTablet
+        ? Math.max(valueSize * 0.55, 14)
+        : Math.max(valueSize * 0.6, 16);
 
-      setValueFontSize(Math.round(newValueSize));
-      setTitleFontSize(Math.round(newTitleSize));
-      setUnitFontSize(Math.round(newUnitSize));
+      const unitSize = responsive.isMobile
+        ? Math.max(valueSize * 0.4, 9)
+        : responsive.isTablet
+        ? Math.max(valueSize * 0.45, 11)
+        : Math.max(valueSize * 0.5, 13);
+
+      setValueFontSize(Math.round(Math.max(valueSize, responsive.isMobile ? 18 : 20)));
+      setTitleFontSize(Math.round(Math.max(titleSize, responsive.isMobile ? 10 : 12)));
+      setUnitFontSize(Math.round(Math.max(unitSize, responsive.isMobile ? 8 : 10)));
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
@@ -93,7 +103,7 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     updateDimensions();
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [config.responsiveSettings]);
 
   useEffect(() => {
     if (!config.deviceUniqId) {
@@ -363,67 +373,149 @@ export const SingleValueCardWidget = ({ config }: Props) => {
 
   const styles = getStatusStyles();
 
+  // Get responsive padding and styling
+  const responsivePadding = config.responsiveSettings?.paddingClass || "p-4";
+  const responsiveCursor = config.responsiveSettings ? "cursor-pointer" : "cursor-move";
+  const responsiveHover = config.responsiveSettings?.isMobile ? "" : "group hover:scale-[1.01] hover:shadow-md";
+
+  const responsive = config.responsiveSettings!;
+  const isSmallMobile = responsive.isSmallMobile;
+  const isTouchOnly = responsive.isSmallMobile || responsive.isMobile || responsive.isLargeMobile;
+
+  // Enhanced responsive sizing
+  useLayoutEffect(() => {
+    if (!responsive) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
+      setDimensions({ width, height });
+
+      // More sophisticated font scaling based on device capabilities
+      const baseFontSize = responsive.isSmallMobile
+        ? responsive.fontSizeScale * 16
+        : responsive.isMobile
+        ? responsive.fontSizeScale * 18
+        : responsive.isLargeMobile
+        ? responsive.fontSizeScale * 20
+        : responsive.isSmallTablet
+        ? responsive.fontSizeScale * 22
+        : responsive.fontSizeScale * 24;
+
+      const valueSize = responsive.isSmallMobile
+        ? Math.min(baseFontSize * 0.6, width * 0.2)
+        : responsive.isMobile
+        ? Math.min(baseFontSize * 0.7, width * 0.22)
+        : responsive.isLargeMobile
+        ? Math.min(baseFontSize * 0.75, width * 0.25)
+        : Math.min(baseFontSize * 0.85, width * 0.28);
+
+      const titleSize = responsive.isSmallMobile
+        ? Math.max(valueSize * 0.45, 8)
+        : responsive.isMobile
+        ? Math.max(valueSize * 0.5, 10)
+        : responsive.isLargeMobile
+        ? Math.max(valueSize * 0.55, 11)
+        : Math.max(valueSize * 0.6, 12);
+
+      const unitSize = responsive.isSmallMobile
+        ? Math.max(valueSize * 0.35, 7)
+        : responsive.isMobile
+        ? Math.max(valueSize * 0.4, 8)
+        : Math.max(valueSize * 0.45, 10);
+
+      setValueFontSize(Math.round(Math.max(valueSize, responsive.isSmallMobile ? 14 : responsive.isMobile ? 16 : 18)));
+      setTitleFontSize(Math.round(Math.max(titleSize, responsive.isSmallMobile ? 8 : responsive.isMobile ? 9 : 10)));
+      setUnitFontSize(Math.round(Math.max(unitSize, responsive.isSmallMobile ? 6 : responsive.isMobile ? 7 : 8)));
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    resizeObserver.observe(container);
+    updateDimensions();
+
+    return () => resizeObserver.disconnect();
+  }, [responsive]);
+
   return (
     <div
       ref={containerRef}
       className={`
-        w-full h-full relative overflow-hidden cursor-move
+        w-full h-full relative overflow-hidden ${responsive.touchMode ? 'cursor-pointer' : 'cursor-move'}
         bg-card
         border border-border/60 rounded-xl
-        shadow-sm hover:shadow-md
-        transition-all duration-300 ease-out
-        group hover:scale-[1.01] transform-gpu
+        shadow-sm transition-all duration-300 ease-out transform-gpu
+        ${!isTouchOnly ? 'group hover:scale-[1.01] hover:shadow-md' : ''}
+        ${responsive.layoutDensity === 'ultra-compact' ? 'rounded-lg' : ''}
+        ${responsive.compactMode ? 'shadow-none border-border/40' : ''}
       `}
       style={{
-        minWidth: 120,
-        minHeight: 80,
+        minWidth: responsive.isSmallMobile ? 80 : responsive.isMobile ? 100 : responsive.isLargeMobile ? 110 : 120,
+        minHeight: responsive.isSmallMobile ? 50 : responsive.isMobile ? 60 : responsive.isLargeMobile ? 65 : 80,
       }}
     >
-      {/* Status indicators - clean minimal approach */}
-      <div className="absolute top-3 right-3 z-10">
-        <div className="flex items-center gap-2">
-          {renderTrendIndicator()}
+      {/* Enhanced status indicators */}
+      <div className={`absolute ${isSmallMobile ? 'top-0.5 right-0.5' : responsive.isMobile ? 'top-1 right-1' : 'top-2 right-2'} z-10`}>
+        <div className={`flex items-center ${responsive.gapClass}`}>
+          {responsive.showIcons && responsive.enableAnimations !== false && renderTrendIndicator()}
           <div
             className={`rounded-full transition-all duration-300 ${
               styles.indicator
-            } ${styles.pulse ? "animate-pulse" : ""}`}
+            } ${styles.pulse && responsive.enableAnimations !== false ? "animate-pulse" : ""}`}
             style={{
-              width: Math.max(titleFontSize * 0.6, 8),
-              height: Math.max(titleFontSize * 0.6, 8),
+              width: Math.max(titleFontSize * 0.5, isSmallMobile ? 4 : responsive.isMobile ? 6 : 8),
+              height: Math.max(titleFontSize * 0.5, isSmallMobile ? 4 : responsive.isMobile ? 6 : 8),
             }}
           />
         </div>
       </div>
 
-      {/* Header with clean typography */}
-      <div className="absolute top-0 left-0 right-0 p-4 pr-16">
-        <h3
-          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
-          style={{
-            fontSize: `${titleFontSize}px`,
-            lineHeight: 1.3,
-          }}
-          title={config.customName}
-        >
-          {config.customName}
-        </h3>
+      {/* Responsive header with enhanced touch targets */}
+      <div className={`absolute top-0 left-0 right-0 ${responsive.paddingClass} ${
+        isSmallMobile ? `pr-8 ${responsive.compactMode ? 'py-1' : 'py-1'}` :
+        responsive.isMobile ? 'pr-10' : 'pr-12'
+      }`}>
+        {responsive.showLabels && (
+          <h3
+            className={`font-medium ${responsive.truncateText ? 'truncate' : ''} text-left transition-colors duration-200 ${styles.title} ${responsive.fontSizeClass}`}
+            style={{
+              fontSize: isSmallMobile ? `${Math.max(titleFontSize * 0.9, 8)}px` :
+                        responsive.isMobile ? `${Math.max(titleFontSize * 0.95, 9)}px` : `${titleFontSize}px`,
+              lineHeight: responsive.lineHeightScale,
+            }}
+            title={config.customName}
+          >
+            {config.customName}
+          </h3>
+        )}
       </div>
 
-      {/* Main content area */}
+      {/* Enhanced content area with responsive padding */}
       <div
-        className="absolute inset-0 flex items-center justify-center"
+        className={`absolute inset-0 flex items-center justify-center ${
+          responsive.layoutDirection === 'vertical' ? 'flex-col justify-center' : 'justify-center'
+        }`}
         style={{
-          paddingTop: titleFontSize * 2.5,
-          paddingBottom: 16,
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingTop: responsive.showLabels ? (titleFontSize * responsive.spacingScale * 2.8) : '0.5rem',
+          paddingBottom: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
+          paddingLeft: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
+          paddingRight: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
         }}
       >
         {renderContent()}
       </div>
 
-      {/* Subtle hover effect - minimal */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Conditional hover effects - only on non-touch devices */}
+      {!isTouchOnly && responsive.enableAnimations !== false && (
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/3 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      )}
+
+      {/* Touch feedback for touch devices */}
+      {responsive.touchMode && responsive.enableAnimations !== false && (
+        <div className="absolute inset-0 bg-slate-900/5 active:bg-slate-900/10 pointer-events-none rounded-xl opacity-0 active:opacity-100 transition-opacity duration-150" />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // File: components/widgets/WidgetRenderer.tsx
 "use client";
 
+import { useResponsiveWidget } from "@/hooks/useResponsiveWidget";
 import { SingleValueCardWidget } from "./SingleValueCard/SingleValueCardWidget";
 import { IconStatusCardWidget } from "./IconStatusCard/IconStatusCardWidget";
 import { GroupedIconStatusWidget } from "./GroupedIconStatus/GroupedIconStatusWidget";
@@ -63,92 +64,102 @@ export const WidgetRenderer = ({ item }: Props) => {
 
   const { widgetType, config } = item;
 
+  // Use responsive hook for all widgets
+  const responsiveSettings = useResponsiveWidget(widgetType);
+
   // Pastikan config ada sebelum merender
   if (!config) {
     return <div className="p-4 text-center">Please configure this widget.</div>;
   }
 
+  // Pass responsive settings to all widgets via config
+  const configWithResponsive = {
+    ...config,
+    responsiveSettings,
+  };
+
+  // Use responsive config for all widgets
   switch (widgetType) {
     case "Single Value Card":
-      return <SingleValueCardWidget config={config} />;
+      return <SingleValueCardWidget config={configWithResponsive} />;
     case "Icon Status Card":
-      return <IconStatusCardWidget config={config} />;
+      return <IconStatusCardWidget config={configWithResponsive} />;
     case "Grouped Icon Status":
-      return <GroupedIconStatusWidget config={config} />;
+      return <GroupedIconStatusWidget config={configWithResponsive} />;
     case "Analogue gauges":
-      return <AnalogueGaugeWidget config={config} />;
+      return <AnalogueGaugeWidget config={configWithResponsive} />;
     case "Temperature Indicator Bar":
-      return <TemperatureIndicatorBarWidget config={config} />;
+      return <TemperatureIndicatorBarWidget config={configWithResponsive} />;
     case "Calculated Parameter Card":
-      return <CalculatedParameterWidget config={config} />;
+      return <CalculatedParameterWidget config={configWithResponsive} />;
     case "Running Hours Log":
-      return <RunningHoursLogWidget config={config} />;
+      return <RunningHoursLogWidget config={configWithResponsive} />;
     case "Energy Usage – Last Month":
-      return <EnergyUsageWidget config={config} />;
+      return <EnergyUsageWidget config={configWithResponsive} />;
     case "Energy Usage – Current Month":
-      return <EnergyUsageWidget config={config} />;
+      return <EnergyUsageWidget config={configWithResponsive} />;
     case "Energy Target Gap":
-      return <EnergyTargetGapWidget config={config} />;
+      return <EnergyTargetGapWidget config={configWithResponsive} />;
     case "Breaker Status":
-      return <BreakerStatusWidget config={config} />;
+      return <BreakerStatusWidget config={configWithResponsive} />;
     case "Multi-Protocol Monitor":
-      return <MultiProtocolMonitorWidget config={config} />;
+      return <MultiProtocolMonitorWidget config={configWithResponsive} />;
     case "Chart Line":
-      return <ChartLineWidget config={config} />;
+      return <ChartLineWidget config={configWithResponsive} />;
     case "Chart Bar":
-      return <ChartBarWidget config={config} />;
+      return <ChartBarWidget config={configWithResponsive} />;
     case "Multi-Series Chart":
-      return <MultiSeriesChartWidget config={config} />;
+      return <MultiSeriesChartWidget config={configWithResponsive} />;
     case "Basic Trend Chart":
-      return <BasicTrendChartWidget config={config} />;
+      return <BasicTrendChartWidget config={configWithResponsive} />;
     case "Power Analyzer Chart":
-      return <PowerAnalyzerChartWidget config={config} />;
+      return <PowerAnalyzerChartWidget config={configWithResponsive} />;
     case "Energy Target Chart":
-      return <EnergyTargetChartWidget config={config} />;
+      return <EnergyTargetChartWidget config={configWithResponsive} />;
     case "Power Generate Chart":
-      return <PowerGenerateChartWidget config={config} />;
+      return <PowerGenerateChartWidget config={configWithResponsive} />;
     case "Button Control Modbus":
-      return <ButtonControlModbusWidget config={config} />;
+      return <ButtonControlModbusWidget config={configWithResponsive} />;
     case "Button Control Modular":
-      return <ButtonControlModularWidget config={config} />;
+      return <ButtonControlModularWidget config={configWithResponsive} />;
     case "Alarm Log List":
-      return <AlarmLogListWidget config={config} />;
+      return <AlarmLogListWidget config={configWithResponsive} />;
     case "Alarm Summary":
-      return <AlarmSummaryWidget config={config} />;
+      return <AlarmSummaryWidget config={configWithResponsive} />;
     case "Dashboard Shortcut":
-      return <DashboardShortcutWidget config={config} />;
+      return <DashboardShortcutWidget config={configWithResponsive} />;
     case "Camera Last Snapshot":
-      return <CameraSnapshotWidget config={config} />;
+      return <CameraSnapshotWidget config={configWithResponsive} />;
     case "Access Controller Status":
-      return <AccessControllerStatusWidget config={config} />;
+      return <AccessControllerStatusWidget config={configWithResponsive} />;
     case "Lock Access Control":
-      return <LockAccessControlWidget config={config} />;
+      return <LockAccessControlWidget config={configWithResponsive} />;
     case "3D Subrack View":
-      return <Subrack3dWidget config={config} />;
+      return <Subrack3dWidget config={configWithResponsive} />;
     case "Modular 3D Device View":
-      return <Modular3dDeviceViewWidget config={config} />;
+      return <Modular3dDeviceViewWidget config={configWithResponsive} />;
     case "3D Containment View":
-      return <Containment3dWidget config={config} />;
+      return <Containment3dWidget config={configWithResponsive} />;
     case "3D Container View":
-      return <Container3dWidget config={config} />;
+      return <Container3dWidget config={configWithResponsive} />;
     case "LoRaWAN Device Data":
-      return <LoRaWANDeviceWidget config={config} />;
+      return <LoRaWANDeviceWidget config={configWithResponsive} />;
     case "CCTV Monitor Videos":
-      return <CctvMonitorVideosWidget config={config} />;
+      return <CctvMonitorVideosWidget config={configWithResponsive} />;
     case "CCTV Live Stream":
-      return <CctvLiveStreamWidget config={config} />;
+      return <CctvLiveStreamWidget config={configWithResponsive} />;
     case "Maintenance List":
-      return <MaintenanceListWidget config={config} />;
+      return <MaintenanceListWidget config={configWithResponsive} />;
     case "Maintenance Calendar":
-      return <MaintenanceCalendarWidget config={config} />;
+      return <MaintenanceCalendarWidget config={configWithResponsive} />;
     case "Maintenance Statistics":
-      return <MaintenanceStatisticsWidget config={config} />;
+      return <MaintenanceStatisticsWidget config={configWithResponsive} />;
     case "3D Rack Server View":
-      return <RackServer3dWidget config={config} />;
+      return <RackServer3dWidget config={configWithResponsive} />;
     case "Zigbee Device":
-      return <ZigbeeDeviceWidget config={config} />;
+      return <ZigbeeDeviceWidget config={configWithResponsive} />;
     case "Thermal Camera":
-      return <ThermalCameraWidget config={config} />;
+      return <ThermalCameraWidget config={configWithResponsive} />;
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">

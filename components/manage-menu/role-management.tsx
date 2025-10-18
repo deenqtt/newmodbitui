@@ -8,7 +8,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, Shield } from "lucide-react";
+import { useSearchFilter } from "@/hooks/use-search-filter";
+import { usePagination } from "@/hooks/use-pagination";
+import { Plus, Edit, Trash2, Users, Shield, Search } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Role {
   id: string;
@@ -33,6 +44,16 @@ export function RoleManagement() {
     name: "",
     description: "",
   });
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Search functionality
+  const { searchQuery, setSearchQuery, filteredData: filteredRoles } = useSearchFilter(roles, ['name', 'description']);
+
+  // Pagination logic
+  const { paginatedData: paginatedRoles, totalPages, hasNextPage, hasPrevPage } = usePagination(filteredRoles, pageSize, currentPage);
 
   useEffect(() => {
     fetchRoles();
@@ -283,6 +304,24 @@ export function RoleManagement() {
         </Dialog>
       </div>
 
+      {/* Search Input */}
+      <div className="flex items-center space-x-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search roles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-muted-foreground">
+            {filteredRoles.length} of {roles.length} roles
+          </p>
+        )}
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -296,7 +335,7 @@ export function RoleManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {roles.map((role) => (
+            {paginatedRoles.map((role) => (
               <TableRow key={role.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
@@ -357,6 +396,48 @@ export function RoleManagement() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasPrevPage) setCurrentPage(currentPage - 1);
+                }}
+                className={!hasPrevPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  isActive={currentPage === page}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasNextPage) setCurrentPage(currentPage + 1);
+                }}
+                className={!hasNextPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

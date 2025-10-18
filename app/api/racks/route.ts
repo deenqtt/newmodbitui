@@ -18,8 +18,7 @@ export async function GET() {
           select: {
             id: true,
             positionU: true,
-            sizeU: true,
-            status: true
+            sizeU: true
           }
         },
         _count: {
@@ -30,8 +29,8 @@ export async function GET() {
     });
 
     // Calculate used capacity for each rack
-    const racksWithCapacityInfo = racks.map(rack => {
-      const usedU = rack.devices.reduce((total, device) => {
+    const racksWithCapacityInfo = racks.map((rack: any) => {
+      const usedU = rack.devices.reduce((total: number, device: any) => {
         return total + (device.sizeU || 1);
       }, 0);
 

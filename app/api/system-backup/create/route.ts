@@ -3,12 +3,24 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 import { getAuthFromCookie } from "@/lib/auth"; // Sesuaikan jika perlu otentikasi
-import { Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   const auth = await getAuthFromCookie(request);
-  // Pastikan hanya admin yang bisa melakukan backup
-  if (!auth || auth.role !== Role.ADMIN) {
+
+  // Check if user is admin
+  if (!auth?.userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    include: { role_data: true },
+  });
+
+  if (!user || !user.role_data?.name.toLowerCase().includes('admin')) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 

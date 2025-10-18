@@ -118,7 +118,8 @@ async function seedMenu() {
       // Dashboard Group
       { name: 'dashboard-overview', label: 'Overview Dashboard', path: '/', icon: 'LayoutDashboard', order: 0, groupName: 'dashboard', isActive: true, isDeveloper: false },
       { name: 'dashboard-layout2d', label: 'Process Flow', path: '/layout2d', icon: 'Workflow', order: 1, groupName: 'dashboard', isActive: true, isDeveloper: false },
-
+      { name: 'dashboard-node-map', label: 'Node Map View', path: '/manage-node-map', icon: 'Globe', order: 5, groupName: 'dashboard', isActive: false, isDeveloper: true },
+      
       // Control Group
       { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isActive: false, isDeveloper: false },
       { name: 'control-schedule', label: 'Scheduled Control', path: '/control/schedule', icon: 'Calendar', order: 1, groupName: 'control', isActive: false, isDeveloper: false },
@@ -159,11 +160,14 @@ async function seedMenu() {
       { name: 'payload-static', label: 'Static Payload', path: '/payload/static', icon: 'FileText', order: 0, groupName: 'payload', isActive: false, isDeveloper: true },
       { name: 'payload-remapping', label: 'Payload Remapping', path: '/payload/remapping', icon: 'ArrowRightLeft', order: 1, groupName: 'payload', isActive: false, isDeveloper: true },
       { name: 'payload-discover', label: 'Payload Discovery', path: '/payload/discover', icon: 'Search', order: 2, groupName: 'payload', isActive: false, isDeveloper: true },
+      { name: 'payload-node-info-discover', label: 'Node Info Discover', path: '/node-info-discover', icon: 'Compass', order: 3, groupName: 'payload', isActive: true, isDeveloper: true },
 
       // System Config Group (Developer)
       { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'system', isActive: true, isDeveloper: true },
       { name: 'system-power-analyzer', label: 'Power Analyzer', path: '/system-config/power-analyzer', icon: 'Zap', order: 1, groupName: 'system', isActive: false, isDeveloper: true },
       { name: 'system-system-backup', label: 'System Backup', path: '/system-config/system-backup', icon: 'HardDrive', order: 2, groupName: 'system', isActive: true, isDeveloper: true },
+      { name: 'system-tenant-management', label: 'Tenant Management', path: '/manage-tenants', icon: 'Building2', order: 3, groupName: 'system', isActive: false, isDeveloper: true },
+      { name: 'system-node-locations', label: 'Node Locations', path: '/manage-node-locations', icon: 'MapPin', order: 4, groupName: 'system', isActive: true, isDeveloper: true },
       { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 99, groupName: 'system', isActive: true, isDeveloper: true },
 
       // Analytics Group

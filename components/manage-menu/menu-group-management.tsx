@@ -9,9 +9,20 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, FolderOpen, Menu } from "lucide-react";
+import { useSearchFilter } from "@/hooks/use-search-filter";
+import { usePagination } from "@/hooks/use-pagination";
+import { Plus, Edit, Trash2, FolderOpen, Menu, Search } from "lucide-react";
 import IconSelector from "@/components/layout2d/IconSelector";
 import { getIconWithFallback } from "@/lib/icon-library";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface MenuGroup {
   id: string;
@@ -48,8 +59,18 @@ export function MenuGroupManagement() {
     isDeveloper: false,
   });
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Search functionality
+  const { searchQuery, setSearchQuery, filteredData: filteredMenuGroups } = useSearchFilter(menuGroups, ['name', 'label', 'icon']);
+
+  // Pagination logic
+  const { paginatedData: paginatedMenuGroups, totalPages, hasNextPage, hasPrevPage } = usePagination(filteredMenuGroups, pageSize, currentPage);
+
   // Ensure table switches are controlled
-  const processedMenuGroups = menuGroups.map(group => ({
+  const processedMenuGroups = paginatedMenuGroups.map(group => ({
     ...group,
     isActive: !!group.isActive, // Ensure boolean for switch
   }));
@@ -415,6 +436,24 @@ export function MenuGroupManagement() {
         </Dialog>
       </div>
 
+      {/* Search Input */}
+      <div className="flex items-center space-x-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search menu groups..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-muted-foreground">
+            {filteredMenuGroups.length} of {menuGroups.length} menu groups
+          </p>
+        )}
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -483,6 +522,48 @@ export function MenuGroupManagement() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasPrevPage) setCurrentPage(currentPage - 1);
+                }}
+                className={!hasPrevPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  isActive={currentPage === page}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasNextPage) setCurrentPage(currentPage + 1);
+                }}
+                className={!hasNextPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

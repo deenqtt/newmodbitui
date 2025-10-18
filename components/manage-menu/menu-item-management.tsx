@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +10,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { useSearchFilter } from "@/hooks/use-search-filter";
+import { usePagination } from "@/hooks/use-pagination";
+import { Plus, Edit, Trash2, Eye, EyeOff, Search, Filter } from "lucide-react";
 import IconSelector from "@/components/layout2d/IconSelector";
 import { getIconWithFallback } from "@/lib/icon-library";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface MenuItem {
   id: string;
@@ -55,6 +66,25 @@ export function MenuItemManagement() {
     isActive: true,
     isDeveloper: false,
   });
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Group filter
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
+
+  // Filter by group first
+  const filteredByGroup = useMemo(() => {
+    if (selectedGroupId === "all") return menuItems;
+    return menuItems.filter(item => item.menuGroupId === selectedGroupId);
+  }, [menuItems, selectedGroupId]);
+
+  // Search functionality - search on name, label, path, and group label
+  const { searchQuery, setSearchQuery, filteredData: filteredMenuItems } = useSearchFilter(filteredByGroup, ['name', 'label', 'path', 'menuGroup.label']);
+
+  // Pagination logic
+  const { paginatedData: paginatedMenuItems, totalPages, hasNextPage, hasPrevPage } = usePagination(filteredMenuItems, pageSize, currentPage);
 
   useEffect(() => {
     fetchMenuItems();
@@ -463,6 +493,47 @@ export function MenuItemManagement() {
         </Dialog>
       </div>
 
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex items-center space-x-2 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search menu items..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+
+          <div className="relative">
+            <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Select value={selectedGroupId} onValueChange={(value) => {
+              setSelectedGroupId(value);
+              setCurrentPage(1); // Reset to first page when filter changes
+            }}>
+              <SelectTrigger className="w-48 pl-8">
+                <SelectValue placeholder="All groups" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All groups</SelectItem>
+                {menuGroups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {(searchQuery || selectedGroupId !== "all") && (
+          <p className="text-sm text-muted-foreground">
+            {filteredMenuItems.length} of {menuItems.length} menu items
+          </p>
+        )}
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -478,7 +549,7 @@ export function MenuItemManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {menuItems.map((item) => (
+            {paginatedMenuItems.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
                 <TableCell>
@@ -546,6 +617,48 @@ export function MenuItemManagement() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasPrevPage) setCurrentPage(currentPage - 1);
+                }}
+                className={!hasPrevPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  isActive={currentPage === page}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (hasNextPage) setCurrentPage(currentPage + 1);
+                }}
+                className={!hasNextPage ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

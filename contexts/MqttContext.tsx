@@ -62,15 +62,27 @@ export function MqttProvider({ children }: { children: ReactNode }) {
       if (clientRef.current && typeof clientRef.current.isConnected === 'function' && clientRef.current.isConnected()) {
         try {
           clientRef.current.subscribe(topic);
-          console.log(`MQTT successfully subscribed to topic: ${topic}`);
         } catch (err) {
-          console.warn(`MQTT subscribe failed for topic ${topic}:`, err);
+          // Silently handle subscription error
         }
-      } else {
-        console.warn(`MQTT client not ready for subscription to topic: ${topic}`);
       }
     }, 1000); // Wait 1 second after connection is established
   }, []);
+
+  const matchesTopic = (wildcard: string, actualTopic: string): boolean => {
+    if (wildcard === actualTopic) return true;
+    if (wildcard.endsWith('/#')) {
+      const prefix = wildcard.slice(0, -2);
+      return actualTopic.startsWith(prefix + '/');
+    }
+    if (wildcard.includes('+')) {
+      // Basic + matching for single level
+      const pattern = wildcard.replace(/\//g, '\\/').replace(/\+/g, '[^/]+');
+      const regex = new RegExp(`^${pattern}$`);
+      return regex.test(actualTopic);
+    }
+    return false;
+  };
 
   const unsubscribe = useCallback((topic: string, listener: MqttListener) => {
     const topicListeners = listenersRef.current.get(topic) || [];
@@ -115,21 +127,11 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
     const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
 
-    console.log(`MQTT Context: Connecting to broker at ${mqttHost}:${mqttPort}`);
-    console.log(`MQTT Context: Broker host: ${mqttHost}`);
-    console.log(`MQTT Context: Broker port: ${mqttPort}`);
-    console.log(`MQTT Context: Environment: ${process.env.NODE_ENV}`);
-    console.log(`MQTT Context: Client ID: ${clientId}`);
-    console.log(`MQTT Context: Using hostname from: ${process.env.NODE_ENV === "production" ? "window.location.hostname" : "environment variable"}`);
-
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
 
     mqttClient.onConnectionLost = (responseObject: Paho.MQTTError) => {
       if (responseObject.errorCode !== 0) {
-        console.warn(`MQTT Context: Connection lost to ${mqttHost}:${mqttPort}`);
-        console.warn(`MQTT Context: Error code: ${responseObject.errorCode}`);
-        console.warn(`MQTT Context: Error message: ${responseObject.errorMessage}`);
         setConnectionStatus("Disconnected");
       }
     };
@@ -137,14 +139,15 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     mqttClient.onMessageArrived = (message: Paho.Message) => {
       const topic = message.destinationName;
       const payload = message.payloadString;
-      const topicListeners = listenersRef.current.get(topic) || [];
-      topicListeners.forEach((listener) => listener(topic, payload));
+      listenersRef.current.forEach((topicListeners, wildcard) => {
+        if (matchesTopic(wildcard, topic)) {
+          topicListeners.forEach((listener) => listener(topic, payload));
+        }
+      });
     };
 
     mqttClient.connect({
       onSuccess: () => {
-        console.log(`MQTT Context: Successfully connected to ${mqttHost}:${mqttPort}`);
-        console.log(`MQTT Context: Connection state: CONNECTED`);
         setConnectionStatus("Connected");
         setIsReady(true);
         listenersRef.current.forEach((_, topic) => {
@@ -152,9 +155,6 @@ export function MqttProvider({ children }: { children: ReactNode }) {
         });
       },
       onFailure: (responseObject: Paho.MQTTError) => {
-        console.error(`MQTT Context: Failed to connect to ${mqttHost}:${mqttPort}`);
-        console.error(`MQTT Context: Error code: ${responseObject.errorCode}`);
-        console.error(`MQTT Context: Error message: ${responseObject.errorMessage}`);
         setConnectionStatus("Failed to Connect");
         setIsReady(false); // Set isReady ke false jika koneksi gagal
       },
@@ -172,19 +172,16 @@ export function MqttProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      console.log("[Global Cron] Memicu semua cron job...");
-
       fetch("/api/cron/log-data").catch((err) => {
-        console.error("[Global Cron] Gagal memicu log-data API:", err);
+        // Silently handle cron API errors
       });
 
       fetch("/api/cron/bill-logger").catch((err) => {
-        console.error("[Global Cron] Gagal memicu bill-logger API:", err);
+        // Silently handle cron API errors
       });
     }, 600000); // 600000 ms = 10 menit
 
     return () => {
-      // console.log("[Global Cron] Menghentikan interval logging di background.");
       clearInterval(intervalId);
     };
   }, []);

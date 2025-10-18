@@ -37,6 +37,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Device is offline" }, { status: 409 });
     }
 
+    if (!device.friendlyName) {
+      return NextResponse.json({ error: "Device friendly name is not set" }, { status: 400 });
+    }
+
     const zigbeeService = getZigbeeListenerService();
 
     try {

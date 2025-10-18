@@ -1,0 +1,24 @@
+# Core MQTT Communication
+paho-mqtt==1.6.1
+
+# System Monitoring & Hardware Control
+psutil==5.9.0
+netifaces==0.11.0
+getmac==0.9.4
+
+# HTTP Communication & Web Services
+requests==2.31.0
+
+# Web Framework
+flask==2.3.3
+flask-cors==4.0.0
+
+# Task Scheduling
+schedule==1.2.0
+
+# Serial Communication (for EC25 modem)
+pyserial==3.5
+
+# I2C Communication
+smbus2==0.4.2
+

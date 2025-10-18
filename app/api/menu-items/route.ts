@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { menuGroupId, name, label, path, icon, component, order, isDeveloper } = body;
+    const { menuGroupId, name, label, path, icon, order, isDeveloper } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
         label,
         path,
         icon,
-        component,
         order: order ?? 0,
         isDeveloper: isDeveloper ?? false,
       },

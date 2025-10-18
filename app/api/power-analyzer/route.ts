@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
     // Parse JSON strings back to objects untuk frontend
     const parsedConfigs = configs.map((config) => ({
       ...config,
-      pduList: config.pduList ? JSON.parse(config.pduList) : [],
-      mainPower: config.mainPower ? JSON.parse(config.mainPower) : {},
+      pduList: config.pduList && typeof config.pduList === 'string' ? JSON.parse(config.pduList) : [],
+      mainPower: config.mainPower && typeof config.mainPower === 'string' ? JSON.parse(config.mainPower) : {},
     }));
 
     return NextResponse.json(parsedConfigs);
@@ -101,8 +101,8 @@ export async function POST(request: NextRequest) {
     // Parse response untuk frontend
     const responseConfig = {
       ...newConfig,
-      pduList: JSON.parse(newConfig.pduList || "[]"),
-      mainPower: JSON.parse(newConfig.mainPower || "{}"),
+      pduList: newConfig.pduList && typeof newConfig.pduList === 'string' ? JSON.parse(newConfig.pduList) : [],
+      mainPower: newConfig.mainPower && typeof newConfig.mainPower === 'string' ? JSON.parse(newConfig.mainPower) : {},
     };
 
     return NextResponse.json(responseConfig, { status: 201 });

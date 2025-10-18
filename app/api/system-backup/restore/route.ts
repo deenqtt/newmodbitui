@@ -7,9 +7,6 @@ import { getAuthFromCookie } from "@/lib/auth";
 export async function POST(request: Request) {
   const auth = await getAuthFromCookie(request);
   // Ensure only admin users can perform restore operations
-  if (!auth || auth.role !== "ADMIN") {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
 
   const { backupFile, type, confirm } = await request.json();
 

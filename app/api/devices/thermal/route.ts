@@ -46,7 +46,7 @@ export async function GET() {
       // Parse latest payload for additional info
       let latestData = null;
       try {
-        latestData = device.lastPayload ? JSON.parse(device.lastPayload) : null;
+        latestData = device.lastPayload && typeof device.lastPayload === 'string' ? JSON.parse(device.lastPayload) : null;
       } catch (error) {
         console.warn(`Failed to parse payload for device ${device.id}`);
       }

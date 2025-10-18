@@ -40,7 +40,7 @@ export async function GET(
     }
 
     // Calculate capacity information
-    const usedU = rack.devices.reduce((total, device) => {
+    const usedU = rack.devices.reduce((total: number, device: any) => {
       return total + (device.sizeU || 1);
     }, 0);
 
@@ -105,8 +105,7 @@ export async function PUT(
           select: {
             id: true,
             positionU: true,
-            sizeU: true,
-            status: true
+            sizeU: true
           }
         },
         _count: {

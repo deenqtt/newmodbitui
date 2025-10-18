@@ -145,10 +145,14 @@ model DeviceExternal {
   name                        String
   topic                       String                      @unique
   address                     String?
+  rackId                      String? // Optional rack assignment
+  positionU                   Int?                        @default(0) // Position in rack (U units)
+  sizeU                       Int?                        @default(1) // Size in rack (U units)
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime                    @updatedAt
   lastPayload                 Json?
   lastUpdatedByMqtt           DateTime?
+  rack                        Rack?                       @relation(fields: [rackId], references: [id])
   alarmConfigs                AlarmConfiguration[]
   publishTargetForBillConfig  BillConfiguration?          @relation("PublishTargetForBill")
   sourceForBillConfigs        BillConfiguration[]         @relation("SourceDeviceForBill")
@@ -651,6 +655,58 @@ enum AlarmLogStatus {
   ACTIVE
   ACKNOWLEDGED
   CLEARED
+}
+
+model Tenant {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  company     String?
+  email       String    @unique
+  phone       String?
+  address     String?
+  status      String    @default("active") // active, inactive, suspended
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isActive    Boolean   @default(true)
+  notes       String?
+
+  // Relations - when implementing multi-tenancy
+  // users       User[]    // Uncomment when adding tenant isolation
+  locations   NodeTenantLocation[]
+
+  @@map("Tenant")
+}
+
+model NodeTenantLocation {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  longitude   Float
+  latitude    Float
+  url         String?
+  topic       String?
+  description String?
+  status      String    @default("active") // active, inactive
+  nodeType    String    @default("node") // "server" or "node" - distinguishes server nodes from regular nodes
+  tenantId    String?   // Optional foreign key for locations assigned to tenants
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isActive    Boolean   @default(true)
+
+  // Relations
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
+
+  @@map("NodeTenantLocation")
+}
+
+model Rack {
+  id         String         @id @default(cuid())
+  name       String         @unique
+  capacityU  Int            @default(42)
+  location   String?
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  devices    DeviceExternal[]
 }
 
 model Layout2D {

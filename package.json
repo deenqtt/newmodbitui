@@ -11,6 +11,8 @@
     "seed:menu": "node scripts/seed-menu.js",
     "seed:init": "node scripts/seed-init.js",
     "seed:devices": "node scripts/seed-devices.js",
+    "seed:tenants": "node scripts/seed-tenants.js",
+    "seed:node-locations": "node scripts/seed-node-locations.js",
     "db:seed": "npm run seed:init"
   },
   "dependencies": {
@@ -62,6 +64,7 @@
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
+    "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "lucide-react": "^0.518.0",
     "moment": "^2.30.1",
@@ -83,6 +86,7 @@
     "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
     "react-intersection-observer": "^9.16.0",
+    "react-leaflet": "^4.2.1",
     "react-resizable": "^3.0.5",
     "react-select": "^5.10.2",
     "react-use-measure": "^2.1.7",
@@ -101,6 +105,7 @@
   "devDependencies": {
     "@types/hls.js": "^0.13.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/leaflet": "^1.9.21",
     "@types/lodash": "^4.17.20",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",
