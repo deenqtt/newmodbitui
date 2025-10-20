@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { getAuthFromCookie } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthFromCookie } from "@/lib/auth";
 
-// GET semua tenants
-export async function GET(request: Request) {
+// GET /api/tenants - Get all tenants
+export async function GET(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
   if (!auth) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -11,34 +11,43 @@ export async function GET(request: Request) {
 
   try {
     const tenants = await prisma.tenant.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        company: true,
-        email: true,
-        phone: true,
-        address: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        isActive: true,
-        notes: true,
+      include: {
+        locations: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            nodeType: true,
+            longitude: true,
+            latitude: true,
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
       },
     });
 
-    return NextResponse.json(tenants);
+    // Add location count for each tenant
+    const tenantsWithStats = tenants.map(tenant => ({
+      ...tenant,
+      locationCount: tenant.locations.length,
+      activeLocations: tenant.locations.filter(loc => Boolean(loc.status) === true).length,
+      inactiveLocations: tenant.locations.filter(loc => Boolean(loc.status) === false).length,
+    }));
+
+    return NextResponse.json(tenantsWithStats);
   } catch (error) {
     console.error("Error fetching tenants:", error);
     return NextResponse.json(
-      { message: "Terjadi kesalahan saat mengambil data tenant" },
+      { message: "Failed to fetch tenants" },
       { status: 500 }
     );
   }
 }
 
-// POST tenant baru
-export async function POST(request: Request) {
+// POST /api/tenants - Create new tenant
+export async function POST(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
   if (!auth) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -49,7 +58,7 @@ export async function POST(request: Request) {
 
     if (!name || !email) {
       return NextResponse.json(
-        { message: "Nama dan email wajib diisi" },
+        { message: "Name and email are required" },
         { status: 400 }
       );
     }
@@ -64,33 +73,56 @@ export async function POST(request: Request) {
         status: status || "active",
         notes,
       },
-      select: {
-        id: true,
-        name: true,
-        company: true,
-        email: true,
-        phone: true,
-        address: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        isActive: true,
-        notes: true,
+      include: {
+        locations: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            nodeType: true,
+          },
+        },
       },
     });
 
-    return NextResponse.json(newTenant, { status: 201 });
+    return NextResponse.json({ ...newTenant, locationCount: newTenant.locations.length }, { status: 201 });
   } catch (error: any) {
     if (error.code === "P2002") {
       return NextResponse.json(
-        { message: "Nama atau email tenant sudah terdaftar" },
+        { message: "Tenant name or email already exists" },
         { status: 409 }
       );
     }
     console.error("Error creating tenant:", error);
     return NextResponse.json(
-      { message: "Terjadi kesalahan saat membuat tenant" },
+      { message: "Failed to create tenant" },
       { status: 500 }
     );
   }
+}
+
+// PUT /api/tenants - Bulk update (optional, for future use)
+export async function PUT(request: NextRequest) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  return NextResponse.json(
+    { message: "Bulk update not supported. Use /api/tenants/[id] for individual updates" },
+    { status: 405 }
+  );
+}
+
+// DELETE /api/tenants - Bulk delete (optional, for future use)
+export async function DELETE(request: NextRequest) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  return NextResponse.json(
+    { message: "Bulk delete not supported. Use /api/tenants/[id] for individual deletion" },
+    { status: 405 }
+  );
 }

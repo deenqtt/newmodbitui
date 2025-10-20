@@ -2,6 +2,119 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+async function seedTenantsAndLocations() {
+  console.log('🏢🔗 Seeding tenants and node locations...');
+
+  try {
+    // First seed tenants
+    const tenants = await seedTenants();
+
+    // Then seed node locations (which depend on tenants)
+    const locations = await seedNodeLocations();
+
+    console.log(`🎉 Combined seeding completed!`);
+    console.log(`   🏢 Tenants: ${tenants.length}`);
+    console.log(`   📍 Node Locations: ${locations.length}`);
+    console.log(`   🔗 Tenant-Assigned Locations: ${locations.filter(l => l.tenantId).length}`);
+    console.log(`   📍 Standalone Locations: ${locations.filter(l => !l.tenantId).length}`);
+
+    return { tenants, locations };
+  } catch (error) {
+    console.error('❌ Error in combined tenant and location seeding:', error);
+    throw error;
+  }
+}
+
+async function seedTenants() {
+  console.log('🏢 Seeding tenants...');
+
+  try {
+    // Create sample tenants
+    const tenants = [
+      {
+        name: 'Server',
+        company: 'Server Infrastructure',
+        email: 'server@server.co.id',
+        phone: '+62-21-5678-9012',
+        address: 'Jl. Server No. 1, Jakarta Selatan, DKI Jakarta',
+        status: 'active',
+        notes: 'Server infrastructure and data center management'
+      },
+      {
+        name: 'PT. Jakarta Data Center',
+        company: 'Jakarta Data Center',
+        email: 'admin@jdc.co.id',
+        phone: '+62-21-1234-5678',
+        address: 'Jl. Sudirman No. 45, Jakarta Pusat, DKI Jakarta',
+        status: 'active',
+        notes: 'Main data center provider in Jakarta area'
+      },
+      {
+        name: 'PT. Surabaya Technology Hub',
+        company: 'Surabaya Tech Hub',
+        email: 'contact@sth.co.id',
+        phone: '+62-31-8765-4321',
+        address: 'Jl. Tunjungan No. 123, Surabaya, Jawa Timur',
+        status: 'active',
+        notes: 'Technology hub serving East Java region'
+      },
+      {
+        name: 'PT. Bandung Digital Solutions',
+        company: 'Bandung Digital',
+        email: 'info@bdigital.co.id',
+        phone: '+62-22-5566-7788',
+        address: 'Jl. Asia Afrika No. 78, Bandung, Jawa Barat',
+        status: 'active',
+        notes: 'Digital solutions provider in Bandung area'
+      },
+      {
+        name: 'PT. Medan Cloud Services',
+        company: 'Medan Cloud',
+        email: 'support@medancloud.co.id',
+        phone: '+62-61-4455-6677',
+        address: 'Jl. Diponegoro No. 234, Medan, Sumatera Utara',
+        status: 'inactive',
+        notes: 'Cloud services provider in North Sumatra'
+      },
+      {
+        name: 'PT. Bali Digital Island',
+        company: 'Bali Digital',
+        email: 'hello@balidigital.co.id',
+        phone: '+62-361-8888-9999',
+        address: 'Jl. Raya Kuta No. 567, Kuta, Bali',
+        status: 'active',
+        notes: 'Digital innovation hub in Bali tourism area'
+      },
+      {
+        name: 'PT. Makassar Enterprise Network',
+        company: 'Makassar Enterprise',
+        email: 'admin@makassar-ent.co.id',
+        phone: '+62-411-3333-4444',
+        address: 'Jl. Penghibur No. 89, Makassar, Sulawesi Selatan',
+        status: 'active',
+        notes: 'Enterprise networking solutions in Makassar'
+      }
+    ];
+
+    const createdTenants = [];
+    for (const tenantData of tenants) {
+      const tenant = await prisma.tenant.upsert({
+        where: { email: tenantData.email },
+        update: {},
+        create: tenantData,
+      });
+      createdTenants.push(tenant);
+      console.log(`✓ Created tenant: ${tenant.name}`);
+    }
+
+    console.log(`✅ ${createdTenants.length} tenants seeded successfully`);
+    return createdTenants;
+  } catch (error) {
+    console.error('❌ Error seeding tenants:', error);
+    throw error;
+  }
+}
+
 async function seedNodeLocations() {
   console.log('📍 Seeding node tenant locations...');
 
@@ -39,7 +152,7 @@ async function seedNodeLocations() {
         description: 'Digital campus facility in Bandung',
         status: true,
         nodeType: 'node',
-        tenantIndex: 2 // PT. Bandung Digital Solutions
+        tenantIndex: 3 // PT. Bandung Digital Solutions
       },
 
       // Bali area
@@ -52,7 +165,7 @@ async function seedNodeLocations() {
         description: 'Tourism digital services hub',
         status: true,
         nodeType: 'node',
-        tenantIndex: 4 // PT. Bali Digital Island
+        tenantIndex: 5 // PT. Bali Digital Island
       },
 
       // Medan area
@@ -65,7 +178,7 @@ async function seedNodeLocations() {
         description: 'Cloud computing center',
         status: true,
         nodeType: 'node',
-        tenantIndex: 3 // PT. Medan Cloud Services
+        tenantIndex: 4 // PT. Medan Cloud Services
       },
 
       // Makassar area
@@ -78,7 +191,7 @@ async function seedNodeLocations() {
         description: 'Enterprise networking hub',
         status: true,
         nodeType: 'node',
-        tenantIndex: 5 // PT. Makassar Enterprise Network
+        tenantIndex: 6 // PT. Makassar Enterprise Network
       },
 
       // Batam area (Riau Islands)
@@ -89,7 +202,7 @@ async function seedNodeLocations() {
         url: 'https://batam-industrial.bi-zone.co.id',
         topic: 'iot/batam/industrial/zone',
         description: 'Industrial monitoring zone in Batam',
-        status: true,
+        status: false, // Inactive location
         nodeType: 'node',
         tenantIndex: null
       },
@@ -128,7 +241,7 @@ async function seedNodeLocations() {
         url: 'https://balikpapan-oil.e-kalimantan.co.id',
         topic: 'iot/balikpapan/oil/hub',
         description: 'Oil and gas monitoring hub in Balikpapan',
-        status: true,
+        status: false, // Temporarily inactive
         nodeType: 'node',
         tenantIndex: null
       }
@@ -197,13 +310,15 @@ async function seedNodeLocations() {
         }
       });
 
-      console.log(`✓ Upserted location: ${location.name} (${tenantName}) - nodeType: ${location.nodeType}`);
+      console.log(`✓ Upserted location: ${location.name} (${tenantName}) - nodeType: ${location.nodeType} - status: ${location.status}`);
       createdLocations.push(location);
     }
 
     console.log(`✅ ${createdLocations.length} node tenant locations seeded successfully`);
-    console.log(`   📊 Tenant-assigned: ${createdLocations.filter(l => l.tenantId !== '').length}`);
-    console.log(`   📍 Standalone: ${createdLocations.filter(l => l.tenantId === '').length}`);
+    console.log(`   📊 Tenant-assigned: ${createdLocations.filter(l => l.tenantId !== null).length}`);
+    console.log(`   📍 Standalone: ${createdLocations.filter(l => l.tenantId === null).length}`);
+    console.log(`   ✅ Active: ${createdLocations.filter(l => l.status === true).length}`);
+    console.log(`   ⚠️ Inactive: ${createdLocations.filter(l => l.status === false).length}`);
 
     return createdLocations;
   } catch (error) {
@@ -214,18 +329,20 @@ async function seedNodeLocations() {
 
 // Export for use in other scripts
 module.exports = {
+  seedTenantsAndLocations,
+  seedTenants,
   seedNodeLocations,
-  default: seedNodeLocations
+  default: seedTenantsAndLocations
 };
 
 // Run if called directly
 if (require.main === module) {
-  seedNodeLocations()
+  seedTenantsAndLocations()
     .then(() => {
-      console.log('📍 Node tenant location seeding completed!');
+      console.log('🏢🔗 Combined tenant and location seeding completed successfully!');
     })
     .catch((error) => {
-      console.error('❌ Node tenant location seeding failed:', error);
+      console.error('❌ Combined tenant and location seeding failed:', error);
       process.exit(1);
     })
     .finally(() => {

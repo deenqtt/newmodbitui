@@ -69,8 +69,8 @@ export function getEnvMQTTBrokerUrl(): string {
 
   if (isDevelopment) {
     // Development: Use ENV variables
-    host = process.env.NEXT_PUBLIC_MQTT_BROKER_HOST || "192.168.0.193";
-    port = process.env.NEXT_PUBLIC_MQTT_BROKER_PORT || "9000";
+    host = process.env.NEXT_PUBLIC_MQTT_HOST || "localhost";
+    port = process.env.NEXT_PUBLIC_MQTT_PORT || "9000";
     protocol = "ws";
     console.log(`Config: Development mode - MQTT broker: ${host}:${port}`);
   } else if (isProduction) {

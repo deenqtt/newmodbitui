@@ -1,0 +1,388 @@
+{
+  "generated_at": "2025-10-20T03:38:25.820Z",
+  "total_payloads": 12,
+  "topics_covered": 4,
+  "payloads": [
+    {
+      "timestamp": "2025-10-20T03:38:25.749Z",
+      "device_id": "dc",
+      "topic": "iot/server/main/dc",
+      "status": "online",
+      "uptime": 5577,
+      "type": "server_monitor",
+      "data_center_metrics": {
+        "temperature": 28.92016998127169,
+        "humidity": 46.416310368403444,
+        "cpu_temp": 37.79837720979683,
+        "ram_usage_percent": 39,
+        "cpu_usage_percent": 0,
+        "disk_usage_percent": 20,
+        "network_rx_mbps": 400.88431854827024,
+        "network_tx_mbps": 391.66263790270983,
+        "active_connections": 423
+      },
+      "power_metrics": {
+        "main_voltage": 215.10332542628646,
+        "current_phase_a": 17.207572931655157,
+        "current_phase_b": 22.07299176996596,
+        "current_phase_c": 11.597191865759985,
+        "power_factor": 0.823079051398836,
+        "total_power_kw": 6.850209518666794
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.816Z",
+      "device_id": "dc",
+      "topic": "iot/server/main/dc",
+      "status": "online",
+      "uptime": 77261,
+      "type": "server_monitor",
+      "data_center_metrics": {
+        "temperature": 25.690005083894558,
+        "humidity": 61.57686955148778,
+        "cpu_temp": 41.88110781254847,
+        "ram_usage_percent": 28,
+        "cpu_usage_percent": 50,
+        "disk_usage_percent": 39,
+        "network_rx_mbps": 280.960513660379,
+        "network_tx_mbps": 140.87959267412865,
+        "active_connections": 393
+      },
+      "power_metrics": {
+        "main_voltage": 220.2585013699254,
+        "current_phase_a": 12.951547574336217,
+        "current_phase_b": 27.729375974393516,
+        "current_phase_c": 11.959190054167706,
+        "power_factor": 0.9964684248461634,
+        "total_power_kw": 21.76029731407835
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.817Z",
+      "device_id": "dc",
+      "topic": "iot/server/main/dc",
+      "status": "online",
+      "uptime": 62032,
+      "type": "server_monitor",
+      "data_center_metrics": {
+        "temperature": 28.946539875334004,
+        "humidity": 63.28417006469517,
+        "cpu_temp": 55.852800107058144,
+        "ram_usage_percent": 7,
+        "cpu_usage_percent": 27,
+        "disk_usage_percent": 34,
+        "network_rx_mbps": 912.8107546900177,
+        "network_tx_mbps": 54.242957339185494,
+        "active_connections": 100
+      },
+      "power_metrics": {
+        "main_voltage": 216.03694092730376,
+        "current_phase_a": 17.163234585809015,
+        "current_phase_b": 14.14784062814915,
+        "current_phase_c": 15.91447149473954,
+        "power_factor": 0.9739825159375054,
+        "total_power_kw": 6.881495835955125
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.817Z",
+      "device_id": "campus",
+      "topic": "iot/bandung/digital/campus",
+      "status": "online",
+      "uptime": 14164,
+      "type": "campus_monitoring",
+      "environment": {
+        "indoor_temp": 29.22849938228223,
+        "humidity_percent": 53.04045079735694,
+        "air_quality_ppm": 584.471463921473,
+        "noise_level_db": 38.33678800105559,
+        "light_level_lux": 910.1523968629373,
+        "occupancy_count": 80
+      },
+      "building_systems": {
+        "hvac_status": "standby",
+        "lighting_system": "auto",
+        "security_system": "armed",
+        "fire_alarm": "normal",
+        "elevator_status": "operational",
+        "backup_power": "battery"
+      },
+      "digital_services": {
+        "wifi_clients": 153,
+        "network_devices": 13,
+        "server_response_ms": 91.05670358306695,
+        "uptime_percent": 99.73010177436743,
+        "active_sessions": 309,
+        "bandwidth_usage_mbps": 74.60370804133927
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.817Z",
+      "device_id": "campus",
+      "topic": "iot/bandung/digital/campus",
+      "status": "online",
+      "uptime": 83229,
+      "type": "campus_monitoring",
+      "environment": {
+        "indoor_temp": 24.654180428324057,
+        "humidity_percent": 67.98784593008986,
+        "air_quality_ppm": 987.9872926788945,
+        "noise_level_db": 31.768136525808124,
+        "light_level_lux": 717.5888375140289,
+        "occupancy_count": 73
+      },
+      "building_systems": {
+        "hvac_status": "running",
+        "lighting_system": "auto",
+        "security_system": "armed",
+        "fire_alarm": "normal",
+        "elevator_status": "operational",
+        "backup_power": "battery"
+      },
+      "digital_services": {
+        "wifi_clients": 118,
+        "network_devices": 16,
+        "server_response_ms": 95.35323018193552,
+        "uptime_percent": 99.92432722917933,
+        "active_sessions": 263,
+        "bandwidth_usage_mbps": 69.19452092000253
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.818Z",
+      "device_id": "campus",
+      "topic": "iot/bandung/digital/campus",
+      "status": "online",
+      "uptime": 11577,
+      "type": "campus_monitoring",
+      "environment": {
+        "indoor_temp": 25.22393754852207,
+        "humidity_percent": 53.41704054221316,
+        "air_quality_ppm": 673.1865253066383,
+        "noise_level_db": 51.6088183402072,
+        "light_level_lux": 551.8867069365338,
+        "occupancy_count": 1
+      },
+      "building_systems": {
+        "hvac_status": "running",
+        "lighting_system": "auto",
+        "security_system": "armed",
+        "fire_alarm": "normal",
+        "elevator_status": "operational",
+        "backup_power": "battery"
+      },
+      "digital_services": {
+        "wifi_clients": 55,
+        "network_devices": 27,
+        "server_response_ms": 73.99083326136393,
+        "uptime_percent": 99.19116407756941,
+        "active_sessions": 843,
+        "bandwidth_usage_mbps": 74.02632657989136
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.818Z",
+      "device_id": "hub",
+      "topic": "iot/bali/tourism/hub",
+      "status": "online",
+      "uptime": 55886,
+      "type": "network_gateway",
+      "network_status": {
+        "wan_connected": true,
+        "wan_ip": "192.168.1.118",
+        "lan_connected": true,
+        "lan_clients": 14,
+        "wifi_connected": true,
+        "wifi_clients": 25,
+        "vpn_active": true
+      },
+      "network_metrics": {
+        "wan_download_mbps": 69.03660407903361,
+        "wan_upload_mbps": 22.378901997057497,
+        "lan_traffic_rx_mbps": 490.2646242084583,
+        "lan_traffic_tx_mbps": 813.3672322970833,
+        "signal_strength_dbm": -23.43824388208421,
+        "ping_ms": 25.88535376417825,
+        "packet_loss_percent": 0.10768236720619662,
+        "jitter_ms": 1.949727324088063
+      },
+      "security_metrics": {
+        "firewall_active": true,
+        "intrusion_attempts": 7,
+        "failed_logins": 1,
+        "active_connections": 88,
+        "bandwidth_usage_percent": 75
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.818Z",
+      "device_id": "hub",
+      "topic": "iot/bali/tourism/hub",
+      "status": "online",
+      "uptime": 17384,
+      "type": "network_gateway",
+      "network_status": {
+        "wan_connected": true,
+        "wan_ip": "192.168.1.157",
+        "lan_connected": true,
+        "lan_clients": 20,
+        "wifi_connected": true,
+        "wifi_clients": 20,
+        "vpn_active": true
+      },
+      "network_metrics": {
+        "wan_download_mbps": 77.98343284478095,
+        "wan_upload_mbps": 18.19155790679353,
+        "lan_traffic_rx_mbps": 80.44821681549297,
+        "lan_traffic_tx_mbps": 902.1091085395727,
+        "signal_strength_dbm": -22.66466930927691,
+        "ping_ms": 25.580898490583106,
+        "packet_loss_percent": 1.921786650514179,
+        "jitter_ms": 3.9403432495294988
+      },
+      "security_metrics": {
+        "firewall_active": true,
+        "intrusion_attempts": 3,
+        "failed_logins": 4,
+        "active_connections": 16,
+        "bandwidth_usage_percent": 50
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.818Z",
+      "device_id": "hub",
+      "topic": "iot/bali/tourism/hub",
+      "status": "online",
+      "uptime": 1727,
+      "type": "network_gateway",
+      "network_status": {
+        "wan_connected": true,
+        "wan_ip": "192.168.1.135",
+        "lan_connected": true,
+        "lan_clients": 5,
+        "wifi_connected": true,
+        "wifi_clients": 10,
+        "vpn_active": true
+      },
+      "network_metrics": {
+        "wan_download_mbps": 63.97349168180027,
+        "wan_upload_mbps": 37.059829249646995,
+        "lan_traffic_rx_mbps": 173.2661957531052,
+        "lan_traffic_tx_mbps": 570.7501191514386,
+        "signal_strength_dbm": -11.120201796927635,
+        "ping_ms": 10.929549711881869,
+        "packet_loss_percent": 0.417161180788141,
+        "jitter_ms": 2.348880336533999
+      },
+      "security_metrics": {
+        "firewall_active": true,
+        "intrusion_attempts": 5,
+        "failed_logins": 3,
+        "active_connections": 57,
+        "bandwidth_usage_percent": 43
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.819Z",
+      "device_id": "zone",
+      "topic": "iot/batam/industrial/zone",
+      "status": "online",
+      "uptime": 47075,
+      "type": "industrial_monitor",
+      "machine_status": {
+        "conveyor_running": true,
+        "motor_1_running": true,
+        "motor_2_running": true,
+        "pump_active": true,
+        "valve_open": true,
+        "emergency_stop": false,
+        "maintenance_mode": false
+      },
+      "process_metrics": {
+        "production_rate_ppm": 200,
+        "efficiency_percent": 89.43707002922808,
+        "cycle_time_seconds": 31.21060232663514,
+        "temperature_c": 56.467942300583324,
+        "pressure_psi": 114.71909867552492,
+        "vibration_mm_s": 3.1953312766698905,
+        "noise_db": 72.88906785806502
+      },
+      "equipment_health": {
+        "bearing_temperature": 67.12016054640213,
+        "oil_pressure": 47.771496565880334,
+        "oil_temperature": 76.41768965212243,
+        "motor_current_a": 6.762262118312363,
+        "power_consumption_kw": 18.542236261386304,
+        "runtime_hours": 7556.079792840062
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.819Z",
+      "device_id": "zone",
+      "topic": "iot/batam/industrial/zone",
+      "status": "online",
+      "uptime": 54912,
+      "type": "industrial_monitor",
+      "machine_status": {
+        "conveyor_running": true,
+        "motor_1_running": true,
+        "motor_2_running": true,
+        "pump_active": true,
+        "valve_open": true,
+        "emergency_stop": false,
+        "maintenance_mode": false
+      },
+      "process_metrics": {
+        "production_rate_ppm": 271,
+        "efficiency_percent": 94.5485204466684,
+        "cycle_time_seconds": 34.108197423585736,
+        "temperature_c": 48.6811064757277,
+        "pressure_psi": 78.74725642519964,
+        "vibration_mm_s": 1.1221919425890947,
+        "noise_db": 85.47328764305827
+      },
+      "equipment_health": {
+        "bearing_temperature": 61.84550043641896,
+        "oil_pressure": 45.76785721617506,
+        "oil_temperature": 70.46099820314133,
+        "motor_current_a": 7.063165869982113,
+        "power_consumption_kw": 24.817726729573074,
+        "runtime_hours": 1416.0719011366837
+      }
+    },
+    {
+      "timestamp": "2025-10-20T03:38:25.819Z",
+      "device_id": "zone",
+      "topic": "iot/batam/industrial/zone",
+      "status": "online",
+      "uptime": 50290,
+      "type": "industrial_monitor",
+      "machine_status": {
+        "conveyor_running": true,
+        "motor_1_running": true,
+        "motor_2_running": true,
+        "pump_active": true,
+        "valve_open": true,
+        "emergency_stop": false,
+        "maintenance_mode": false
+      },
+      "process_metrics": {
+        "production_rate_ppm": 201,
+        "efficiency_percent": 85.14289482780437,
+        "cycle_time_seconds": 44.510900020999074,
+        "temperature_c": 59.18084099439243,
+        "pressure_psi": 82.77883370062983,
+        "vibration_mm_s": 8.68287023219565,
+        "noise_db": 96.71159183122558
+      },
+      "equipment_health": {
+        "bearing_temperature": 74.5323488433477,
+        "oil_pressure": 56.568104985258806,
+        "oil_temperature": 73.69693199259925,
+        "motor_current_a": 6.818027895839956,
+        "power_consumption_kw": 14.7522896253472,
+        "runtime_hours": 3620.60281612876
+      }
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, RefreshCw } from "lucide-react";
+import { MapPin, RefreshCw, Server, Wifi } from "lucide-react";
 
 // Dynamically import Map component to avoid SSR issues with Leaflet
 const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), {
@@ -61,9 +61,9 @@ interface NodeTenantLocation {
   url: string | null;
   topic: string | null;
   description: string | null;
-  status: string;
+  status: boolean;
   nodeType: string | null;
-  tenantId: string;
+  tenantId: string | null;
   tenant?: {
     id: string;
     name: string;
@@ -82,7 +82,12 @@ export default function ManageNodeMapPage() {
 
   useEffect(() => {
     fetchLocations();
+    // Auto-refresh location data every 1 minute to reflect status changes
+    const interval = setInterval(fetchLocations, 60000); // 60 seconds = 1 minute
+    return () => clearInterval(interval);
+  }, []);
 
+  useEffect(() => {
     // Fix for default marker icon and create custom icons
     if (typeof window !== 'undefined') {
       import('leaflet').then((L) => {
@@ -104,11 +109,6 @@ export default function ManageNodeMapPage() {
         setCreateIcon(() => iconCreator);
       });
     }
-
-    // Cleanup when component unmounts
-    return () => {
-      setMapKey(prev => prev + 1);
-    };
   }, []);
 
   const fetchLocations = async () => {
@@ -131,14 +131,11 @@ export default function ManageNodeMapPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">Active</Badge>;
-      case "inactive":
-        return <Badge variant="secondary">Inactive</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const getStatusBadge = (status: boolean) => {
+    if (status) {
+      return <Badge variant="default">Active</Badge>;
+    } else {
+      return <Badge variant="secondary">Inactive</Badge>;
     }
   };
 
@@ -231,8 +228,8 @@ export default function ManageNodeMapPage() {
                   return nodeLocations
                     .flatMap((location, locationIndex) =>
                       serverNodes.map((serverNode, serverIndex) => {
-                        const isActiveConnection = location.status === 'active' && serverNode.status === 'active';
-                        const lineColor = isActiveConnection ? '#00fc3fff' : '#ef4444';
+                        const isActiveConnection = location.status;
+                        const lineColor = isActiveConnection ? '#00b42dff' : '#e50b0bff';
                         const lineOpacity = isActiveConnection ? 0.7 : 0.5;
 
                         return (
@@ -246,7 +243,7 @@ export default function ManageNodeMapPage() {
                               color: lineColor,
                               weight: 2,
                               opacity: lineOpacity,
-                              dashArray: isActiveConnection ? undefined : '5, 5',
+                              dashArray: '5, 5',
                             }}
                           />
                         );
@@ -259,8 +256,8 @@ export default function ManageNodeMapPage() {
                   const isServer = location.nodeType === 'server';
 
                   const iconUrl = isServer
-                    ? (location.status === "active" ? "/server-green.svg" : "/server-red.svg")
-                    : (location.status === "active" ? "/router-green.svg" : "/router-red.svg");
+                    ? (location.status ? "/server-green.svg" : "/server-red.svg")
+                    : (location.status ? "/router-green.svg" : "/router-red.svg");
 
                   // Create icon with different sizes for server vs router
                   const icon = createIcon ? createIcon(iconUrl, isServer ? 32 : 24) : undefined;
@@ -272,44 +269,65 @@ export default function ManageNodeMapPage() {
                       icon={icon}
                     >
                     <Popup>
-                      <div>
-                        <h3 className="font-semibold text-lg mb-3 text-dark">{location.name}</h3>
+                      <div className="min-w-[280px] max-w-[400px] p-4 bg-background border border-border rounded-lg shadow-lg">
+                        <div className="flex items-start gap-3 mb-4">
+                          {location.nodeType === "server" ? (
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                              <Server className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                              <Wifi className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </div>
+                          )}
 
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground font-medium">Status:</span>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-lg text-foreground mb-1 truncate">
+                              {location.name}
+                            </h3>
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {location.nodeType} Node
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Status:</span>
                             {getStatusBadge(location.status)}
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground font-medium">Tenant:</span>
-                            {getTenantBadge(location)}
+                          <div className="flex items-start justify-between">
+                            <span className="text-sm font-medium text-muted-foreground mr-2">Tenant:</span>
+                            <div className="flex-1 min-w-0 text-right">
+                              {getTenantBadge(location)}
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground font-medium">Coordinates:</span>
-                            <span className="font-mono text-xs bg-muted/30 px-1 py-0.5 rounded text-foreground">
-                              {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">Coordinates:</span>
+                            <span className="font-mono text-xs bg-muted/50 px-2 py-1 rounded text-muted-foreground border">
+                              {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                             </span>
                           </div>
 
                           {location.topic && (
-                            <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground font-medium">Topic:</span>
-                              <code className="bg-muted/30 px-1 py-0.5 rounded text-xs break-all text-foreground">
+                            <div className="space-y-1">
+                              <span className="text-sm font-medium text-muted-foreground block">MQTT Topic:</span>
+                              <code className="bg-muted/50 px-2 py-1 rounded text-xs break-all text-foreground border block">
                                 {location.topic}
                               </code>
                             </div>
                           )}
 
                           {location.url && (
-                            <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground font-medium">URL:</span>
+                            <div className="space-y-1">
+                              <span className="text-sm font-medium text-muted-foreground block">URL:</span>
                               <a
                                 href={location.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline text-xs break-all"
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm break-all block hover:bg-blue-50 dark:hover:bg-blue-950/30 px-2 py-1 rounded border"
                               >
                                 {location.url}
                               </a>
@@ -317,9 +335,11 @@ export default function ManageNodeMapPage() {
                           )}
 
                           {location.description && (
-                            <div className="mt-3 pt-2 border-t border-border">
-                              <span className="text-muted-foreground font-medium block mb-1">Description:</span>
-                              <p className="text-sm text-foreground leading-relaxed">{location.description}</p>
+                            <div className="mt-4 pt-3 border-t border-border">
+                              <span className="text-sm font-medium text-muted-foreground block mb-2">Description:</span>
+                              <p className="text-sm text-foreground leading-relaxed">
+                                {location.description}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -356,7 +376,7 @@ export default function ManageNodeMapPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Active</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {locations.filter((loc) => loc.status === "active").length}
+                    {locations.filter((loc) => loc.status).length}
                   </p>
                 </div>
                 <div className="p-2 bg-green-100 rounded-full">
@@ -372,7 +392,7 @@ export default function ManageNodeMapPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Inactive</p>
                   <p className="text-2xl font-bold text-red-600">
-                    {locations.filter((loc) => loc.status === "inactive").length}
+                    {locations.filter((loc) => !loc.status).length}
                   </p>
                 </div>
                 <div className="p-2 bg-red-100 rounded-full">

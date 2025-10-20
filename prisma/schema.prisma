@@ -160,6 +160,7 @@ model DeviceExternal {
   layout2DDataPoints          Layout2DDataPoint[]
   layout2DFlowIndicators      Layout2DFlowIndicator[]
   maintenanceTasks            Maintenance[]
+  thermalData                 ThermalData[]
   powerAnalyzerApiTopicConfig PowerAnalyzerConfiguration? @relation("PowerAnalyzerApiTopic")
   pueApiTopicConfig           PueConfiguration?           @relation("PueApiTopic")
 }
@@ -173,9 +174,12 @@ model LoggingConfiguration {
   deviceUniqId String
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  lastLoggedAt DateTime?
+  
+  loggingIntervalMinutes Int  @default(10)
+  
   logs         LoggedData[]
   device       DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
-
   @@unique([deviceUniqId, key])
 }
 
@@ -477,154 +481,20 @@ model GatewayStats {
   gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
 }
 
-model EC25Modem {
-  id           String  @id @default(cuid())
-  imei         String  @unique
-  manufacturer String?
-  model        String?
-  revision     String?
 
-  // Connection status
-  connected Boolean  @default(false)
-  lastSeen  DateTime @default(now())
-
-  // Current network status (latest data, bukan log)
-  currentOperator           String?
-  currentRegistrationStatus String?
-  currentNetworkType        String?
-  currentSignalStrength     Int?
-  currentSignalQuality      Int?
-
-  // Detailed signal info
-  currentRsrp   Float?
-  currentRsrq   Float?
-  currentSinr   Float?
-  currentCellId String?
-
-  // Current GPS position (latest data, bukan log)
-  currentLatitude     Float?
-  currentLongitude    Float?
-  currentAltitude     Float?
-  currentSpeed        Float?
-  currentSatellites   Int?
-  currentGpsFixStatus String?
-
-  // Configuration
-  configApn      String?
-  configUsername String?
-  configPin      String?
-
-  // Relations to historical data
-  networkHistory EC25NetworkData[]
-  gpsHistory     EC25GpsData[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ec25_modems")
-}
-
-// Historical network data - hanya disimpan saat ada perubahan signifikan
-model EC25NetworkData {
-  id      String    @id @default(cuid())
-  modemId String
-  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
-
-  operator           String?
-  registrationStatus String?
-  networkType        String?
-  signalStrength     Int?
-  signalQuality      Int?
-
-  createdAt DateTime @default(now())
-
-  @@index([modemId, createdAt])
-  @@map("ec25_network_data")
-}
-
-// Historical GPS data - hanya disimpan saat ada perubahan lokasi signifikan
-model EC25GpsData {
-  id      String    @id @default(cuid())
-  modemId String
-  modem   EC25Modem @relation(fields: [modemId], references: [id], onDelete: Cascade)
-
-  fixStatus  String?
-  latitude   Float?
-  longitude  Float?
-  altitude   Float?
-  speed      Float?
-  satellites Int?
-
-  createdAt DateTime @default(now())
-
-  @@index([modemId, createdAt])
-  @@index([latitude, longitude])
-  @@map("ec25_gps_data")
-}
-
-// Service health monitoring
-model EC25ServiceHealth {
-  id            String    @id @default(cuid())
-  serviceId     String    @unique
-  status        String
-  lastSeen      DateTime
-  lastHeartbeat DateTime?
-  uptime        Float?
-  memoryUsage   String? // JSON string
-  data          String? // JSON string for additional data
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("ec25_service_health")
-}
-
-// Service status logs - untuk audit trail
-model EC25ServiceLog {
-  id        String  @id @default(cuid())
-  serviceId String
-  status    String
-  uptime    Float?
-  data      String? // JSON string
-
-  createdAt DateTime @default(now())
-
-  @@index([serviceId, createdAt])
-  @@map("ec25_service_logs")
-}
-
-// Alerts dari modem service
-model EC25Alert {
-  id             String    @id @default(cuid())
-  type           String
-  message        String
-  severity       String // info, warning, error, critical
-  requiresAction Boolean   @default(false)
-  details        String? // JSON string
-  resolved       Boolean   @default(false)
-  resolvedAt     DateTime?
-  resolvedBy     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([resolved, createdAt])
-  @@index([severity, createdAt])
-  @@map("ec25_alerts")
-}
-
-// Command logs - untuk audit trail commands
-model EC25CommandLog {
-  id      String  @id @default(cuid())
-  command String
-  status  String
-  message String?
-  data    String? // JSON string
-
-  createdAt DateTime @default(now())
-
-  @@index([command, createdAt])
-  @@map("ec25_command_logs")
+model ThermalData {
+  id        Int      @id @default(autoincrement())
+  deviceId  String
+  timestamp DateTime @default(now())
+  minTemp   Float?
+  maxTemp   Float?
+  avgTemp   Float?
+  // rawData   String?  // REMOVED - tidak perlu disimpan
+  frameCount Int?     // Optional: untuk tracking frame number
+  
+  device    DeviceExternal @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@index([deviceId, timestamp])
 }
 
 enum AlarmType {
@@ -685,17 +555,36 @@ model NodeTenantLocation {
   url         String?
   topic       String?
   description String?
-  status      String    @default("active") // active, inactive
-  nodeType    String    @default("node") // "server" or "node" - distinguishes server nodes from regular nodes
+  status      Boolean   @default(false) // Auto update to true when MQTT payload received
+  nodeType    String    @default("node") // "server" or "node"
   tenantId    String?   // Optional foreign key for locations assigned to tenants
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  isActive    Boolean   @default(true)
+  isActive    Boolean   @default(true) // General active/inactive for soft deletes
+
+  // MQTT payload tracking
+  mqttPayloads NodeLocationMqttPayload[]
 
   // Relations
   tenant      Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@map("NodeTenantLocation")
+}
+
+model NodeLocationMqttPayload {
+  id           String            @id @default(cuid())
+  locationId   String
+  topic        String            // MQTT topic
+  payload      Json              // MQTT payload data
+  receivedAt   DateTime          @default(now()) // When MQTT message received
+  messageId    String?           // MQTT message ID if available
+
+  // Relations
+  location     NodeTenantLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, receivedAt])
+  @@index([topic])
+  @@map("NodeLocationMqttPayload")
 }
 
 model Rack {

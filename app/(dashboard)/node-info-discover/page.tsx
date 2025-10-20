@@ -367,7 +367,7 @@ const NodeInfoDiscoverPage = () => {
           url: registerFormData.url || undefined,
           topic: selectedNode.topic, // Use the discovered topic
           description: registerFormData.description,
-          status: "active",
+          status: true,
           tenantId: registerFormData.tenantId === "none" ? "" : registerFormData.tenantId || "",
         }),
       });

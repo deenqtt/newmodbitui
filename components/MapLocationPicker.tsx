@@ -159,26 +159,6 @@ export default function MapLocationPicker({
   const [clickedPosition, setClickedPosition] = useState<[number, number] | null>(null);
   const [serverNodes, setServerNodes] = useState<any[]>([]);
 
-  // Fetch server nodes for connection lines
-  useEffect(() => {
-    const fetchServerNodes = async () => {
-      try {
-        const response = await fetch('/api/node-tenant-locations');
-        if (response.ok) {
-          const allLocations = await response.json();
-          // Filter only server type nodes
-          const servers = allLocations.filter((location: any) => location.nodeType === 'server');
-          setServerNodes(servers);
-        }
-      } catch (error) {
-        // Silently fail - lines are visual enhancement
-        console.warn('Could not fetch server nodes for connection lines');
-      }
-    };
-
-    fetchServerNodes();
-  }, []);
-
   const handleMapClick = (event: any) => {
     const lat = parseFloat(event.latlng.lat.toFixed(6));
     const lng = parseFloat(event.latlng.lng.toFixed(6));

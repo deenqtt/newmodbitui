@@ -311,6 +311,23 @@ run_seeders() {
 
     cd "$PROJECT_ROOT"
 
+    # 🔄 First run tenant and node location seeders (required by others)
+    log "Running prerequisite seeders..."
+    if node scripts/seed-tenants.js >/dev/null 2>&1; then
+        log_success "Tenants seeded successfully"
+    else
+        log_error "Tenant seeding failed"
+        exit 1
+    fi
+
+    if node scripts/seed-node-locations.js >/dev/null 2>&1; then
+        log_success "Node locations seeded successfully"
+    else
+        log_error "Node locations seeding failed"
+        exit 1
+    fi
+
+    # 🔄 Now run the main seeder with proper environment variables
     local seeder_env_vars=""
     [ "$ENABLE_USERS" = false ] && seeder_env_vars="$seeder_env_vars SEED_USERS=false"
     [ "$ENABLE_MENU" = false ] && seeder_env_vars="$seeder_env_vars SEED_MENU=false"

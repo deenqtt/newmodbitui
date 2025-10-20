@@ -165,8 +165,8 @@ async function seedMenu() {
       // System Config Group (Developer)
       { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'system', isActive: true, isDeveloper: true },
       { name: 'system-power-analyzer', label: 'Power Analyzer', path: '/system-config/power-analyzer', icon: 'Zap', order: 1, groupName: 'system', isActive: false, isDeveloper: true },
-      { name: 'system-tenant-management', label: 'Tenant Management', path: '/manage-tenants', icon: 'Building2', order: 2, groupName: 'system', isActive: false, isDeveloper: true },
-      { name: 'system-node-locations', label: 'Node Locations', path: '/manage-node-locations', icon: 'MapPin', order: 4, groupName: 'system', isActive: true, isDeveloper: true },
+      { name: 'system-tenant-management', label: 'Tenant Management', path: '/tenants', icon: 'Building2', order: 2, groupName: 'system', isActive: true, isDeveloper: true },
+      { name: 'system-node-locations', label: 'Node Locations', path: '/node-tenant-locations', icon: 'MapPin', order: 4, groupName: 'system', isActive: true, isDeveloper: true },
       { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 99, groupName: 'system', isActive: true, isDeveloper: true },
 
       // Analytics Group

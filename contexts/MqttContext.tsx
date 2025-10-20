@@ -170,21 +170,38 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetch("/api/cron/log-data").catch((err) => {
-        // Silently handle cron API errors
-      });
+  // DISABLED: Cron jobs are causing spam API calls. Run manually only when needed.
+  // useEffect(() => {
+  //   const intervalId = setInterval(() => {
+  //     if (!(window as any).cronLogDataFetched) {
+  //       (window as any).cronLogDataFetched = true;
 
-      fetch("/api/cron/bill-logger").catch((err) => {
-        // Silently handle cron API errors
-      });
-    }, 600000); // 600000 ms = 10 menit
+  //       fetch("/api/cron/log-data").catch((err) => {
+  //         // Silently handle cron API errors
+  //       }).finally(() => {
+  //         setTimeout(() => {
+  //           if (window as any) {
+  //             (window as any).cronLogDataFetched = false;
+  //           }
+  //         }, 60000); // Reset after 1 minute for log-data
+  //       });
+  //     }
 
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []);
+  //     if (!(window as any).cronBillLoggerFetched) {
+  //       (window as any).cronBillLoggerFetched = true;
+
+  //       fetch("/api/cron/bill-logger").catch((err) => {
+  //         // Silently handle cron API errors
+  //       }).finally(() => {
+  //         setTimeout(() => {
+  //           if (window as any) {
+  //             (window as any).cronBillLoggerFetched = false;
+  //           }
+  //         }, 60000); // Reset after 1 minute for bill-logger
+  //       });
+  //     }
+  //   }, 600000); // 600000 ms = 10 menit
+  // }, []);
 
   const value = { isReady, connectionStatus, publish, subscribe, unsubscribe };
 
