@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import MqttStatus from "@/components/ui/mqtt-status";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Compass,
   Zap,
@@ -117,6 +118,12 @@ const NodeInfoDiscoverPage = () => {
   // Device details modal
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
   const [selectedNodeForDevices, setSelectedNodeForDevices] = useState<DiscoveredNode | null>(null);
+
+  // Device registration modal
+  const [registerDeviceModalOpen, setRegisterDeviceModalOpen] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [selectedDevicesForRegistration, setSelectedDevicesForRegistration] = useState<any[]>([]);
+  const [registeringDevices, setRegisteringDevices] = useState(false);
 
   // Activity timeout for nodes (5 minutes)
   const NODE_TIMEOUT = 5 * 60 * 1000;
@@ -312,6 +319,49 @@ const NodeInfoDiscoverPage = () => {
     setDeviceModalOpen(true);
   };
 
+  // Handle opening device registration modal
+  const handleRegisterDevices = (node: DiscoveredNode) => {
+    const parsed = parsePayload(node.lastPayload);
+    const devicesForRegistration: any[] = [];
+
+    // Extract Modbus devices
+    if (parsed.deviceDetails?.modbus) {
+      parsed.deviceDetails.modbus.forEach((device: any, index: number) => {
+        if (device.profile?.topic && device.protocol_setting?.address) { // Only add if both topic and address exist
+          devicesForRegistration.push({
+            id: `modbus-${index}`,
+            topic: device.profile.topic,
+            address: device.protocol_setting.address,
+            protocolType: 'modbus',
+            manufacturer: device.profile?.manufacturer || '',
+            deviceType: device.profile?.device_type || '',
+            name: device.profile?.name || '', // Keep original name as default
+          });
+        }
+      });
+    }
+
+    // Extract Modular devices
+    if (parsed.deviceDetails?.modular) {
+      parsed.deviceDetails.modular.forEach((device: any, index: number) => {
+        if (device.profile?.topic && device.protocol_setting?.address) { // Only add if both topic and address exist
+          devicesForRegistration.push({
+            id: `modular-${index}`,
+            topic: device.profile.topic,
+            address: device.protocol_setting.address,
+            protocolType: 'modular',
+            manufacturer: device.profile?.manufacturer || '',
+            deviceType: device.profile?.device_type || '',
+            name: device.profile?.name || '', // Keep original name as default
+          });
+        }
+      });
+    }
+
+    setSelectedDevicesForRegistration(devicesForRegistration);
+    setRegisterDeviceModalOpen(true);
+  };
+
   // Handle opening registration modal
   const handleRegisterLocation = (node: DiscoveredNode) => {
     setSelectedNode(node);
@@ -385,6 +435,59 @@ const NodeInfoDiscoverPage = () => {
       toast.error(error.message || "Failed to create location");
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // Handle registering devices to DeviceExternal
+  const handleRegisterDevicesToExternal = async () => {
+    // Filter only selected devices
+    const selectedDevices = selectedDevicesForRegistration.filter(d => d.selected);
+
+    // Validate all selected devices have names
+    if (selectedDevices.some(d => !d.name.trim())) {
+      toast.error("All selected devices must have names");
+      return;
+    }
+
+    if (selectedDevices.length === 0) {
+      toast.error("Please select at least one device to register");
+      return;
+    }
+
+    setRegisteringDevices(true);
+
+    try {
+      // For bulk registration (array), API requires uniqId, so we generate it
+      const devicesToRegister = selectedDevices.map(device => ({
+        uniqId: `discovery-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        name: device.name.trim(),
+        topic: device.topic,
+        address: device.address.toString() // Convert to string as required by schema
+      }));
+
+      const response = await fetch("/api/devices/external", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(devicesToRegister),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(`Successfully registered ${result.created || selectedDevices.length} device(s) to DeviceExternal!`);
+        setRegisterDeviceModalOpen(false);
+        setSelectedDevicesForRegistration([]);
+      } else {
+        // Show specific errors from bulk import
+        const errorMessages = result.errors || [result.message || "Failed to register devices"];
+        toast.error(errorMessages.join("; "));
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to register devices");
+    } finally {
+      setRegisteringDevices(false);
     }
   };
 
@@ -1025,6 +1128,21 @@ const NodeInfoDiscoverPage = () => {
                       </Card>
                     )}
 
+                    {/* Registration Button */}
+                    {((parsed.deviceDetails?.modbus && parsed.deviceDetails.modbus.length > 0) ||
+                      (parsed.deviceDetails?.modular && parsed.deviceDetails.modular.length > 0)) && (
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => handleRegisterDevices(selectedNodeForDevices)}
+                          className="flex items-center gap-2"
+                          size="lg"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add to Device External
+                        </Button>
+                      </div>
+                    )}
+
                     {/* No Devices Message */}
                     {(!parsed.deviceDetails?.modbus || parsed.deviceDetails.modbus.length === 0) &&
                      (!parsed.deviceDetails?.modular || parsed.deviceDetails.modular.length === 0) && (
@@ -1038,6 +1156,145 @@ const NodeInfoDiscoverPage = () => {
                   </>
                 );
               })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Device Registration Modal */}
+      <Dialog open={registerDeviceModalOpen} onOpenChange={setRegisterDeviceModalOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Register Selected Devices to DeviceExternal
+            </DialogTitle>
+            <DialogDescription>
+              Select the devices you want to register. Topics and addresses are automatically populated from discovery data.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDevicesForRegistration.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {selectedDevicesForRegistration.length} device(s) discovered
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allSelected = selectedDevicesForRegistration.every(d => d.selected);
+                      setSelectedDevicesForRegistration(prev =>
+                        prev.map(device => ({ ...device, selected: !allSelected }))
+                      );
+                    }}
+                  >
+                    {selectedDevicesForRegistration.every(d => d.selected) ? "Deselect All" : "Select All"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Device Selection Form */}
+              <div className="space-y-4">
+                {selectedDevicesForRegistration.map((device, index) => (
+                  <Card key={device.id} className={`border ${device.selected ? "border-primary bg-primary/5" : ""}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="pt-2">
+                          <Checkbox
+                            id={`select-${device.id}`}
+                            checked={device.selected || false}
+                            onCheckedChange={(checked) => {
+                              const newDevices = [...selectedDevicesForRegistration];
+                              newDevices[index].selected = checked as boolean;
+                              setSelectedDevicesForRegistration(newDevices);
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`device-name-${device.id}`} className="text-sm font-medium">
+                              Device Name {device.selected && "*"}
+                            </Label>
+                            <Input
+                              id={`device-name-${device.id}`}
+                              value={device.name}
+                              onChange={(e) => {
+                                const newDevices = [...selectedDevicesForRegistration];
+                                newDevices[index].name = e.target.value;
+                                setSelectedDevicesForRegistration(newDevices);
+                              }}
+                              placeholder={`Enter device name (e.g., ${device.manufacturer || 'Device'} ${device.protocolType} ${device.address})`}
+                              disabled={!device.selected}
+                              required={device.selected}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Topic (Auto-filled)</Label>
+                            <Input
+                              value={device.topic}
+                              disabled
+                              className="bg-muted font-mono text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Address (Auto-filled)</Label>
+                            <Input
+                              value={device.address}
+                              disabled
+                              className="bg-muted"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t ml-8">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Protocol Type</Label>
+                          <Badge variant="outline">{device.protocolType === 'modbus' ? 'Modbus RTU' : 'Modular I2C'}</Badge>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Device Info</Label>
+                          <div className="text-sm text-muted-foreground">
+                            {device.manufacturer || 'N/A'} • {device.deviceType || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRegisterDeviceModalOpen(false)}
+                  disabled={registeringDevices}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleRegisterDevicesToExternal}
+                  disabled={
+                    registeringDevices ||
+                    selectedDevicesForRegistration.filter(d => d.selected).length === 0 ||
+                    selectedDevicesForRegistration.filter(d => d.selected && !d.name.trim()).length > 0
+                  }
+                  className="flex items-center gap-2"
+                >
+                  {registeringDevices ? "Registering..." : `Register ${selectedDevicesForRegistration.filter(d => d.selected).length} Device(s)`}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
