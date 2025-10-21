@@ -559,8 +559,8 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
             <List
               className="text-muted-foreground"
               style={{
-                width: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
-                height: Math.max(layoutConfig.dynamicSizes.iconSize * 0.7, 14),
+                width: Math.max(layoutConfig.dynamicSizes.iconSize * 0.5, 10),
+                height: Math.max(layoutConfig.dynamicSizes.iconSize * 0.5, 10),
               }}
             />
           </div>
@@ -568,23 +568,13 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
             <h3
               className="font-bold text-foreground truncate leading-tight"
               style={{
-                fontSize: `${layoutConfig.dynamicSizes.fontSize * 1.1}px`,
+                fontSize: `${layoutConfig.dynamicSizes.fontSize * 1}px`,
               }}
               title={config.title}
             >
               {config.title}
             </h3>
-            {layoutConfig.layoutMode === "normal" && (
-              <p
-                className="text-muted-foreground truncate"
-                style={{
-                  fontSize: `${layoutConfig.dynamicSizes.fontSize * 0.75}px`,
-                }}
-              >
-                {statusSummary.total} device
-                {statusSummary.total !== 1 ? "s" : ""}
-              </p>
-            )}
+            
           </div>
         </div>
 

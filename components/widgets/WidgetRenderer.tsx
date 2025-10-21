@@ -163,7 +163,7 @@ export const WidgetRenderer = ({ item }: Props) => {
     default:
       return (
         <div className="p-4 text-center italic text-muted-foreground">
-          Widget type "{widgetType}" is not implemented yet.
+          Widget type &ldquo;{widgetType}&rdquo; is not implemented yet.
         </div>
       );
   }

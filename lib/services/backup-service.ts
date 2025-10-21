@@ -644,7 +644,9 @@ export class BackupService {
       >`
         SELECT name, type, sql
         FROM sqlite_master
-        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+        WHERE type = 'table'
+        AND name NOT LIKE 'sqlite_%'
+        AND name NOT LIKE '_%'
         ORDER BY name
       `;
 
@@ -671,6 +673,10 @@ export class BackupService {
               const result = await (prisma as any)[this.camelCase(modelName)].count();
               rowCount = result;
               console.log(`   📊 Counted ${rowCount} records in ${table.name} using Prisma client`);
+            } else if (modelName === '') {
+              // Skip system tables that shouldn't be counted
+              console.log(`   📊 Skipped system table ${table.name}`);
+              rowCount = 0;
             } else {
               // Fallback to raw SQL if model not found
               const rowCountResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -912,6 +918,7 @@ export class BackupService {
       'MenuGroup': 'menuGroup',
       'MenuItem': 'menuItem',
       'NodeTenantLocation': 'nodeTenantLocation',
+      'NodeLocationMqttPayload': 'nodeLocationMqttPayload',
       'Notification': 'notification',
       'Permission': 'permission',
       'PowerAnalyzerConfiguration': 'powerAnalyzerConfiguration',
@@ -921,6 +928,7 @@ export class BackupService {
       'RoleMenuPermission': 'roleMenuPermission',
       'RolePermission': 'rolePermission',
       'Tenant': 'tenant',
+      'ThermalData': 'thermalData',
       'User': 'user',
       'ZkTecoDevice': 'zkTecoDevice',
       'ZkTecoUser': 'zkTecoUser',
