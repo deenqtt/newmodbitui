@@ -35,9 +35,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
-export const ChartBarConfigModal = ({ isOpen, onClose, onSave }: Props) => {
+export const ChartBarConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,22 +53,32 @@ export const ChartBarConfigModal = ({ isOpen, onClose, onSave }: Props) => {
   const [timeRange, setTimeRange] = useState("7d");
   const [barColor, setBarColor] = useState("#82ca9d");
   const [units, setUnits] = useState("");
-  // --- STATE BARU ---
   const [hasAnimation, setHasAnimation] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState("5"); // dalam menit
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "");
+      setSelectedConfigId(initialConfig.loggingConfigId || null);
+      setTimeRange(initialConfig.timeRange || "7d");
+      setBarColor(initialConfig.barColor || "#82ca9d");
+      setUnits(initialConfig.units || "");
+      setHasAnimation(initialConfig.hasAnimation === false ? false : true);
+      setRefreshInterval(String(initialConfig.refreshInterval || 5));
+    } else if (isOpen) {
+      setIsEditMode(false);
       setWidgetTitle("");
       setSelectedConfigId(null);
       setTimeRange("7d");
       setBarColor("#82ca9d");
       setUnits("");
-      // --- RESET STATE BARU ---
       setHasAnimation(true);
       setRefreshInterval("5");
+    }
 
+    if (isOpen) {
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -79,7 +95,7 @@ export const ChartBarConfigModal = ({ isOpen, onClose, onSave }: Props) => {
       };
       fetchConfigs();
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, initialConfig, onClose]);
 
   const handleSave = () => {
     if (!widgetTitle || !selectedConfigId) {
@@ -106,9 +122,13 @@ export const ChartBarConfigModal = ({ isOpen, onClose, onSave }: Props) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-xl">Configure Bar Chart</DialogTitle>
+          <DialogTitle className="text-xl">
+            {isEditMode ? "Edit Bar Chart" : "Configure Bar Chart"}
+          </DialogTitle>
           <DialogDescription>
-            Select a data source and customize the chart's appearance.
+            {isEditMode
+              ? "Update your bar chart widget configuration."
+              : "Select a data source and customize the chart's appearance."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
@@ -210,7 +230,7 @@ export const ChartBarConfigModal = ({ isOpen, onClose, onSave }: Props) => {
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -37,38 +37,60 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    selectedDevice: MqttDevice;
+    selectedKey: string;
+    onValue: string;
+    offValue: string;
+  };
 }
 
 export const ButtonControlModbusConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const { publish, subscribe, unsubscribe, isReady } = useMqtt();
 
-  const [widgetTitle, setWidgetTitle] = useState("");
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || ""
+  );
   const [devices, setDevices] = useState<MqttDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const responseTopicRef = useRef<string | null>(null);
   const keySubTopicRef = useRef<string | null>(null);
 
-  const [selectedDevice, setSelectedDevice] = useState<MqttDevice | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<MqttDevice | null>(
+    initialConfig?.selectedDevice || null
+  );
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [onValue, setOnValue] = useState("1");
-  const [offValue, setOffValue] = useState("0");
+  const [selectedKey, setSelectedKey] = useState<string | null>(
+    initialConfig?.selectedKey || null
+  );
+  const [onValue, setOnValue] = useState(initialConfig?.onValue || "1");
+  const [offValue, setOffValue] = useState(initialConfig?.offValue || "0");
 
   useEffect(() => {
     if (isOpen && isReady) {
-      // Reset state
-      setWidgetTitle("");
-      setDevices([]);
-      setSelectedDevice(null);
-      setAvailableKeys([]);
-      setSelectedKey(null);
-      setOnValue("1");
-      setOffValue("0");
+      // Set initial values if in edit mode, otherwise reset
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setSelectedDevice(initialConfig.selectedDevice);
+        setSelectedKey(initialConfig.selectedKey);
+        setOnValue(initialConfig.onValue);
+        setOffValue(initialConfig.offValue);
+      } else {
+        setWidgetTitle("");
+        setSelectedDevice(null);
+        setSelectedKey(null);
+        setOnValue("1");
+        setOffValue("0");
+      }
+      setDevices([]); // Always refetch devices
+      setAvailableKeys([]); // Always refetch keys
       setIsLoadingDevices(true);
 
       const commandTopic = "command_device_modbus";
@@ -121,11 +143,23 @@ export const ButtonControlModbusConfigModal = ({
     }
     if (topic && topic !== keySubTopicRef.current) {
       setAvailableKeys([]);
-      setIsWaitingForKey(true);
+      // Only set isWaitingForKey to true if we are actually fetching new keys
+      if (
+        !initialConfig ||
+        initialConfig.selectedDevice?.profile.topic !== topic
+      ) {
+        setIsWaitingForKey(true);
+      }
       subscribe(topic, handleMqttKeyResponse);
       keySubTopicRef.current = topic;
     }
-  }, [selectedDevice, subscribe, unsubscribe, handleMqttKeyResponse]);
+  }, [
+    selectedDevice,
+    subscribe,
+    unsubscribe,
+    handleMqttKeyResponse,
+    initialConfig,
+  ]);
 
   const handleDeviceChange = (topic: string) => {
     const device = devices.find((d) => d.profile.topic === topic);
@@ -239,10 +273,24 @@ export const ButtonControlModbusConfigModal = ({
           </div>
         </div>
         <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isLoadingDevices}
+          >
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
+          <Button
+            type="submit"
+            onClick={handleSave}
+            disabled={
+              isLoadingDevices ||
+              !widgetTitle ||
+              !selectedDevice ||
+              !selectedKey
+            }
+          >
             Save Widget
           </Button>
         </DialogFooter>

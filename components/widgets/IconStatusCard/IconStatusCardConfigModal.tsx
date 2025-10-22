@@ -43,12 +43,23 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    selectedKey: string;
+    multiply?: number;
+    units?: string;
+    selectedIcon?: string;
+    iconColor?: string;
+    iconBgColor?: string;
+  }; // ✅ TAMBAH PROP BARU
 }
 
 export const IconStatusCardConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig, // ✅ DESTRUCTURE PROP BARU
 }: Props) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
@@ -70,8 +81,29 @@ export const IconStatusCardConfigModal = ({
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
 
+  // ✅ TAMBAH STATE UNTUK TRACK EDIT MODE
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // ✅ EFFECT BARU: PRE-FILL DATA JIKA ADA initialConfig
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setCustomName(initialConfig.customName || "");
+      setSelectedDeviceUniqId(initialConfig.deviceUniqId || null);
+      setSelectedKey(initialConfig.selectedKey || null);
+      setMultiply(String(initialConfig.multiply || 1));
+      setUnits(initialConfig.units || "");
+      setSelectedIcon(initialConfig.selectedIcon || "Zap");
+      setIconColor(initialConfig.iconColor || "#FFFFFF");
+      setIconBgColor(initialConfig.iconBgColor || "#3B82F6");
+
+      // ✅ Jika edit mode, langsung set available keys dengan key yang dipilih
+      if (initialConfig.selectedKey) {
+        setAvailableKeys([initialConfig.selectedKey]);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
+      // Reset ke default values untuk create mode
       setCustomName("");
       setSelectedDeviceUniqId(null);
       setSelectedKey(null);
@@ -82,7 +114,11 @@ export const IconStatusCardConfigModal = ({
       setIconBgColor("#3B82F6");
       setAvailableKeys([]);
       setIsWaitingForKey(false);
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchDevices = async () => {
         setIsLoadingDevices(true);
         try {
@@ -102,7 +138,6 @@ export const IconStatusCardConfigModal = ({
     }
   }, [isOpen, onClose]);
 
-  // --- START: Logika MQTT yang Ditambahkan Kembali ---
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
       try {
@@ -110,7 +145,12 @@ export const IconStatusCardConfigModal = ({
         if (typeof payload.value === "string") {
           const innerPayload = JSON.parse(payload.value);
           const keys = Object.keys(innerPayload);
-          setAvailableKeys(keys);
+
+          // ✅ JIKA EDIT MODE, gabungkan dengan key yang sudah ada
+          setAvailableKeys((prevKeys) => {
+            const allKeys = [...new Set([...prevKeys, ...keys])];
+            return allKeys;
+          });
         } else {
           console.warn("Payload 'value' is not a JSON string:", payload.value);
         }
@@ -137,7 +177,10 @@ export const IconStatusCardConfigModal = ({
     }
 
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      // ✅ PERBAIKAN: Jangan clear keys di edit mode, tapi tetap subscribe
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
@@ -155,13 +198,16 @@ export const IconStatusCardConfigModal = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
-  // --- END: Logika MQTT yang Ditambahkan Kembali ---
 
   const handleDeviceChange = (uniqId: string) => {
     setSelectedDeviceUniqId(uniqId);
     setSelectedKey(null);
-    setAvailableKeys([]);
+    // ✅ Hanya clear keys jika bukan edit mode ATAU device berubah
+    if (!isEditMode || uniqId !== initialConfig?.deviceUniqId) {
+      setAvailableKeys([]);
+    }
   };
 
   const handleSave = () => {
@@ -186,10 +232,15 @@ export const IconStatusCardConfigModal = ({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Icon Status Card
+            {/* ✅ UBAH TITLE SESUAI MODE */}
+            {isEditMode
+              ? "Edit Icon Status Card"
+              : "Configure Icon Status Card"}
           </DialogTitle>
           <DialogDescription>
-            Select device, key, and customize the appearance of the card.
+            {isEditMode
+              ? "Update your widget configuration below."
+              : "Select device, key, and customize the appearance of the card."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 max-h-[70vh] overflow-y-auto">
@@ -259,20 +310,28 @@ export const IconStatusCardConfigModal = ({
                         <span>Waiting for real-time data...</span>
                       </div>
                     </>
-                  ) : availableKeys.length === 0 ? (
+                  ) : availableKeys.length === 0 && !isEditMode ? (
                     <p className="text-yellow-600 dark:text-yellow-400">
                       No data available from this device
                     </p>
-                  ) : (
+                  ) : availableKeys.length > 0 ? (
                     <>
                       <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                        <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        <svg
+                          className="w-3 h-3"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                         <span>{availableKeys.length} keys available</span>
                       </div>
                     </>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
@@ -302,7 +361,7 @@ export const IconStatusCardConfigModal = ({
           <div className="space-y-4">
             <div>
               <Label>Icon</Label>
-              <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 border p-3 rounded-md mt-2">
+              <div className="grid grid-cols-5 sm:grid-cols-6 gap-2 border p-3 rounded-md mt-2 max-h-[200px] overflow-y-auto">
                 {iconList.map(({ name, icon: Icon }) => (
                   <button
                     key={name}
@@ -347,7 +406,8 @@ export const IconStatusCardConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {/* ✅ UBAH TEXT BUTTON SESUAI MODE */}
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

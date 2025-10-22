@@ -44,12 +44,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
 export const MultiSeriesChartConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,19 +61,16 @@ export const MultiSeriesChartConfigModal = ({
   const [timeRange, setTimeRange] = useState("24h");
   const [hasAnimation, setHasAnimation] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState("5");
-  // --- PERUBAHAN: State untuk chartType dipindah ke sini ---
   const [chartType, setChartType] = useState<"line" | "bar" | "area">("line");
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const getRandomColor = () =>
+    `#${Math.floor(Math.random() * 16777215)
+      .toString(16)
+      .padStart(6, "0")}`;
 
   useEffect(() => {
     if (isOpen) {
-      setWidgetTitle("");
-      setSeries([]);
-      addSeries(); // Mulai dengan satu series
-      setTimeRange("24h");
-      setHasAnimation(true);
-      setRefreshInterval("5");
-      setChartType("line"); // Reset chartType
-
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -87,13 +86,38 @@ export const MultiSeriesChartConfigModal = ({
         }
       };
       fetchConfigs();
-    }
-  }, [isOpen, onClose]);
 
-  const getRandomColor = () =>
-    `#${Math.floor(Math.random() * 16777215)
-      .toString(16)
-      .padStart(6, "0")}`;
+      if (initialConfig) {
+        setIsEditMode(true);
+        setWidgetTitle(initialConfig.widgetTitle || "");
+        setTimeRange(initialConfig.timeRange || "24h");
+        setHasAnimation(initialConfig.hasAnimation === false ? false : true);
+        setRefreshInterval(String(initialConfig.refreshInterval || 5));
+        setChartType(initialConfig.chartType || "line");
+        const seriesWithIds =
+          initialConfig.series?.map((s: Omit<DataSeries, "id">) => ({
+            ...s,
+            id: `series-${Date.now()}-${Math.random()}`,
+          })) || [];
+        setSeries(seriesWithIds);
+      } else {
+        setIsEditMode(false);
+        setWidgetTitle("");
+        setTimeRange("24h");
+        setHasAnimation(true);
+        setRefreshInterval("5");
+        setChartType("line");
+        setSeries([
+          {
+            id: `series-${Date.now()}`,
+            name: "",
+            loggingConfigId: null,
+            color: getRandomColor(),
+          },
+        ]);
+      }
+    }
+  }, [isOpen, initialConfig, onClose]);
 
   const addSeries = () => {
     setSeries((prev) => [
@@ -151,10 +175,14 @@ export const MultiSeriesChartConfigModal = ({
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Multi-Series Chart
+            {isEditMode
+              ? "Edit Multi-Series Chart"
+              : "Configure Multi-Series Chart"}
           </DialogTitle>
           <DialogDescription>
-            Add and configure multiple data series to display in one chart.
+            {isEditMode
+              ? "Update your multi-series chart widget configuration."
+              : "Add and configure multiple data series to display in one chart."}
           </DialogDescription>
         </DialogHeader>
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[70vh]">
@@ -296,7 +324,7 @@ export const MultiSeriesChartConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

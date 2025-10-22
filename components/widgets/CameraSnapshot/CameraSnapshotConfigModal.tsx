@@ -34,23 +34,37 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    cctvId: string;
+  };
 }
 
 export const CameraSnapshotConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [cctvList, setCctvList] = useState<CctvConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [widgetTitle, setWidgetTitle] = useState("");
-  const [selectedCctvId, setSelectedCctvId] = useState<string | null>(null);
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || ""
+  );
+  const [selectedCctvId, setSelectedCctvId] = useState<string | null>(
+    initialConfig?.cctvId || null
+  );
 
   useEffect(() => {
     if (isOpen) {
-      setWidgetTitle("");
-      setSelectedCctvId(null);
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setSelectedCctvId(initialConfig.cctvId);
+      } else {
+        setWidgetTitle("");
+        setSelectedCctvId(null);
+      }
 
       const fetchCctvList = async () => {
         setIsLoading(true);
@@ -67,7 +81,7 @@ export const CameraSnapshotConfigModal = ({
       };
       fetchCctvList();
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, initialConfig]);
 
   const handleSave = () => {
     if (!widgetTitle || !selectedCctvId) {
@@ -128,10 +142,19 @@ export const CameraSnapshotConfigModal = ({
           </div>
         </div>
         <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isLoading}
+          >
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
+          <Button
+            type="submit"
+            onClick={handleSave}
+            disabled={isLoading || !widgetTitle || !selectedCctvId}
+          >
             Save Widget
           </Button>
         </DialogFooter>

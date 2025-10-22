@@ -55,9 +55,10 @@ export const IconStatusCardWidget = ({ config }: Props) => {
     titleFontSize: 12,
     padding: 16,
     gap: 12,
+    headerHeight: 40,
   });
 
-  // Enhanced responsive calculation
+  // FIXED: Enhanced responsive calculation
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -67,53 +68,83 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       const { width, height } = rect;
       setDimensions({ width, height });
 
-      // Smart layout mode detection
+      // FIXED: Better layout mode detection
       const aspectRatio = width / height;
       const area = width * height;
       const minDimension = Math.min(width, height);
 
       let currentLayoutMode: "horizontal" | "vertical" | "compact";
-      if (area < 8000 || minDimension < 100) {
+
+      // Compact mode for very small widgets
+      if (area < 10000 || minDimension < 100) {
         currentLayoutMode = "compact";
-      } else if (aspectRatio > 1.3) {
+      }
+      // Horizontal for wide widgets (aspect ratio > 1.5)
+      else if (aspectRatio > 1.5 && width > 250) {
         currentLayoutMode = "horizontal";
-      } else {
+      }
+      // Vertical for tall or square widgets
+      else {
         currentLayoutMode = "vertical";
       }
 
       setLayoutMode(currentLayoutMode);
 
-      // Advanced responsive sizing with better proportions
-      const baseScale = Math.sqrt(area) / 140;
-      const widthScale = width / 220;
-      const heightScale = height / 140;
-      const finalScale = Math.min(baseScale, widthScale, heightScale, 2);
+      // FIXED: Better size calculations with max limits
+      const baseScale = Math.sqrt(area) / 150;
 
-      // Dynamic sizes optimized for each layout mode
+      // Calculate header height first
+      const headerHeight = Math.max(36, Math.min(height * 0.25, 56));
+      const availableHeight = height - headerHeight;
+
+      // FIXED: Responsive sizes with better proportions - SMALLER ICONS
       const sizes = {
         compact: {
-          valueFontSize: Math.max(12, Math.min(minDimension * 0.12, 18)),
-          unitFontSize: Math.max(9, Math.min(minDimension * 0.08, 12)),
-          iconSize: Math.max(18, Math.min(minDimension * 0.25, 28)),
-          titleFontSize: Math.max(9, Math.min(minDimension * 0.08, 11)),
-          padding: Math.max(8, minDimension * 0.08),
+          valueFontSize: Math.max(14, Math.min(minDimension * 0.14, 20)),
+          unitFontSize: Math.max(10, Math.min(minDimension * 0.09, 14)),
+          iconSize: Math.max(16, Math.min(minDimension * 0.22, 26)),
+          titleFontSize: Math.max(10, Math.min(minDimension * 0.09, 13)),
+          padding: Math.max(8, minDimension * 0.06),
           gap: Math.max(4, minDimension * 0.04),
+          headerHeight: Math.max(32, Math.min(minDimension * 0.3, 44)),
         },
         horizontal: {
-          valueFontSize: Math.max(16, Math.min(width * 0.1, height * 0.25)),
-          unitFontSize: Math.max(11, Math.min(width * 0.07, height * 0.18)),
-          iconSize: Math.max(24, Math.min(width * 0.12, height * 0.4)),
-          titleFontSize: Math.max(11, Math.min(width * 0.06, height * 0.15)),
-          padding: Math.max(12, width * 0.05),
-          gap: Math.max(12, width * 0.06),
+          // FIXED: Smaller icon sizes for horizontal layout
+          valueFontSize: Math.max(
+            18,
+            Math.min(availableHeight * 0.35, width * 0.08, 48)
+          ),
+          unitFontSize: Math.max(
+            12,
+            Math.min(availableHeight * 0.25, width * 0.055, 24)
+          ),
+          iconSize: Math.max(
+            24,
+            Math.min(availableHeight * 0.4, width * 0.08, 56)
+          ),
+          titleFontSize: Math.max(11, Math.min(headerHeight * 0.35, 16)),
+          padding: Math.max(16, Math.min(width * 0.04, 32)),
+          gap: Math.max(12, Math.min(width * 0.05, 28)),
+          headerHeight,
         },
         vertical: {
-          valueFontSize: Math.max(18, Math.min(width * 0.15, height * 0.2)),
-          unitFontSize: Math.max(12, Math.min(width * 0.1, height * 0.14)),
-          iconSize: Math.max(28, Math.min(width * 0.2, height * 0.25)),
-          titleFontSize: Math.max(11, Math.min(width * 0.08, height * 0.1)),
-          padding: Math.max(12, height * 0.08),
-          gap: Math.max(8, height * 0.06),
+          // FIXED: Smaller icon sizes for vertical layout
+          valueFontSize: Math.max(
+            20,
+            Math.min(width * 0.18, availableHeight * 0.18, 56)
+          ),
+          unitFontSize: Math.max(
+            13,
+            Math.min(width * 0.12, availableHeight * 0.12, 28)
+          ),
+          iconSize: Math.max(
+            28,
+            Math.min(width * 0.2, availableHeight * 0.2, 64)
+          ),
+          titleFontSize: Math.max(12, Math.min(headerHeight * 0.35, 16)),
+          padding: Math.max(16, Math.min(height * 0.06, 32)),
+          gap: Math.max(10, Math.min(availableHeight * 0.08, 24)),
+          headerHeight,
         },
       };
 
@@ -202,13 +233,12 @@ export const IconStatusCardWidget = ({ config }: Props) => {
 
   const IconComponent = getIconComponent(config.selectedIcon || "Zap");
 
-  // Clean minimal styling - consistent dengan SingleValueCard
+  // Clean minimal styling with dark mode support
   const getStatusStyling = () => {
     const baseStyles = {
       title: "text-slate-700 dark:text-slate-300",
       value: "text-slate-900 dark:text-slate-100",
       unit: "text-slate-500 dark:text-slate-400",
-      // Icon selalu neutral gray kecuali ada custom color
       iconBg: config.iconBgColor || "#64748B",
       iconColor: config.iconColor || "#FFFFFF",
     };
@@ -217,15 +247,14 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500 dark:bg-emerald-400",
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
           pulse: false,
         };
       case "error":
         return {
           ...baseStyles,
-          indicator: "bg-red-500 dark:bg-red-400",
+          indicator: "bg-red-500 dark:bg-red-500",
           pulse: false,
-          // Sedikit hint warna di text untuk error
           title: "text-red-600 dark:text-red-400",
           value: "text-red-700 dark:text-red-300",
         };
@@ -233,7 +262,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       case "waiting":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500 dark:bg-amber-400",
+          indicator: "bg-amber-500 dark:bg-amber-500",
           pulse: true,
           title: "text-slate-600 dark:text-slate-400",
           value: "text-slate-700 dark:text-slate-300",
@@ -251,7 +280,6 @@ export const IconStatusCardWidget = ({ config }: Props) => {
     if (value === null) return "—";
 
     if (typeof value === "number") {
-      // Smart number formatting
       if (Math.abs(value) >= 1000000) {
         return (
           (value / 1000000).toLocaleString(undefined, {
@@ -335,7 +363,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
           >
             {isOffline ? (
               <WifiOff
-                className="text-slate-500 dark:text-slate-300"
+                className="text-slate-500 dark:text-slate-400"
                 style={{
                   width: dynamicSizes.iconSize * 0.6,
                   height: dynamicSizes.iconSize * 0.6,
@@ -379,14 +407,14 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       <div className="flex flex-col items-center justify-center gap-3 text-center">
         <div className="relative">
           <div
-            className="bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+            className="bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-600"
             style={{
               width: dynamicSizes.iconSize * 1.3,
               height: dynamicSizes.iconSize * 1.3,
             }}
           >
             <Clock
-              className="text-slate-400"
+              className="text-slate-400 dark:text-slate-500"
               style={{
                 width: dynamicSizes.iconSize * 0.6,
                 height: dynamicSizes.iconSize * 0.6,
@@ -396,7 +424,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
         </div>
         {layoutMode !== "compact" && (
           <p
-            className="font-medium text-slate-600"
+            className="font-medium text-slate-600 dark:text-slate-400"
             style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
           >
             Waiting for data...
@@ -416,20 +444,22 @@ export const IconStatusCardWidget = ({ config }: Props) => {
 
     // Icon element dengan clean styling
     const iconElement = IconComponent && (
-      <div className="relative group">
+      <div className="relative group flex-shrink-0">
         <div
-          className="rounded-xl shadow-sm flex items-center justify-center transition-all duration-300 ease-out transform hover:scale-105 border border-slate-200/50"
+          className="rounded-xl shadow-sm flex items-center justify-center transition-all duration-300 ease-out transform hover:scale-105 border border-slate-200/50 dark:border-slate-600/50"
           style={{
             backgroundColor: styles.iconBg,
             color: styles.iconColor,
-            width: dynamicSizes.iconSize * 1.3,
-            height: dynamicSizes.iconSize * 1.3,
+            width: dynamicSizes.iconSize * 1.4,
+            height: dynamicSizes.iconSize * 1.4,
+            minWidth: dynamicSizes.iconSize * 1.4,
+            minHeight: dynamicSizes.iconSize * 1.4,
           }}
         >
           <IconComponent
             style={{
-              height: dynamicSizes.iconSize * 0.65,
-              width: dynamicSizes.iconSize * 0.65,
+              height: dynamicSizes.iconSize * 0.7,
+              width: dynamicSizes.iconSize * 0.7,
             }}
           />
         </div>
@@ -438,8 +468,11 @@ export const IconStatusCardWidget = ({ config }: Props) => {
 
     // Value element dengan clean typography
     const valueElement = (
-      <div className="space-y-1">
-        <div className="flex items-baseline gap-1 justify-center">
+      <div
+        className="flex flex-col items-center justify-center min-w-0"
+        style={{ gap: `${Math.max(4, dynamicSizes.gap * 0.3)}px` }}
+      >
+        <div className="flex items-baseline gap-1.5 justify-center flex-wrap">
           <span
             className={`font-bold tracking-tight leading-none transition-all duration-300 ${styles.value}`}
             style={{ fontSize: `${dynamicSizes.valueFontSize}px` }}
@@ -458,12 +491,12 @@ export const IconStatusCardWidget = ({ config }: Props) => {
         {lastUpdate && layoutMode !== "compact" && (
           <div
             className={`flex items-center justify-center gap-1 ${styles.unit} opacity-60`}
-            style={{ fontSize: `${dynamicSizes.titleFontSize * 0.8}px` }}
+            style={{ fontSize: `${dynamicSizes.titleFontSize * 0.85}px` }}
           >
             <Clock
               style={{
-                width: dynamicSizes.titleFontSize * 0.8,
-                height: dynamicSizes.titleFontSize * 0.8,
+                width: dynamicSizes.titleFontSize * 0.85,
+                height: dynamicSizes.titleFontSize * 0.85,
               }}
             />
             <span>{formatTime(lastUpdate)}</span>
@@ -472,40 +505,27 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       </div>
     );
 
-    // Title element
-    const titleElement = (
-      <p
-        className={`font-medium text-center leading-tight transition-colors duration-200 ${styles.title}`}
-        style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
-        title={config.customName}
-      >
-        {layoutMode === "compact" && config.customName.length > 12
-          ? `${config.customName.substring(0, 12)}...`
-          : config.customName}
-      </p>
-    );
-
-    // Layout rendering optimized for each mode
+    // FIXED: Better layout rendering for each mode
     switch (layoutMode) {
       case "compact":
         return (
-          <div className="flex flex-col items-center justify-center gap-2 w-full text-center">
+          <div
+            className="flex flex-col items-center justify-center w-full"
+            style={{ gap: `${dynamicSizes.gap * 0.8}px` }}
+          >
             {iconElement}
-            <div className="space-y-1 min-w-0 flex-1">{valueElement}</div>
+            {valueElement}
           </div>
         );
 
       case "horizontal":
         return (
           <div
-            className="flex items-center justify-start w-full"
-            style={{ gap: `${dynamicSizes.gap}px` }}
+            className="flex items-center justify-center w-full h-full"
+            style={{ gap: `${dynamicSizes.gap}px`, maxWidth: "100%" }}
           >
-            <div className="flex-shrink-0">{iconElement}</div>
-            <div className="min-w-0 flex-1 space-y-1">
-              {titleElement}
-              {valueElement}
-            </div>
+            {iconElement}
+            {valueElement}
           </div>
         );
 
@@ -513,14 +533,11 @@ export const IconStatusCardWidget = ({ config }: Props) => {
       default:
         return (
           <div
-            className="flex flex-col items-center justify-center w-full text-center"
+            className="flex flex-col items-center justify-center w-full h-full"
             style={{ gap: `${dynamicSizes.gap}px` }}
           >
             {iconElement}
-            <div className="space-y-1 min-w-0">
-              {valueElement}
-              {titleElement}
-            </div>
+            {valueElement}
           </div>
         );
     }
@@ -540,53 +557,72 @@ export const IconStatusCardWidget = ({ config }: Props) => {
         group hover:scale-[1.01] transform-gpu
       `}
       style={{
-        padding: `${dynamicSizes.padding}px`,
         minWidth: 100,
         minHeight: 80,
       }}
     >
-      {/* Clean minimal status indicators */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-        {/* Connection status */}
-        <div className="flex items-center gap-1">
+      {/* FIXED: Header with dynamic height */}
+      <div
+        className="absolute top-0 left-0 right-0 px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
+        <h3
+          className={`font-medium truncate transition-colors duration-200 ${styles.title}`}
+          style={{
+            fontSize: `${dynamicSizes.titleFontSize}px`,
+            lineHeight: 1.3,
+            flex: 1,
+          }}
+          title={config.customName}
+        >
+          {config.customName}
+        </h3>
+        {/* Status indicators - in header */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
           {connectionStatus === "Connected" ? (
             <Wifi
-              className="text-slate-400"
+              className="text-slate-400 dark:text-slate-500"
               style={{
-                width: Math.max(dynamicSizes.titleFontSize * 0.8, 10),
-                height: Math.max(dynamicSizes.titleFontSize * 0.8, 10),
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
               }}
             />
           ) : (
             <WifiOff
-              className="text-slate-400"
+              className="text-slate-400 dark:text-slate-500"
               style={{
-                width: Math.max(dynamicSizes.titleFontSize * 0.8, 10),
-                height: Math.max(dynamicSizes.titleFontSize * 0.8, 10),
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
               }}
             />
           )}
+          <div
+            className={`rounded-full ${styles.indicator} ${
+              styles.pulse ? "animate-pulse" : ""
+            } transition-all duration-300`}
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+            }}
+          />
         </div>
-
-        {/* Activity indicator */}
-        <div
-          className={`rounded-full ${styles.indicator} ${
-            styles.pulse ? "animate-pulse" : ""
-          } transition-all duration-300`}
-          style={{
-            width: Math.max(dynamicSizes.titleFontSize * 0.6, 8),
-            height: Math.max(dynamicSizes.titleFontSize * 0.6, 8),
-          }}
-        />
       </div>
 
-      {/* Main content */}
-      <div className="w-full h-full flex items-center justify-center">
+      {/* FIXED: Main content with proper spacing from header */}
+      <div
+        className="w-full h-full flex items-center justify-center"
+        style={{
+          paddingTop: dynamicSizes.headerHeight + dynamicSizes.padding * 0.5,
+          paddingBottom: dynamicSizes.padding,
+          paddingLeft: dynamicSizes.padding,
+          paddingRight: dynamicSizes.padding,
+        }}
+      >
         {renderMainContent()}
       </div>
 
       {/* Minimal hover effects */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

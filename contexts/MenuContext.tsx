@@ -11,6 +11,7 @@ interface MenuContextType {
   refreshMenu: () => Promise<void>;
   isDeveloper: boolean;
   retryMenuLoad: () => void;
+  activePreset: { id: string; name: string; description?: string } | null;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
@@ -21,6 +22,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(false);
+  const [activePreset, setActivePreset] = useState<{ id: string; name: string; description?: string } | null>(null);
   const [menuCache, setMenuCache] = useState<Map<string, UserMenuData>>(new Map());
 
   const fetchMenu = async (forceRefresh = false) => {
@@ -72,6 +74,17 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
       setMenuData(menuDataResult);
       setIsDeveloper(!!data.isDeveloper);
+
+      // Set active preset from API response
+      const newActivePreset = data.activePreset || null;
+
+      // Invalidate cache if active preset changed to ensure fresh menu data
+      if (activePreset?.id !== newActivePreset?.id) {
+        console.log('[MenuContext] Active preset changed, clearing cache:', activePreset?.name || 'none', '→', newActivePreset?.name || 'none');
+        setMenuCache(new Map());
+      }
+
+      setActivePreset(newActivePreset);
 
     } catch (err: any) {
       // If cache exists and request fails, use cached data but show error
@@ -131,6 +144,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     refreshMenu,
     isDeveloper,
     retryMenuLoad,
+    activePreset,
   };
 
   return (

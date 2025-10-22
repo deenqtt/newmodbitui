@@ -678,3 +678,44 @@ model Layout2DFlowIndicator {
 
   @@unique([layoutId, deviceUniqId, selectedKey, positionX, positionY])
 }
+
+// Menu Preset System - Allows users to create custom menu configurations
+model MenuPreset {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  icon        String?          @default("Menu")
+  isActive    Boolean          @default(false)
+  isSystem    Boolean          @default(false) // Built-in presets
+  createdBy   String           // User ID who created
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations to selected menu structure
+  selectedGroups MenuPresetGroup[]
+  selectedItems  MenuPresetItem[]
+
+  @@map("MenuPreset")
+}
+
+model MenuPresetGroup {
+  id       String     @id @default(cuid())
+  presetId String
+  groupId  String     // Reference to MenuGroup.id
+
+  preset   MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@unique([presetId, groupId])
+  @@map("MenuPresetGroup")
+}
+
+model MenuPresetItem {
+  id       String     @id @default(cuid())
+  presetId String
+  itemId   String     // Reference to MenuItem.id
+
+  preset   MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@unique([presetId, itemId])
+  @@map("MenuPresetItem")
+}

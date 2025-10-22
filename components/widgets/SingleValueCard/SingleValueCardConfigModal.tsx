@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import Swal from "sweetalert2";
-import { useMqtt } from "@/contexts/MqttContext"; // <-- 1. IMPORT USEMQTT
+import { useMqtt } from "@/contexts/MqttContext";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -36,14 +36,22 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    selectedKey: string;
+    multiply?: number;
+    units?: string;
+  };
 }
 
 export const SingleValueCardConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
-  const { subscribe, unsubscribe } = useMqtt(); // <-- 2. GUNAKAN HOOK MQTT
+  const { subscribe, unsubscribe } = useMqtt();
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
@@ -54,11 +62,33 @@ export const SingleValueCardConfigModal = ({
   >(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [multiply, setMultiply] = useState("1");
+  const [units, setUnits] = useState(""); // ✅ TAMBAH STATE UNTUK UNITS
 
   // State untuk key yang didapat dari MQTT
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
+
+  // State untuk track edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // ✅ EFFECT: PRE-FILL DATA JIKA ADA initialConfig
+  useEffect(() => {
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setCustomName(initialConfig.customName || "");
+      setSelectedDeviceUniqId(initialConfig.deviceUniqId || null);
+      setSelectedKey(initialConfig.selectedKey || null);
+      setMultiply(String(initialConfig.multiply || 1));
+      setUnits(initialConfig.units || ""); // ✅ SET UNITS DARI INITIAL CONFIG
+
+      if (initialConfig.selectedKey) {
+        setAvailableKeys([initialConfig.selectedKey]);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
+    }
+  }, [isOpen, initialConfig]);
 
   // Fetch data perangkat saat modal dibuka
   useEffect(() => {
@@ -86,22 +116,26 @@ export const SingleValueCardConfigModal = ({
         setSelectedDeviceUniqId(null);
         setSelectedKey(null);
         setMultiply("1");
+        setUnits(""); // ✅ RESET UNITS
         setAvailableKeys([]);
         setIsWaitingForKey(false);
+        setIsEditMode(false);
       }, 200);
     }
   }, [isOpen, onClose]);
 
-  // --- 3. LOGIKA UTAMA UNTUK SUBSCRIBE & UNSUBSCRIBE ---
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
       try {
         const payload = JSON.parse(payloadString);
-        // Cek jika 'value' adalah string JSON, lalu parse lagi
         if (typeof payload.value === "string") {
           const innerPayload = JSON.parse(payload.value);
           const keys = Object.keys(innerPayload);
-          setAvailableKeys(keys);
+
+          setAvailableKeys((prevKeys) => {
+            const allKeys = [...new Set([...prevKeys, ...keys])];
+            return allKeys;
+          });
         } else {
           console.warn("Payload 'value' is not a JSON string:", payload.value);
         }
@@ -109,7 +143,6 @@ export const SingleValueCardConfigModal = ({
         console.error("Failed to parse MQTT payload:", e);
       } finally {
         setIsWaitingForKey(false);
-        // Langsung unsubscribe setelah mendapat data pertama
         unsubscribe(topic, handleMqttMessage);
         subscribedTopicRef.current = null;
       }
@@ -123,21 +156,20 @@ export const SingleValueCardConfigModal = ({
     );
     const newTopic = selectedDevice?.topic;
 
-    // Unsubscribe dari topik lama jika ada
     if (subscribedTopicRef.current && subscribedTopicRef.current !== newTopic) {
       unsubscribe(subscribedTopicRef.current, handleMqttMessage);
       subscribedTopicRef.current = null;
     }
 
-    // Subscribe ke topik baru jika valid dan berbeda
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
     }
 
-    // Cleanup saat komponen unmount atau modal ditutup
     return () => {
       if (subscribedTopicRef.current) {
         unsubscribe(subscribedTopicRef.current, handleMqttMessage);
@@ -150,18 +182,20 @@ export const SingleValueCardConfigModal = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
 
-  // Handler saat mengganti perangkat di dropdown
   const handleDeviceChange = (uniqId: string) => {
     setSelectedDeviceUniqId(uniqId);
     setSelectedKey(null);
-    setAvailableKeys([]);
+    if (!isEditMode || uniqId !== initialConfig?.deviceUniqId) {
+      setAvailableKeys([]);
+    }
   };
 
   const handleSave = () => {
     if (!customName || !selectedDeviceUniqId || !selectedKey) {
-      Swal.fire("Incomplete", "Please fill all fields.", "warning");
+      Swal.fire("Incomplete", "Please fill all required fields.", "warning");
       return;
     }
     onSave({
@@ -169,6 +203,7 @@ export const SingleValueCardConfigModal = ({
       deviceUniqId: selectedDeviceUniqId,
       selectedKey,
       multiply: parseFloat(multiply) || 1,
+      units: units.trim(), // ✅ INCLUDE UNITS DALAM SAVE
     });
   };
 
@@ -177,15 +212,21 @@ export const SingleValueCardConfigModal = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Single Value Card
+            {isEditMode
+              ? "Edit Single Value Card"
+              : "Configure Single Value Card"}
           </DialogTitle>
           <DialogDescription>
-            Select a device to get available data keys via MQTT.
+            {isEditMode
+              ? "Update your widget configuration below."
+              : "Select a device to get available data keys via MQTT."}
           </DialogDescription>
         </DialogHeader>
+
         <div className="grid gap-6 p-6">
+          {/* Custom Name */}
           <div className="grid gap-2">
-            <Label htmlFor="customName">Custom Name</Label>
+            <Label htmlFor="customName">Display Name</Label>
             <Input
               id="customName"
               value={customName}
@@ -194,6 +235,7 @@ export const SingleValueCardConfigModal = ({
             />
           </div>
 
+          {/* Device Selection */}
           <div className="grid gap-2">
             <Label htmlFor="device">Device</Label>
             {isLoadingDevices ? (
@@ -217,6 +259,7 @@ export const SingleValueCardConfigModal = ({
             )}
           </div>
 
+          {/* Data Key Selection */}
           <div className="grid gap-2">
             <Label htmlFor="key">Data Key</Label>
             <Select
@@ -243,13 +286,15 @@ export const SingleValueCardConfigModal = ({
             </Select>
             {selectedDeviceUniqId &&
               !isWaitingForKey &&
-              availableKeys.length === 0 && (
+              availableKeys.length === 0 &&
+              !isEditMode && (
                 <p className="text-xs text-muted-foreground">
                   No keys received. Ensure the device is publishing data.
                 </p>
               )}
           </div>
 
+          {/* Multiplier */}
           <div className="grid gap-2">
             <Label htmlFor="multiply">Multiplier (Optional)</Label>
             <Input
@@ -261,13 +306,29 @@ export const SingleValueCardConfigModal = ({
               step="0.01"
             />
           </div>
+
+          {/* ✅ TAMBAH FORM UNITS */}
+          <div className="grid gap-2">
+            <Label htmlFor="units">Units (Optional)</Label>
+            <Input
+              id="units"
+              type="text"
+              value={units}
+              onChange={(e) => setUnits(e.target.value)}
+              placeholder="e.g., V, kW, °C, %"
+            />
+            <p className="text-xs text-muted-foreground">
+              Display unit suffix (e.g., V for Voltage, kW for Power)
+            </p>
+          </div>
         </div>
+
         <DialogFooter className="px-6 pb-6 sm:justify-end">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

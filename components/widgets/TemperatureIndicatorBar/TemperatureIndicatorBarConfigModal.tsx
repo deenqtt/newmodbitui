@@ -36,12 +36,22 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    selectedKey: string;
+    multiply?: number;
+    units?: string;
+    minValue?: number;
+    maxValue?: number;
+  }; // ✅ TAMBAH PROP BARU
 }
 
 export const TemperatureIndicatorBarConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig, // ✅ DESTRUCTURE PROP BARU
 }: Props) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
@@ -54,7 +64,7 @@ export const TemperatureIndicatorBarConfigModal = ({
   >(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [multiply, setMultiply] = useState("1");
-  const [units, setUnits] = useState("°C"); // Default unit untuk suhu
+  const [units, setUnits] = useState("°C");
   const [minValue, setMinValue] = useState("0");
   const [maxValue, setMaxValue] = useState("100");
 
@@ -62,9 +72,28 @@ export const TemperatureIndicatorBarConfigModal = ({
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
 
+  // ✅ TAMBAH STATE UNTUK TRACK EDIT MODE
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // ✅ EFFECT BARU: PRE-FILL DATA JIKA ADA initialConfig
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setCustomName(initialConfig.customName || "");
+      setSelectedDeviceUniqId(initialConfig.deviceUniqId || null);
+      setSelectedKey(initialConfig.selectedKey || null);
+      setMultiply(String(initialConfig.multiply || 1));
+      setUnits(initialConfig.units || "°C");
+      setMinValue(String(initialConfig.minValue ?? 0));
+      setMaxValue(String(initialConfig.maxValue ?? 100));
+
+      // ✅ Jika edit mode, langsung set available keys dengan key yang dipilih
+      if (initialConfig.selectedKey) {
+        setAvailableKeys([initialConfig.selectedKey]);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
+      // Reset ke default values
       setCustomName("");
       setSelectedDeviceUniqId(null);
       setSelectedKey(null);
@@ -73,7 +102,12 @@ export const TemperatureIndicatorBarConfigModal = ({
       setMinValue("0");
       setMaxValue("100");
       setAvailableKeys([]);
+      setIsWaitingForKey(false);
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchDevices = async () => {
         setIsLoadingDevices(true);
         try {
@@ -99,7 +133,13 @@ export const TemperatureIndicatorBarConfigModal = ({
         const payload = JSON.parse(payloadString);
         const innerPayload =
           typeof payload.value === "string" ? JSON.parse(payload.value) : {};
-        setAvailableKeys(Object.keys(innerPayload));
+
+        // ✅ JIKA EDIT MODE, gabungkan dengan key yang sudah ada
+        setAvailableKeys((prevKeys) => {
+          const newKeys = Object.keys(innerPayload);
+          const allKeys = [...new Set([...prevKeys, ...newKeys])];
+          return allKeys;
+        });
       } catch (e) {
         console.error("Failed to parse MQTT payload:", e);
       } finally {
@@ -123,7 +163,10 @@ export const TemperatureIndicatorBarConfigModal = ({
     }
 
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      // ✅ PERBAIKAN: Jangan clear keys di edit mode, tapi tetap subscribe
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
@@ -141,11 +184,16 @@ export const TemperatureIndicatorBarConfigModal = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
 
   const handleDeviceChange = (value: string) => {
     setSelectedDeviceUniqId(value);
     setSelectedKey(null);
+    // ✅ Hanya clear keys jika bukan edit mode ATAU device berubah
+    if (!isEditMode || value !== initialConfig?.deviceUniqId) {
+      setAvailableKeys([]);
+    }
   };
 
   const handleSave = () => {
@@ -169,10 +217,13 @@ export const TemperatureIndicatorBarConfigModal = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Temperature Bar
+            {/* ✅ UBAH TITLE SESUAI MODE */}
+            {isEditMode ? "Edit Temperature Bar" : "Configure Temperature Bar"}
           </DialogTitle>
           <DialogDescription>
-            Set the data source and the temperature range for the indicator bar.
+            {isEditMode
+              ? "Update your temperature indicator bar configuration."
+              : "Set the data source and the temperature range for the indicator bar."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 p-6 max-h-[70vh] overflow-y-auto">
@@ -228,6 +279,14 @@ export const TemperatureIndicatorBarConfigModal = ({
                 ))}
               </SelectContent>
             </Select>
+            {selectedDeviceUniqId &&
+              !isWaitingForKey &&
+              availableKeys.length === 0 &&
+              !isEditMode && (
+                <p className="text-xs text-muted-foreground">
+                  No keys received. Ensure the device is publishing data.
+                </p>
+              )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
@@ -273,7 +332,8 @@ export const TemperatureIndicatorBarConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {/* ✅ UBAH TEXT BUTTON SESUAI MODE */}
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

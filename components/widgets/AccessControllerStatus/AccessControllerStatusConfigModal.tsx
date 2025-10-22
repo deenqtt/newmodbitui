@@ -33,21 +33,38 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: { title: string; controllerId: string }) => void;
+  initialConfig?: {
+    title: string;
+    controllerId: string;
+  };
 }
 
 export function AccessControllerStatusConfigModal({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) {
-  const [title, setTitle] = useState("Access Controller Status");
-  const [selectedControllerId, setSelectedControllerId] = useState("");
+  const [title, setTitle] = useState(
+    initialConfig?.title || "Access Controller Status"
+  );
+  const [selectedControllerId, setSelectedControllerId] = useState(
+    initialConfig?.controllerId || ""
+  );
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Efek ini akan berjalan setiap kali modal dibuka (isOpen menjadi true)
   useEffect(() => {
     if (isOpen) {
+      if (initialConfig) {
+        setTitle(initialConfig.title);
+        setSelectedControllerId(initialConfig.controllerId);
+      } else {
+        setTitle("Access Controller Status");
+        setSelectedControllerId("");
+      }
+
       const fetchControllers = async () => {
         setIsLoading(true);
         try {
@@ -63,7 +80,7 @@ export function AccessControllerStatusConfigModal({
       };
       fetchControllers();
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   // Fungsi yang dipanggil saat tombol "Save" diklik
   const handleSave = () => {
@@ -118,7 +135,10 @@ export function AccessControllerStatusConfigModal({
           <Button variant="outline" onClick={onClose}>
             Batal
           </Button>
-          <Button onClick={handleSave} disabled={!selectedControllerId}>
+          <Button
+            onClick={handleSave}
+            disabled={!selectedControllerId || isLoading}
+          >
             Simpan
           </Button>
         </DialogFooter>

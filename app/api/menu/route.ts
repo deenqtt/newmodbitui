@@ -93,12 +93,73 @@ export async function GET(request: NextRequest) {
         isAdmin || isDeveloper ? true : (group.isActive !== false) // isActive can be undefined (treated as active) or true
       );
 
-    // Filter menu items based on permissions, with special handling for admin manage-menu
-    const filteredMenuGroups = menuGroups
+    // Check if there's an active preset for this user
+    const activePreset = await prisma.menuPreset.findFirst({
+      where: {
+        isActive: true,
+        createdBy: auth.userId
+      },
+      include: {
+        selectedGroups: true,
+        selectedItems: true
+      }
+    });
+
+    // BASIC MENU GROUPS FILTERING (when no preset active)
+    let baseFilteredMenuGroups = menuGroups;
+
+    // Apply different filtering logic if there's an active preset
+    if (activePreset) {
+      // For active preset: Include preset-selected items even if they would normally be filtered out
+      const presetGroupIds = activePreset.selectedGroups.map((pg: any) => pg.groupId);
+      const presetItemIds = activePreset.selectedItems.map((pi: any) => pi.itemId);
+
+      // For preset mode, we completely bypass all normal filtering and only show selected items
+      // Fetch all selected groups first
+      const selectedGroups = await prisma.menuGroup.findMany({
+        where: { id: { in: presetGroupIds } },
+      });
+
+      // Fetch ALL selected items by ID - this ignores all isActive, isDeveloper, and permission filters
+      const selectedItems = await prisma.menuItem.findMany({
+        where: { id: { in: presetItemIds } },
+        include: {
+          permissions: {
+            where: { roleId },
+            select: {
+              canView: true,
+              canCreate: true,
+              canUpdate: true,
+              canDelete: true,
+            },
+          },
+        },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      });
+
+      // Build menu groups structure with ALL selected items, bypassing any current restrictions
+      baseFilteredMenuGroups = selectedGroups.map((group: any) => ({
+        ...group,
+        _count: { items: 0 }, // Will be overridden
+        items: selectedItems.filter((item: any) => item.menuGroupId === group.id),
+      }));
+
+      console.log(`[API] Preset "${activePreset.name}" active - allowing ${presetGroupIds.length} groups, ${presetItemIds.length} items (ignoring isActive/isDeveloper restrictions)`);
+    } else {
+      console.log('[API] No active preset - using default menu visibility rules');
+    }
+
+    // FINAL MENU ITEMS FILTERING
+    const finalMenuGroups = baseFilteredMenuGroups
       .map((group: any) => ({
         ...group,
         menuItems: group.items.filter((item: any) => {
-          // Always show menu items that user has permissions for
+          // For preset mode: all items in preset are allowed (permissions check override)
+          if (activePreset) {
+            return true; // Preset overrides all permission checks
+          }
+
+          // For normal mode: permission-based filtering
           if (item.permissions.length > 0 && item.permissions[0].canView) {
             return true;
           }
@@ -110,8 +171,8 @@ export async function GET(request: NextRequest) {
         }).map((item: any) => ({
           ...item,
           permissions: item.permissions[0] || {
-            canView: true,
-            canCreate: isAdmin, // Admin gets full access by default
+            canView: activePreset ? true : false, // Preset mode: everything is viewable
+            canCreate: isAdmin,
             canUpdate: isAdmin,
             canDelete: isAdmin,
           },
@@ -121,8 +182,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: filteredMenuGroups,
+      data: finalMenuGroups,
       isDeveloper,
+      activePreset: activePreset ? {
+        id: activePreset.id,
+        name: activePreset.name,
+        description: activePreset.description
+      } : null,
     });
 
   } catch (error) {

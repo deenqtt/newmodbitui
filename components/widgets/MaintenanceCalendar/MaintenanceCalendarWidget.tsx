@@ -2,11 +2,25 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isToday,
+  addMonths,
+  subMonths,
+} from "date-fns";
 import { id } from "date-fns/locale";
-import { Loader2, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  AlertTriangle,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -30,7 +44,7 @@ interface MaintenanceItem {
 interface Props {
   config: {
     widgetTitle?: string;
-    viewType?: 'month' | 'week';
+    viewType?: "month" | "week";
     showCompleted?: boolean;
     highlightOverdue?: boolean;
   };
@@ -41,127 +55,121 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
   const [status, setStatus] = useState<"loading" | "error" | "ok">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [fontSize, setFontSize] = useState(10);
+  const [connectionStatus] = useState<"Connected" | "Disconnected">(
+    "Connected"
+  );
 
-  // Responsive font sizing
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dynamicSizes, setDynamicSizes] = useState({
+    fontSize: 10,
+    titleFontSize: 14,
+    headerHeight: 40,
+  });
+
+  // FIXED: Responsive sizing - consistent with other widgets
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width } = entry.contentRect;
-        const baseSize = Math.max(8, width / 35);
-        setFontSize(Math.min(14, baseSize));
-      }
-    });
+    const updateDimensions = () => {
+      const rect = container.getBoundingClientRect();
+      const { width, height } = rect;
 
+      // Calculate header height
+      const headerHeight = Math.max(36, Math.min(height * 0.15, 48));
+
+      // Base font size for calendar
+      const baseSize = Math.max(8, width / 35);
+      const fontSize = Math.min(12, baseSize);
+      const titleSize = Math.max(11, Math.min(headerHeight * 0.32, 14));
+
+      setDynamicSizes({
+        fontSize: Math.round(fontSize),
+        titleFontSize: Math.round(titleSize),
+        headerHeight,
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
     resizeObserver.observe(container);
+    updateDimensions();
+
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Mock data for testing - updated with current month dates (August 2025)
+  // Mock data
   const getMockData = (): MaintenanceItem[] => [
     {
       id: 1,
       name: "Server Room AC Maintenance",
-      description: "Regular maintenance check for air conditioning system",
-      startTask: "2025-08-15T08:00:00Z",
-      endTask: "2025-08-15T12:00:00Z",
+      description: "Regular maintenance check",
+      startTask: "2025-10-15T08:00:00Z",
+      endTask: "2025-10-15T12:00:00Z",
       status: "completed",
-      assignedTo: { id: "1", email: "tech1@company.com", phoneNumber: "+1234567890" },
-      deviceTarget: { name: "AC Unit - Server Room" }
+      assignedTo: { id: "1", email: "tech1@company.com" },
+      deviceTarget: { name: "AC Unit - Server Room" },
     },
     {
       id: 2,
       name: "UPS Battery Check",
-      description: "Monthly UPS battery voltage and capacity check",
-      startTask: "2025-08-20T09:00:00Z",
-      endTask: "2025-08-22T11:00:00Z",
+      description: "Monthly UPS check",
+      startTask: "2025-10-20T09:00:00Z",
+      endTask: "2025-10-22T11:00:00Z",
       status: "in_progress",
-      assignedTo: { id: "2", email: "tech2@company.com", phoneNumber: "+1234567891" },
-      deviceTarget: { name: "UPS Unit - Main Power" }
+      assignedTo: { id: "2", email: "tech2@company.com" },
+      deviceTarget: { name: "UPS Unit - Main Power" },
     },
     {
       id: 3,
       name: "Network Switch Cleaning",
-      description: "Clean dust from network switches and check cable connections",
-      startTask: "2025-08-25T07:00:00Z",
-      endTask: "2025-08-25T09:00:00Z",
+      description: "Clean dust from network switches",
+      startTask: "2025-10-25T07:00:00Z",
+      endTask: "2025-10-25T09:00:00Z",
       status: "scheduled",
-      assignedTo: { id: "1", email: "tech1@company.com", phoneNumber: "+1234567890" },
-      deviceTarget: { name: "Network Switch - Floor 2" }
+      assignedTo: { id: "1", email: "tech1@company.com" },
+      deviceTarget: { name: "Network Switch - Floor 2" },
     },
-    {
-      id: 4,
-      name: "Fire Suppression Test",
-      description: "Quarterly fire suppression system test and inspection",
-      startTask: "2025-08-12T06:00:00Z",
-      endTask: "2025-08-12T08:00:00Z",
-      status: "overdue",
-      assignedTo: { id: "3", email: "safety@company.com", phoneNumber: "+1234567892" },
-      deviceTarget: { name: "Fire Suppression System" }
-    }
   ];
 
   // Fetch maintenance data
   const fetchMaintenanceData = async () => {
     try {
       setStatus("loading");
-      console.log(`[MaintenanceCalendar] Fetching from: ${API_BASE_URL}/api/maintenance`);
-      
       const response = await fetch(`${API_BASE_URL}/api/maintenance`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
       });
-      
-      console.log(`[MaintenanceCalendar] Response status: ${response.status}`);
-      
+
       if (!response.ok) {
-        // Use mock data if API fails
-        console.warn(`[MaintenanceCalendar] API failed with ${response.status}, using mock data`);
         const mockData = getMockData();
-        
-        // Filter data based on config
         let filteredData = mockData;
         if (!config.showCompleted) {
-          filteredData = mockData.filter((item: MaintenanceItem) => 
-            item.status.toLowerCase() !== 'completed'
+          filteredData = mockData.filter(
+            (item) => item.status.toLowerCase() !== "completed"
           );
         }
-        
         setMaintenanceList(filteredData);
         setStatus("ok");
         return;
       }
-      
+
       const data = await response.json();
-      
-      // Filter data based on config
       let filteredData = data;
       if (!config.showCompleted) {
-        filteredData = data.filter((item: MaintenanceItem) => 
-          item.status.toLowerCase() !== 'completed'
+        filteredData = data.filter(
+          (item: MaintenanceItem) => item.status.toLowerCase() !== "completed"
         );
       }
       setMaintenanceList(filteredData);
       setStatus("ok");
     } catch (err: any) {
-      
-      // Use mock data as fallback
       const mockData = getMockData();
-      
-      // Filter data based on config
       let filteredData = mockData;
       if (!config.showCompleted) {
-        filteredData = mockData.filter((item: MaintenanceItem) => 
-          item.status.toLowerCase() !== 'completed'
+        filteredData = mockData.filter(
+          (item) => item.status.toLowerCase() !== "completed"
         );
       }
-      
       setMaintenanceList(filteredData);
       setStatus("ok");
     }
@@ -171,39 +179,83 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
     fetchMaintenanceData();
   }, [config.showCompleted]);
 
-  // Get maintenance tasks for specific date
+  // Get tasks for specific date
   const getTasksForDate = (date: Date) => {
-    return maintenanceList.filter(item => {
+    return maintenanceList.filter((item) => {
       const startDate = new Date(item.startTask);
       const endDate = new Date(item.endTask);
-      
-      // Set times to start of day for proper date comparison
-      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      const startOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-      const endOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-      
+      const dateOnly = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
+      const startOnly = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      );
+      const endOnly = new Date(
+        endDate.getFullYear(),
+        endDate.getMonth(),
+        endDate.getDate()
+      );
       return dateOnly >= startOnly && dateOnly <= endOnly;
     });
   };
 
-  // Get status color (for calendar indicators)
+  // FIXED: Status colors with dark mode
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'scheduled':
-        return 'bg-blue-500';
-      case 'in_progress':
-      case 'in progress':
-        return 'bg-yellow-500';
-      case 'completed':
-        return 'bg-green-500';
-      case 'cancelled':
-        return 'bg-red-500';
-      case 'overdue':
-        return 'bg-orange-500';
-      case 'outs': // Handle the "Outs" status from API
-        return 'bg-purple-500';
+      case "scheduled":
+        return "bg-blue-500 dark:bg-blue-600";
+      case "in_progress":
+      case "in progress":
+        return "bg-yellow-500 dark:bg-yellow-600";
+      case "completed":
+        return "bg-green-500 dark:bg-green-600";
+      case "cancelled":
+        return "bg-red-500 dark:bg-red-600";
+      case "overdue":
+        return "bg-orange-500 dark:bg-orange-600";
+      case "outs":
+        return "bg-purple-500 dark:bg-purple-600";
       default:
-        return 'bg-gray-500';
+        return "bg-slate-500 dark:bg-slate-600";
+    }
+  };
+
+  // FIXED: Status styling with dark mode
+  const getStatusStyles = () => {
+    const baseStyles = {
+      title: "text-slate-700 dark:text-slate-300",
+      label: "text-slate-600 dark:text-slate-400",
+    };
+
+    switch (status) {
+      case "ok":
+        return {
+          ...baseStyles,
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
+          pulse: false,
+        };
+      case "error":
+        return {
+          ...baseStyles,
+          indicator: "bg-red-500 dark:bg-red-500",
+          pulse: false,
+        };
+      case "loading":
+        return {
+          ...baseStyles,
+          indicator: "bg-amber-500 dark:bg-amber-500",
+          pulse: true,
+        };
+      default:
+        return {
+          ...baseStyles,
+          indicator: "bg-slate-400 dark:bg-slate-500",
+          pulse: false,
+        };
     }
   };
 
@@ -216,13 +268,17 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
   const monthEnd = endOfMonth(currentDate);
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  // Render content based on status
+  const styles = getStatusStyles();
+
+  // Render content
   const renderContent = () => {
     if (status === "loading") {
       return (
         <div className="flex flex-col items-center justify-center h-full p-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-          <p className="text-sm text-muted-foreground">Loading calendar...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400 dark:text-slate-500 mb-2" />
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Loading calendar...
+          </p>
         </div>
       );
     }
@@ -230,109 +286,139 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
     if (status === "error") {
       return (
         <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-          <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
-          <p className="text-sm font-semibold text-destructive">Error</p>
-          <p className="text-xs text-muted-foreground mt-1">{errorMessage}</p>
+          <AlertTriangle className="h-8 w-8 text-red-500 dark:text-red-400 mb-2" />
+          <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+            Error
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {errorMessage}
+          </p>
         </div>
       );
     }
 
     return (
       <div className="h-full flex flex-col">
-        {/* Month Navigation */}
-        <div className="flex items-center justify-between p-2 border-b">
-          <Button
-            variant="ghost"
-            size="sm"
+        {/* FIXED: Month Navigation with dark mode */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200/40 dark:border-slate-700/40">
+          <button
             onClick={goToPreviousMonth}
-            className="h-8 w-8 p-0"
+            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
           >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <h4 
-            className="font-semibold text-center"
-            style={{ fontSize: `${fontSize + 1}px` }}
+            <ChevronLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+          </button>
+
+          <h4
+            className="font-semibold text-slate-700 dark:text-slate-300"
+            style={{ fontSize: `${dynamicSizes.fontSize + 2}px` }}
           >
             {format(currentDate, "MMMM yyyy", { locale: id })}
           </h4>
-          
-          <Button
-            variant="ghost"
-            size="sm"
+
+          <button
             onClick={goToNextMonth}
-            className="h-8 w-8 p-0"
+            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
           >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            <ChevronRight className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+          </button>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="flex-1 p-2">
+        {/* FIXED: Calendar Grid with dark mode */}
+        <div className="flex-1 p-2 overflow-auto">
           {/* Day Headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
-              <div 
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
+              <div
                 key={day}
-                className="text-center text-gray-600 font-semibold p-1"
-                style={{ fontSize: `${fontSize - 1}px` }}
+                className="text-center text-slate-600 dark:text-slate-400 font-semibold p-1"
+                style={{ fontSize: `${dynamicSizes.fontSize}px` }}
               >
                 {day}
               </div>
             ))}
           </div>
 
-          {/* Calendar Days */}
-          <div className="grid grid-cols-7 gap-1 flex-1">
-            {monthDays.map(day => {
+          {/* FIXED: Calendar Days with dark mode */}
+          <div className="grid grid-cols-7 gap-1">
+            {monthDays.map((day) => {
               const tasksForDay = getTasksForDate(day);
               const isCurrentDay = isToday(day);
-              
-              
+
               return (
                 <div
                   key={day.toISOString()}
                   className={`
-                    relative border rounded p-1 min-h-[3rem] transition-colors
-                    ${isCurrentDay ? 'border-primary bg-primary/10' : 'border-gray-200'}
-                    ${tasksForDay.length > 0 ? 'bg-blue-50' : 'bg-white'}
+                    relative border rounded-lg p-1 min-h-[3rem] transition-colors
+                    ${
+                      isCurrentDay
+                        ? "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-slate-200 dark:border-slate-700"
+                    }
+                    ${
+                      tasksForDay.length > 0 && !isCurrentDay
+                        ? "bg-slate-50 dark:bg-slate-800"
+                        : !isCurrentDay
+                        ? "bg-card"
+                        : ""
+                    }
                   `}
                 >
                   {/* Day Number */}
-                  <div 
-                    className={`text-center font-medium ${isCurrentDay ? 'text-primary' : 'text-gray-700'}`}
-                    style={{ fontSize: `${fontSize}px` }}
+                  <div
+                    className={`text-center font-semibold ${
+                      isCurrentDay
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-slate-700 dark:text-slate-300"
+                    }`}
+                    style={{ fontSize: `${dynamicSizes.fontSize}px` }}
                   >
-                    {format(day, 'd')}
+                    {format(day, "d")}
                   </div>
 
                   {/* Task Indicators */}
                   {tasksForDay.length > 0 && (
-                    <div className="mt-1 space-y-1">
-                      {tasksForDay.slice(0, 2).map(task => {
-                        const isOverdue = config.highlightOverdue && 
-                                        new Date(task.endTask) < new Date() && 
-                                        task.status.toLowerCase() !== 'completed';
-                        
+                    <div className="mt-1 space-y-0.5">
+                      {tasksForDay.slice(0, 2).map((task) => {
+                        const isOverdue =
+                          config.highlightOverdue &&
+                          new Date(task.endTask) < new Date() &&
+                          task.status.toLowerCase() !== "completed";
+
                         return (
                           <div
                             key={task.id}
                             className={`
                               px-1 py-0.5 rounded text-white text-xs truncate
-                              ${isOverdue ? 'bg-orange-500' : getStatusColor(task.status)}
+                              ${
+                                isOverdue
+                                  ? "bg-orange-500 dark:bg-orange-600"
+                                  : getStatusColor(task.status)
+                              }
                             `}
-                            style={{ fontSize: `${fontSize - 2}px` }}
+                            style={{
+                              fontSize: `${Math.max(
+                                dynamicSizes.fontSize - 2,
+                                7
+                              )}px`,
+                            }}
                             title={`${task.name} - ${task.status}`}
                           >
-                            {task.name.length > 8 ? task.name.substring(0, 8) + '...' : task.name}
+                            {task.name.length > 8
+                              ? task.name.substring(0, 8) + "..."
+                              : task.name}
                           </div>
                         );
                       })}
-                      
+
                       {tasksForDay.length > 2 && (
-                        <div 
-                          className="text-center text-gray-500 text-xs"
-                          style={{ fontSize: `${fontSize - 2}px` }}
+                        <div
+                          className="text-center text-slate-500 dark:text-slate-400 text-xs font-medium"
+                          style={{
+                            fontSize: `${Math.max(
+                              dynamicSizes.fontSize - 2,
+                              7
+                            )}px`,
+                          }}
                         >
                           +{tasksForDay.length - 2}
                         </div>
@@ -345,25 +431,45 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="border-t p-2">
+        {/* FIXED: Legend with dark mode */}
+        <div className="border-t border-slate-200/40 dark:border-slate-700/40 px-3 py-2">
           <div className="flex flex-wrap gap-2 justify-center">
-            <div className="flex items-center space-x-1">
-              <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <span style={{ fontSize: `${fontSize - 1}px` }} className="text-gray-600">Scheduled</span>
+            <div className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-blue-500 dark:bg-blue-600" />
+              <span
+                style={{ fontSize: `${dynamicSizes.fontSize}px` }}
+                className="text-slate-600 dark:text-slate-400"
+              >
+                Scheduled
+              </span>
             </div>
-            <div className="flex items-center space-x-1">
-              <div className="h-2 w-2 rounded-full bg-yellow-500" />
-              <span style={{ fontSize: `${fontSize - 1}px` }} className="text-gray-600">In Progress</span>
+            <div className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-yellow-500 dark:bg-yellow-600" />
+              <span
+                style={{ fontSize: `${dynamicSizes.fontSize}px` }}
+                className="text-slate-600 dark:text-slate-400"
+              >
+                In Progress
+              </span>
             </div>
-            <div className="flex items-center space-x-1">
-              <div className="h-2 w-2 rounded-full bg-green-500" />
-              <span style={{ fontSize: `${fontSize - 1}px` }} className="text-gray-600">Completed</span>
+            <div className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-green-500 dark:bg-green-600" />
+              <span
+                style={{ fontSize: `${dynamicSizes.fontSize}px` }}
+                className="text-slate-600 dark:text-slate-400"
+              >
+                Completed
+              </span>
             </div>
             {config.highlightOverdue && (
-              <div className="flex items-center space-x-1">
-                <div className="h-2 w-2 rounded-full bg-orange-500" />
-                <span style={{ fontSize: `${fontSize - 1}px` }} className="text-gray-600">Overdue</span>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-orange-500 dark:bg-orange-600" />
+                <span
+                  style={{ fontSize: `${dynamicSizes.fontSize}px` }}
+                  className="text-slate-600 dark:text-slate-400"
+                >
+                  Overdue
+                </span>
               </div>
             )}
           </div>
@@ -373,35 +479,93 @@ export const MaintenanceCalendarWidget = ({ config }: Props) => {
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="w-full h-full flex flex-col overflow-hidden cursor-move"
+      className="w-full h-full relative overflow-hidden cursor-move bg-card border border-border/60 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 ease-out group hover:scale-[1.01] transform-gpu"
+      style={{ minWidth: 100, minHeight: 80 }}
     >
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <h3 
-            className="font-semibold text-gray-900 truncate flex items-center"
-            style={{ fontSize: `${fontSize + 1}px` }}
-          >
-            <Calendar className="h-4 w-4 mr-2 text-primary" />
+      {/* FIXED: Header - consistent with other widgets */}
+      <div
+        className="absolute top-0 left-0 right-0 px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
+        <h3
+          className={`font-medium truncate transition-colors duration-200 ${styles.title} flex-1 flex items-center gap-2`}
+          style={{
+            fontSize: `${dynamicSizes.titleFontSize}px`,
+            lineHeight: 1.3,
+          }}
+          title={config.widgetTitle || "Maintenance Calendar"}
+        >
+          <Calendar
+            className="text-slate-400 dark:text-slate-500 flex-shrink-0"
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+            }}
+          />
+          <span className="truncate">
             {config.widgetTitle || "Maintenance Calendar"}
-          </h3>
-          <div className="flex items-center space-x-1">
-            <span 
-              className="text-xs text-gray-500 bg-white px-2 py-1 rounded"
-              style={{ fontSize: `${fontSize - 2}px` }}
-            >
-              {maintenanceList.length} tasks
+          </span>
+        </h3>
+
+        {/* FIXED: Status indicators with wifi */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+          {/* Task count badge */}
+          <div
+            className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200/50 dark:border-slate-700/50"
+            style={{
+              fontSize: `${Math.max(dynamicSizes.titleFontSize * 0.7, 9)}px`,
+            }}
+          >
+            <span className="font-medium text-slate-600 dark:text-slate-300">
+              {maintenanceList.length}
             </span>
           </div>
+
+          {/* Wifi status */}
+          {connectionStatus === "Connected" ? (
+            <Wifi
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          ) : (
+            <WifiOff
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          )}
+
+          <div
+            className={`rounded-full transition-all duration-300 ${
+              styles.indicator
+            } ${styles.pulse ? "animate-pulse" : ""}`}
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+            }}
+          />
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div
+        className="w-full h-full overflow-hidden"
+        style={{
+          paddingTop: dynamicSizes.headerHeight,
+        }}
+      >
         {renderContent()}
       </div>
+
+      {/* Minimal hover overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

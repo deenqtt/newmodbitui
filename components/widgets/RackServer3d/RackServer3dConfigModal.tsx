@@ -1,7 +1,7 @@
 // File: components/widgets/RackServer3d/RackServer3dConfigModal.tsx
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, ChangeEvent, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +28,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
-export const RackServer3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
+export const RackServer3dConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
   // State untuk AC/Cooling
   const [showAC, setShowAC] = useState(false);
   const [acImageFile, setAcImageFile] = useState<File | null>(null);
@@ -93,7 +99,7 @@ export const RackServer3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
   // Update posisi/tinggi server
   const handleServerDetailChange = (
     index: number,
-    field: keyof ServerConfig,
+    field: "position" | "height" | "topic",
     value: string | number
   ) => {
     const updatedServers = [...serverPositions];
@@ -104,6 +110,37 @@ export const RackServer3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
     }
     setServerPositions(updatedServers);
   };
+
+  // Initialize state from initialConfig for edit mode
+  useEffect(() => {
+    if (isOpen && initialConfig) {
+      setShowAC(initialConfig.showAC || false);
+      setShowUPS(initialConfig.showUPS || false);
+      setUpsPosition(initialConfig.upsPosition || 1);
+      setUpsHeight(initialConfig.upsHeight || 2);
+      setShowServers(initialConfig.showServers || false);
+      setServerCount(initialConfig.serverCount || 1);
+      setServerPositions(
+        initialConfig.serverPositions?.map((server: any) => ({
+          position: server.position || 1,
+          height: server.height || 1,
+          imageFile: null, // Files need to be re-uploaded on edit
+          topic: server.topic || "",
+        })) || [{ position: 1, height: 1, imageFile: null, topic: "" }]
+      );
+    } else if (isOpen && !initialConfig) {
+      // Reset to defaults when creating new widget
+      setShowAC(false);
+      setAcImageFile(null);
+      setShowUPS(false);
+      setUpsPosition(1);
+      setUpsHeight(2);
+      setUpsImageFile(null);
+      setShowServers(false);
+      setServerCount(1);
+      setServerPositions([{ position: 1, height: 1, imageFile: null, topic: "" }]);
+    }
+  }, [isOpen, initialConfig]);
 
   const handleSave = () => {
     // Validasi dasar (bisa ditambahkan lebih lanjut)
@@ -136,7 +173,9 @@ export const RackServer3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Configure 3D Rack Server View</DialogTitle>
+          <DialogTitle>
+            {initialConfig ? "Edit 3D Rack Server View" : "Configure 3D Rack Server View"}
+          </DialogTitle>
           <DialogDescription>
             Atur komponen-komponen dalam rack server 3D Anda.
           </DialogDescription>
@@ -316,7 +355,7 @@ export const RackServer3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {initialConfig ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

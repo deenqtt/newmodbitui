@@ -15,7 +15,10 @@ import {
   AlertTriangle,
   Gauge,
   TrendingUp,
-  Activity,
+  TrendingDown,
+  Minus,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -43,7 +46,7 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
   const [topic, setTopic] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Enhanced responsive system
+  // FIXED: Enhanced responsive system - consistent with other widgets
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [dynamicSizes, setDynamicSizes] = useState({
@@ -53,11 +56,13 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
     unitFontSize: 12,
     gaugeSize: 1,
     padding: 16,
+    headerHeight: 52,
   });
-  const [layoutMode, setLayoutMode] = useState<"compact" | "normal" | "large">(
+  const [layoutMode, setLayoutMode] = useState<"mini" | "compact" | "normal">(
     "normal"
   );
 
+  // FIXED: Layout calculation - same as other widgets
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -68,49 +73,53 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
 
       setDimensions({ width, height });
 
-      // Determine layout mode based on size
-      const area = width * height;
-      let currentLayoutMode: "compact" | "normal" | "large";
+      const headerHeight = Math.max(36, Math.min(height * 0.25, 56));
+      const availableHeight = height - headerHeight;
 
-      if (area < 20000 || Math.min(width, height) < 120) {
+      // FIXED: Better layout mode detection - consistent naming
+      const minDimension = Math.min(width, height);
+      let currentLayoutMode: "mini" | "compact" | "normal";
+
+      if (minDimension < 160 || availableHeight < 100) {
+        currentLayoutMode = "mini";
+      } else if (minDimension < 240 || availableHeight < 180) {
         currentLayoutMode = "compact";
-      } else if (area > 60000 && Math.min(width, height) > 200) {
-        currentLayoutMode = "large";
       } else {
         currentLayoutMode = "normal";
       }
 
       setLayoutMode(currentLayoutMode);
 
-      // Calculate responsive sizes
-      const minDimension = Math.min(width, height);
-      const maxDimension = Math.max(width, height);
-      const baseScale = minDimension / 150;
+      // FIXED: Dynamic sizing based on layout mode
+      const baseScale = Math.sqrt(width * height) / 130;
 
       const sizeConfigs = {
+        mini: {
+          titleFontSize: Math.max(10, Math.min(headerHeight * 0.3, 13)),
+          valueFontSize: Math.max(16, Math.min(availableHeight * 0.15, 22)),
+          labelFontSize: Math.max(8, Math.min(baseScale * 9, 10)),
+          unitFontSize: Math.max(10, Math.min(baseScale * 11, 12)),
+          gaugeSize: Math.min(minDimension * 0.85, 140),
+          padding: Math.max(8, width * 0.03),
+          headerHeight,
+        },
         compact: {
-          titleFontSize: Math.max(10, baseScale * 12),
-          valueFontSize: Math.max(14, baseScale * 20),
-          labelFontSize: Math.max(8, baseScale * 9),
-          unitFontSize: Math.max(9, baseScale * 11),
-          gaugeSize: Math.max(0.7, Math.min(1, minDimension / 120)),
-          padding: Math.max(8, baseScale * 10),
+          titleFontSize: Math.max(11, Math.min(headerHeight * 0.32, 14)),
+          valueFontSize: Math.max(20, Math.min(availableHeight * 0.18, 28)),
+          labelFontSize: Math.max(9, Math.min(baseScale * 10, 11)),
+          unitFontSize: Math.max(11, Math.min(baseScale * 12, 14)),
+          gaugeSize: Math.min(minDimension * 0.9, 180),
+          padding: Math.max(10, width * 0.04),
+          headerHeight,
         },
         normal: {
-          titleFontSize: Math.max(12, baseScale * 14),
-          valueFontSize: Math.max(18, baseScale * 26),
-          labelFontSize: Math.max(9, baseScale * 11),
-          unitFontSize: Math.max(11, baseScale * 13),
-          gaugeSize: Math.max(0.8, Math.min(1.2, minDimension / 140)),
-          padding: Math.max(12, baseScale * 16),
-        },
-        large: {
-          titleFontSize: Math.max(14, baseScale * 16),
-          valueFontSize: Math.max(22, baseScale * 32),
-          labelFontSize: Math.max(10, baseScale * 12),
-          unitFontSize: Math.max(12, baseScale * 15),
-          gaugeSize: Math.max(1, Math.min(1.5, minDimension / 160)),
-          padding: Math.max(16, baseScale * 20),
+          titleFontSize: Math.max(12, Math.min(headerHeight * 0.32, 15)),
+          valueFontSize: Math.max(24, Math.min(availableHeight * 0.2, 36)),
+          labelFontSize: Math.max(10, Math.min(baseScale * 11, 13)),
+          unitFontSize: Math.max(12, Math.min(baseScale * 14, 16)),
+          gaugeSize: Math.min(minDimension * 0.95, 240),
+          padding: Math.max(12, width * 0.04),
+          headerHeight,
         },
       };
 
@@ -171,7 +180,7 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
           }
         }
       } catch (e) {
-        console.error("Failed to parse MQTT payload for gauge:", e);
+        console.error("Failed to parse MQTT payload:", e);
       }
     },
     [config.selectedKey, config.multiply, currentValue]
@@ -196,7 +205,6 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
 
   const { minValue = 0, maxValue = 100, units = "" } = config;
 
-  // Enhanced gauge calculations
   const gaugePercent =
     currentValue !== null
       ? Math.max(
@@ -205,7 +213,6 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
         )
       : 0;
 
-  // Calculate trend
   const getTrend = () => {
     if (currentValue === null || previousValue === null) return null;
     if (currentValue > previousValue) return "up";
@@ -213,47 +220,53 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
     return "stable";
   };
 
-  // Enhanced status styling
+  // FIXED: Simplified status styling - consistent with other widgets
   const getStatusStyling = () => {
+    const baseStyles = {
+      title: "text-slate-700 dark:text-slate-300",
+      value: "text-slate-900 dark:text-slate-100",
+      unit: "text-slate-500 dark:text-slate-400",
+      label: "text-slate-600 dark:text-slate-400",
+    };
+
     switch (status) {
       case "ok":
         return {
-          bg: "bg-gradient-to-br from-white to-emerald-50",
-          border: "border-emerald-200",
-          indicator: "bg-emerald-500 shadow-emerald-400/50",
+          ...baseStyles,
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
+          pulse: false,
         };
       case "error":
         return {
-          bg: "bg-gradient-to-br from-white to-red-50",
-          border: "border-red-200",
-          indicator: "bg-red-500 shadow-red-400/50",
+          ...baseStyles,
+          indicator: "bg-red-500 dark:bg-red-500",
+          pulse: false,
+          title: "text-red-600 dark:text-red-400",
+          value: "text-red-700 dark:text-red-300",
         };
+      case "loading":
       case "waiting":
         return {
-          bg: "bg-gradient-to-br from-white to-amber-50",
-          border: "border-amber-200",
-          indicator: "bg-amber-500 shadow-amber-400/50",
+          ...baseStyles,
+          indicator: "bg-amber-500 dark:bg-amber-500",
+          pulse: true,
+          title: "text-slate-600 dark:text-slate-400",
+          value: "text-slate-700 dark:text-slate-300",
         };
       default:
         return {
-          bg: "bg-gradient-to-br from-white to-slate-50",
-          border: "border-slate-200",
-          indicator: "bg-slate-400 shadow-slate-400/50",
+          ...baseStyles,
+          indicator: "bg-slate-400 dark:bg-slate-500",
+          pulse: false,
         };
     }
   };
 
-  // Enhanced gauge colors based on value ranges
   const getGaugeColors = () => {
-    const range = maxValue - minValue;
-    const lowThreshold = minValue + range * 0.3;
-    const highThreshold = minValue + range * 0.7;
-
     if (currentValue === null) {
-      return ["#e2e8f0", "#cbd5e1", "#94a3b8"]; // Gray for no data
+      return ["#94a3b8", "#cbd5e1", "#e2e8f0"];
     }
-
-    return ["#10b981", "#f59e0b", "#ef4444"]; // Green -> Yellow -> Red
+    return ["#10b981", "#f59e0b", "#ef4444"];
   };
 
   const formatValue = (value: number | null) => {
@@ -274,28 +287,25 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
   };
 
   const renderLoadingState = () => (
-    <div className="flex flex-col items-center justify-center gap-4 text-center h-full">
-      <div className="relative">
-        <div
-          className="bg-blue-100 rounded-full flex items-center justify-center border-2 border-blue-200"
+    <div className="flex flex-col items-center justify-center gap-3 h-full">
+      <div
+        className="bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600"
+        style={{
+          width: Math.max(dynamicSizes.labelFontSize * 4, 48),
+          height: Math.max(dynamicSizes.labelFontSize * 4, 48),
+        }}
+      >
+        <Loader2
+          className="animate-spin text-slate-400 dark:text-slate-500"
           style={{
-            width: Math.max(dimensions.width / 4, 60),
-            height: Math.max(dimensions.width / 4, 60),
+            width: Math.max(dynamicSizes.labelFontSize * 2.2, 24),
+            height: Math.max(dynamicSizes.labelFontSize * 2.2, 24),
           }}
-        >
-          <Loader2
-            className="animate-spin text-blue-600"
-            style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
-            }}
-          />
-        </div>
-        <div className="absolute inset-0 rounded-full border-2 border-blue-300 animate-ping opacity-30" />
+        />
       </div>
       <p
-        className="text-slate-600 font-medium"
-        style={{ fontSize: `${dynamicSizes.unitFontSize}px` }}
+        className="text-slate-600 dark:text-slate-400 font-medium"
+        style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
       >
         Loading gauge...
       </p>
@@ -303,34 +313,34 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
   );
 
   const renderErrorState = () => (
-    <div className="flex flex-col items-center justify-center gap-4 text-center h-full">
-      <div className="relative">
-        <div
-          className="bg-red-100 rounded-full flex items-center justify-center border-2 border-red-200"
+    <div className="flex flex-col items-center justify-center gap-3 h-full px-4">
+      <div
+        className="bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center border-2 border-slate-200 dark:border-slate-600"
+        style={{
+          width: Math.max(dynamicSizes.labelFontSize * 4, 48),
+          height: Math.max(dynamicSizes.labelFontSize * 4, 48),
+        }}
+      >
+        <AlertTriangle
+          className="text-red-600 dark:text-red-400"
           style={{
-            width: Math.max(dimensions.width / 4, 60),
-            height: Math.max(dimensions.width / 4, 60),
+            width: Math.max(dynamicSizes.labelFontSize * 2.2, 24),
+            height: Math.max(dynamicSizes.labelFontSize * 2.2, 24),
           }}
-        >
-          <AlertTriangle
-            className="text-red-600"
-            style={{
-              width: Math.max(dimensions.width / 8, 24),
-              height: Math.max(dimensions.width / 8, 24),
-            }}
-          />
-        </div>
+        />
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1 text-center">
         <p
-          className="text-red-700 font-semibold"
-          style={{ fontSize: `${dynamicSizes.unitFontSize}px` }}
+          className="text-red-700 dark:text-red-300 font-semibold"
+          style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
         >
           Connection Error
         </p>
         <p
-          className="text-red-600 opacity-80 break-words max-w-full"
-          style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+          className="text-red-600 dark:text-red-400 opacity-80 break-words"
+          style={{
+            fontSize: `${Math.max(dynamicSizes.labelFontSize * 0.85, 8)}px`,
+          }}
         >
           {errorMessage.length > 40
             ? `${errorMessage.substring(0, 40)}...`
@@ -353,13 +363,17 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
     }
 
     const trend = getTrend();
+    const styling = getStatusStyling();
 
     return (
       <div className="w-full h-full flex flex-col items-center justify-center relative">
-        {/* Main Gauge */}
+        {/* FIXED: Gauge Chart with VALUE IN CENTER */}
         <div
-          className="relative w-full flex items-center justify-center"
-          style={{ height: `${dimensions.height * 0.7}px` }}
+          className="relative flex items-center justify-center"
+          style={{
+            height: `${Math.min(dimensions.height * 0.5, 200)}px`,
+            width: "100%",
+          }}
         >
           <GaugeChart
             id={`gauge-chart-${config.deviceUniqId}`}
@@ -367,75 +381,109 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
             colors={getGaugeColors()}
             arcWidth={0.25}
             percent={gaugePercent}
-            textColor="transparent"
+            textColor={
+              styling.value.includes("dark:text-slate-100")
+                ? "#0f172a"
+                : "#0f172a"
+            }
             animate={true}
             animDelay={200}
             animateDuration={800}
             cornerRadius={3}
+            formatTextValue={(value) => ""}
             style={{
-              width: `${
-                Math.min(dimensions.width, dimensions.height) *
-                dynamicSizes.gaugeSize
-              }px`,
-              height: `${
-                Math.min(dimensions.width, dimensions.height) *
-                dynamicSizes.gaugeSize *
-                0.6
-              }px`,
+              width: `${dynamicSizes.gaugeSize}px`,
+              height: `${dynamicSizes.gaugeSize * 0.6}px`,
             }}
           />
 
-          {/* Enhanced Value Display */}
+          {/* FIXED: Custom value display BELOW needle - safe position */}
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
+            className="absolute flex flex-col items-center justify-center"
             style={{
-              marginTop: `${
-                Math.min(dimensions.width, dimensions.height) * 0.1
-              }px`,
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, 60%)",
             }}
           >
             <div className="flex items-baseline gap-1">
               <span
-                className="font-bold text-slate-900 tracking-tight"
-                style={{ fontSize: `${dynamicSizes.valueFontSize}px` }}
+                className={`font-bold tracking-tight transition-colors duration-300 ${styling.value}`}
+                style={{
+                  fontSize: `${dynamicSizes.valueFontSize}px`,
+                  lineHeight: 0.9,
+                }}
               >
                 {formatValue(currentValue)}
               </span>
               {units && (
                 <span
-                  className="font-medium text-slate-500"
+                  className={`font-medium ${styling.unit}`}
                   style={{ fontSize: `${dynamicSizes.unitFontSize}px` }}
                 >
                   {units}
                 </span>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Trend indicator */}
-            {trend && layoutMode !== "compact" && (
-              <div className="flex items-center gap-1 mt-1">
-                <TrendingUp
-                  className={`${
-                    trend === "up"
-                      ? "text-emerald-500 rotate-0"
-                      : trend === "down"
-                      ? "text-red-500 rotate-180"
-                      : "text-slate-400"
-                  } transition-all duration-300`}
-                  style={{
-                    width: dynamicSizes.labelFontSize * 1.2,
-                    height: dynamicSizes.labelFontSize * 1.2,
-                  }}
-                />
+        {/* FIXED: Min/Max Labels with better responsive sizing */}
+        <div className="w-full flex justify-between items-end px-4 mt-2">
+          <div className="text-left">
+            <p
+              className={`font-medium ${styling.label}`}
+              style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+            >
+              Min
+            </p>
+            <p
+              className={`font-semibold ${styling.value}`}
+              style={{ fontSize: `${dynamicSizes.labelFontSize * 1.15}px` }}
+            >
+              {formatValue(minValue)}
+            </p>
+          </div>
+
+          {/* Center info */}
+          <div className="text-center flex flex-col items-center gap-1">
+            {/* FIXED: Trend indicator with proper icons */}
+            {trend && layoutMode !== "mini" && (
+              <div className="flex items-center gap-1.5">
+                {trend === "up" ? (
+                  <TrendingUp
+                    className="text-emerald-500 dark:text-emerald-400"
+                    style={{
+                      width: dynamicSizes.labelFontSize * 1.2,
+                      height: dynamicSizes.labelFontSize * 1.2,
+                    }}
+                  />
+                ) : trend === "down" ? (
+                  <TrendingDown
+                    className="text-red-500 dark:text-red-400"
+                    style={{
+                      width: dynamicSizes.labelFontSize * 1.2,
+                      height: dynamicSizes.labelFontSize * 1.2,
+                    }}
+                  />
+                ) : (
+                  <Minus
+                    className="text-slate-400 dark:text-slate-500"
+                    style={{
+                      width: dynamicSizes.labelFontSize * 1.2,
+                      height: dynamicSizes.labelFontSize * 1.2,
+                    }}
+                  />
+                )}
                 <span
                   className={`font-medium ${
                     trend === "up"
-                      ? "text-emerald-600"
+                      ? "text-emerald-600 dark:text-emerald-400"
                       : trend === "down"
-                      ? "text-red-600"
-                      : "text-slate-500"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-slate-500 dark:text-slate-400"
                   }`}
-                  style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+                  style={{ fontSize: `${dynamicSizes.labelFontSize * 0.95}px` }}
                 >
                   {trend === "up"
                     ? "Rising"
@@ -445,106 +493,119 @@ export const AnalogueGaugeWidget = ({ config }: Props) => {
                 </span>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Enhanced Min/Max Labels */}
-        <div className="absolute bottom-0 w-full flex justify-between items-center px-4">
-          <div className="flex flex-col items-start">
-            <span
-              className="text-slate-500 font-medium"
-              style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
-            >
-              Min
-            </span>
-            <span
-              className="text-slate-700 font-semibold"
-              style={{ fontSize: `${dynamicSizes.labelFontSize * 1.1}px` }}
-            >
-              {formatValue(minValue)}
-            </span>
-          </div>
-
-          {/* Center status */}
-          <div className="flex flex-col items-center">
-            <Activity
-              className="text-blue-500 mb-1"
-              style={{
-                width: dynamicSizes.labelFontSize * 1.2,
-                height: dynamicSizes.labelFontSize * 1.2,
-              }}
-            />
-            {lastUpdate && layoutMode !== "compact" && (
-              <span
-                className="text-slate-400"
+            {lastUpdate && layoutMode === "normal" && (
+              <p
+                className={`${styling.label}`}
                 style={{ fontSize: `${dynamicSizes.labelFontSize * 0.9}px` }}
               >
                 {formatTime(lastUpdate)}
-              </span>
+              </p>
             )}
           </div>
 
-          <div className="flex flex-col items-end">
-            <span
-              className="text-slate-500 font-medium"
+          <div className="text-right">
+            <p
+              className={`font-medium ${styling.label}`}
               style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
             >
               Max
-            </span>
-            <span
-              className="text-slate-700 font-semibold"
-              style={{ fontSize: `${dynamicSizes.labelFontSize * 1.1}px` }}
+            </p>
+            <p
+              className={`font-semibold ${styling.value}`}
+              style={{ fontSize: `${dynamicSizes.labelFontSize * 1.15}px` }}
             >
               {formatValue(maxValue)}
-            </span>
+            </p>
           </div>
         </div>
       </div>
     );
   };
 
-  const statusStyling = getStatusStyling();
+  const styling = getStatusStyling();
 
   return (
     <div
       ref={containerRef}
       className={`
         w-full h-full flex flex-col cursor-move
-       
+        bg-card border border-border/60 rounded-xl
+        shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
         group overflow-hidden
       `}
       style={{
-        padding: `${dynamicSizes.padding}px`,
-        minWidth: 120,
-        minHeight: 120,
+        minWidth: 100,
+        minHeight: 80,
       }}
     >
-      {/* Minimal Header - hanya untuk compact mode */}
-      {layoutMode === "compact" && (
-        <div className="flex items-center justify-between mb-1 relative">
-          <h3
-            className="font-semibold text-slate-800 truncate leading-tight flex-1"
-            style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
-            title={config.customName}
-          >
-            {config.customName}
-          </h3>
+      {/* FIXED: Header - consistent with other widgets, NO VALUE */}
+      <div
+        className="px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
+        {/* Title */}
+        <h3
+          className={`font-medium truncate transition-colors duration-200 ${styling.title} flex-1`}
+          style={{
+            fontSize: `${dynamicSizes.titleFontSize}px`,
+            lineHeight: 1.3,
+          }}
+          title={config.customName}
+        >
+          {config.customName}
+        </h3>
+
+        {/* FIXED: Status Indicators only (value moved to gauge center) */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+          {/* Gauge icon */}
+          <Gauge
+            className="text-slate-400 dark:text-slate-500"
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+            }}
+          />
+
+          {/* FIXED: Wifi status */}
+          {connectionStatus === "Connected" ? (
+            <Wifi
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          ) : (
+            <WifiOff
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          )}
+
+          {/* Status Indicator */}
           <div
-            className={`
-              w-2 h-2 rounded-full shadow-sm transition-all duration-300
-              ${statusStyling.indicator}
-              ${status === "waiting" ? "animate-pulse" : ""}
-            `}
+            className={`rounded-full transition-all duration-300 ${
+              styling.indicator
+            } ${styling.pulse ? "animate-pulse" : ""}`}
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+            }}
           />
         </div>
-      )}
+      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 w-full relative">{renderGaugeContent()}</div>
+      {/* Gauge Content */}
+      <div className="flex-1 w-full relative overflow-hidden">
+        {renderGaugeContent()}
+      </div>
 
       {/* Hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

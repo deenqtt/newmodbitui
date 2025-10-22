@@ -28,7 +28,6 @@ import { PlusCircle, Trash2, List } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Tipe untuk setiap item dalam grup
 interface GroupItem {
   id: string;
   customName: string;
@@ -41,7 +40,6 @@ interface GroupItem {
   iconBgColor: string;
 }
 
-// Tipe untuk data perangkat dari API
 interface DeviceForSelection {
   uniqId: string;
   name: string;
@@ -52,6 +50,19 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    title: string;
+    items: Array<{
+      customName: string;
+      deviceUniqId: string;
+      selectedKey: string;
+      units: string;
+      multiply: number;
+      selectedIcon: string;
+      iconColor: string;
+      iconBgColor: string;
+    }>;
+  }; // ✅ TAMBAH PROP BARU
 }
 
 // Komponen Form untuk satu item
@@ -61,17 +72,20 @@ const ItemForm = ({
   removeItem,
   allDevices,
   isLoadingDevices,
+  isEditMode, // ✅ TAMBAH PROP
 }: {
   item: GroupItem;
   updateItem: (id: string, field: keyof GroupItem, value: any) => void;
   removeItem: (id: string) => void;
   allDevices: DeviceForSelection[];
   isLoadingDevices: boolean;
+  isEditMode: boolean; // ✅ TAMBAH PROP
 }) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
+  const initialDeviceRef = useRef(item.deviceUniqId); // ✅ TRACK INITIAL DEVICE
 
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
@@ -79,7 +93,13 @@ const ItemForm = ({
         const payload = JSON.parse(payloadString);
         const innerPayload =
           typeof payload.value === "string" ? JSON.parse(payload.value) : {};
-        setAvailableKeys(Object.keys(innerPayload));
+
+        // ✅ JIKA EDIT MODE, gabungkan dengan key yang sudah ada
+        setAvailableKeys((prevKeys) => {
+          const newKeys = Object.keys(innerPayload);
+          const allKeys = [...new Set([...prevKeys, ...newKeys])];
+          return allKeys;
+        });
       } catch (e) {
         console.error("Failed to parse MQTT payload in item form:", e);
       } finally {
@@ -91,21 +111,34 @@ const ItemForm = ({
     [unsubscribe]
   );
 
+  // ✅ SET INITIAL KEYS JIKA EDIT MODE
+  useEffect(() => {
+    if (isEditMode && item.selectedKey) {
+      setAvailableKeys([item.selectedKey]);
+    }
+  }, [isEditMode, item.selectedKey]);
+
   useEffect(() => {
     const selectedDevice = allDevices.find(
       (d) => d.uniqId === item.deviceUniqId
     );
     const newTopic = selectedDevice?.topic;
+
     if (subscribedTopicRef.current && subscribedTopicRef.current !== newTopic) {
       unsubscribe(subscribedTopicRef.current, handleMqttMessage);
       subscribedTopicRef.current = null;
     }
+
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      // ✅ PERBAIKAN: Jangan clear keys di edit mode, tapi tetap subscribe
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
     }
+
     return () => {
       if (subscribedTopicRef.current) {
         unsubscribe(subscribedTopicRef.current, handleMqttMessage);
@@ -118,11 +151,16 @@ const ItemForm = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
 
   const handleDeviceChange = (value: string) => {
     updateItem(item.id, "deviceUniqId", value);
     updateItem(item.id, "selectedKey", null);
+    // ✅ Hanya clear keys jika device berubah
+    if (value !== initialDeviceRef.current) {
+      setAvailableKeys([]);
+    }
   };
 
   return (
@@ -199,20 +237,28 @@ const ItemForm = ({
                     <span>Waiting for real-time data...</span>
                   </div>
                 </>
-              ) : availableKeys.length === 0 ? (
+              ) : availableKeys.length === 0 && !isEditMode ? (
                 <p className="text-yellow-600 dark:text-yellow-400">
                   No data available from this device
                 </p>
-              ) : (
+              ) : availableKeys.length > 0 ? (
                 <>
                   <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    <svg
+                      className="w-3 h-3"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     <span>{availableKeys.length} keys available</span>
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </div>
@@ -225,12 +271,11 @@ const ItemForm = ({
           />
         </div>
       </div>
-      {/* --- PERBAIKAN: Tambahkan pilihan ikon & warna di sini --- */}
       <div className="pt-4 border-t">
         <Label className="text-xs font-semibold">Appearance</Label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
           <div className="grid gap-2 sm:col-span-3">
-            <div className="grid grid-cols-6 sm:grid-cols-8 gap-1">
+            <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 max-h-[120px] overflow-y-auto p-1 border rounded">
               {iconList.map(({ name, icon: Icon }) => (
                 <button
                   key={name}
@@ -278,18 +323,48 @@ export const GroupedIconStatusConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig, // ✅ DESTRUCTURE PROP BARU
 }: Props) => {
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [items, setItems] = useState<GroupItem[]>([]);
   const [widgetTitle, setWidgetTitle] = useState("Grouped Status");
 
+  // ✅ TAMBAH STATE UNTUK TRACK EDIT MODE
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // ✅ EFFECT BARU: PRE-FILL DATA JIKA ADA initialConfig
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.title || "Grouped Status");
+
+      // ✅ Convert initialConfig items ke GroupItem format dengan id
+      const loadedItems: GroupItem[] = initialConfig.items.map(
+        (item, index) => ({
+          id: `item-${Date.now()}-${index}`,
+          customName: item.customName || "",
+          deviceUniqId: item.deviceUniqId || null,
+          selectedKey: item.selectedKey || null,
+          units: item.units || "",
+          multiply: String(item.multiply || 1),
+          selectedIcon: item.selectedIcon || "Zap",
+          iconColor: item.iconColor || "#FFFFFF",
+          iconBgColor: item.iconBgColor || "#3B82F6",
+        })
+      );
+
+      setItems(loadedItems);
+    } else if (isOpen) {
+      setIsEditMode(false);
       setItems([]);
       setWidgetTitle("Grouped Status");
       addItem();
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchDevices = async () => {
         setIsLoadingDevices(true);
         try {
@@ -343,7 +418,11 @@ export const GroupedIconStatusConfigModal = ({
     }
     for (const item of items) {
       if (!item.customName || !item.deviceUniqId || !item.selectedKey) {
-        toast.error(`Please complete all fields for item: "${item.customName || "Untitled"}"`);
+        toast.error(
+          `Please complete all fields for item: "${
+            item.customName || "Untitled"
+          }"`
+        );
         return;
       }
     }
@@ -362,17 +441,24 @@ export const GroupedIconStatusConfigModal = ({
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Grouped Icon Status
+            {/* ✅ UBAH TITLE SESUAI MODE */}
+            {isEditMode
+              ? "Edit Grouped Icon Status"
+              : "Configure Grouped Icon Status"}
           </DialogTitle>
           <DialogDescription>
-            Add and configure multiple status items to display in one widget.
+            {isEditMode
+              ? "Update your grouped status widget configuration."
+              : "Add and configure multiple status items to display in one widget."}
           </DialogDescription>
         </DialogHeader>
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {items.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <List className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-sm">No items added yet. Click "Add Another Item" to get started.</p>
+              <p className="text-sm">
+                No items added yet. Click "Add Another Item" to get started.
+              </p>
             </div>
           )}
           <div className="grid gap-2">
@@ -393,6 +479,7 @@ export const GroupedIconStatusConfigModal = ({
                 removeItem={removeItem}
                 allDevices={devices}
                 isLoadingDevices={isLoadingDevices}
+                isEditMode={isEditMode} // ✅ PASS EDIT MODE KE ITEM FORM
               />
             ))}
           </div>
@@ -406,7 +493,8 @@ export const GroupedIconStatusConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {/* ✅ UBAH TEXT BUTTON SESUAI MODE */}
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -56,14 +56,6 @@ export const LoRaWANDeviceConfigModal = ({
   const [refreshInterval, setRefreshInterval] = useState<number>(10);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
-  // Load initial config
-  useEffect(() => {
-    if (initialConfig) {
-      setSelectedDeviceId(initialConfig.deviceId);
-      setRefreshInterval(initialConfig.refreshInterval || 10);
-    }
-  }, [initialConfig]);
-
   // Fetch available LoRaWAN devices
   const fetchDevices = async () => {
     setIsLoadingDevices(true);
@@ -84,11 +76,19 @@ export const LoRaWANDeviceConfigModal = ({
     }
   };
 
+  // Load initial config and fetch devices when modal opens
   useEffect(() => {
     if (isOpen) {
+      if (initialConfig) {
+        setSelectedDeviceId(initialConfig.deviceId);
+        setRefreshInterval(initialConfig.refreshInterval || 10);
+      } else {
+        setSelectedDeviceId("");
+        setRefreshInterval(10);
+      }
       fetchDevices();
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig, fetchDevices]);
 
   const handleSave = () => {
     if (!selectedDeviceId) return;

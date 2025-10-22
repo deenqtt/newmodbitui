@@ -96,6 +96,33 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    deviceId: string;
+    friendlyName: string;
+    customName: string;
+    deviceType: string;
+    manufacturer?: string;
+    modelId?: string;
+  };
+}
+
+// Device model type definition
+interface DeviceModel {
+  name: string;
+  type: string;
+  features: string[];
+}
+
+// Device config type definition
+interface DeviceTypeConfig {
+  icon: any;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  category: string;
+  priority: number;
+  keywords: string[];
+  capabilities: string[];
 }
 
 // ULTIMATE Device Database - Supporting 4500+ Device Models from 510+ Manufacturers
@@ -182,7 +209,7 @@ const ULTIMATE_DEVICE_DATABASE = {
     Blitzwolf: "BlitzWolf",
     Lonsonho: "Lonsonho",
     TuYa: "Tuya",
-  },
+  } as Record<string, string>,
 
   // === MASSIVE MODEL DATABASE - 4500+ DEVICE PATTERNS ===
   models: {
@@ -798,10 +825,7 @@ const ULTIMATE_DEVICE_DATABASE = {
       features: ["state"],
     },
     ZBMINIL2: { name: "SONOFF ZBMINI-L2", type: "switch", features: ["state"] },
-
-    // === Additional brands with hundreds more models ===
-    // Sengled, Innr, Gledopto, etc. - truncated for space but would include all patterns
-  },
+  } as Record<string, DeviceModel>,
 
   // === DEVICE TYPE CLASSIFICATION SYSTEM ===
   deviceTypes: {
@@ -1131,7 +1155,7 @@ const ULTIMATE_DEVICE_DATABASE = {
       keywords: [],
       capabilities: [],
     },
-  },
+  } as Record<string, DeviceTypeConfig>,
 };
 
 // ULTIMATE Device Type Detection Algorithm - Enhanced for 4500+ devices
@@ -1320,7 +1344,7 @@ const getDeviceColor = (deviceType: string) => {
 };
 
 // Get device config
-const getDeviceConfig = (deviceType: string) => {
+const getDeviceConfig = (deviceType: string): DeviceTypeConfig => {
   return (
     ULTIMATE_DEVICE_DATABASE.deviceTypes[deviceType] ||
     ULTIMATE_DEVICE_DATABASE.deviceTypes.unknown
@@ -1396,7 +1420,12 @@ const formatLastSeen = (lastSeen?: string): string => {
   return date.toLocaleDateString();
 };
 
-export const ZigbeeDeviceConfigModal = ({ isOpen, onClose, onSave }: Props) => {
+export const ZigbeeDeviceConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
   const [devices, setDevices] = useState<ZigbeeDevice[]>([]);
   const [filteredDevices, setFilteredDevices] = useState<ZigbeeDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
@@ -1457,7 +1486,7 @@ export const ZigbeeDeviceConfigModal = ({ isOpen, onClose, onSave }: Props) => {
     setFilteredDevices(filtered);
   }, [devices, searchTerm, filterCategory, filterStatus]);
 
-  // Fetch zigbee devices when modal opens
+  // Fetch zigbee devices when modal opens and handle initial config
   useEffect(() => {
     if (isOpen) {
       const fetchDevices = async () => {
@@ -1468,6 +1497,19 @@ export const ZigbeeDeviceConfigModal = ({ isOpen, onClose, onSave }: Props) => {
           const data = await response.json();
           setDevices(data);
           console.log(`Loaded ${data.length} Zigbee devices`);
+
+          // If in edit mode, set initial selected device and custom name
+          if (initialConfig) {
+            const deviceToSelect = data.find(
+              (d: ZigbeeDevice) => d.deviceId === initialConfig.deviceId
+            );
+            if (deviceToSelect) {
+              setSelectedDeviceId(deviceToSelect.id);
+              setCustomName(
+                initialConfig.customName || deviceToSelect.friendlyName
+              );
+            }
+          }
         } catch (error: any) {
           console.error("Error fetching devices:", error);
           alert(`Error: ${error.message || "Failed to fetch devices"}`);
@@ -1487,19 +1529,21 @@ export const ZigbeeDeviceConfigModal = ({ isOpen, onClose, onSave }: Props) => {
         setFilterStatus("all");
       }, 200);
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, initialConfig]);
 
-  // Auto-fill custom name when device is selected
+  // Auto-fill custom name when device is selected (only if not in edit mode or custom name is empty)
   useEffect(() => {
     if (selectedDeviceId) {
       const selectedDevice = devices.find((d) => d.id === selectedDeviceId);
-      if (selectedDevice) {
+      if (selectedDevice && !initialConfig) {
+        // Only auto-fill if not in edit mode
         setCustomName(selectedDevice.friendlyName);
       }
-    } else {
+    } else if (!initialConfig) {
+      // Only clear if not in edit mode
       setCustomName("");
     }
-  }, [selectedDeviceId, devices]);
+  }, [selectedDeviceId, devices, initialConfig]);
 
   const handleSave = () => {
     if (!selectedDeviceId) {

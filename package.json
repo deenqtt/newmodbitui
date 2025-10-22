@@ -13,6 +13,7 @@
     "seed:devices": "node scripts/seed-devices.js",
     "seed:tenants": "node scripts/seed-tenants.js",
     "seed:node-locations": "node scripts/seed-node-locations.js",
+    "seed:alarm-configs": "node scripts/seed-alarm-configs.js",
     "db:seed": "npm run seed:init"
   },
   "dependencies": {

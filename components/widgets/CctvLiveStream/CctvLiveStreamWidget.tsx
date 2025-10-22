@@ -438,14 +438,15 @@ export const CctvLiveStreamWidget = ({ config }: Props) => {
         {monitorInfo?.host && (
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span className="font-mono">
-              {monitorInfo.protocol?.toUpperCase() || 'RTSP'}://{monitorInfo.host}:{monitorInfo.port}
+              {monitorInfo.protocol?.toUpperCase() || "RTSP"}://
+              {monitorInfo.host}:{monitorInfo.port}
             </span>
             <span className="text-blue-600 font-medium">
               {streamUrl ? "HLS Stream" : "No Stream"}
             </span>
           </div>
         )}
-        
+
         {/* Status Info */}
         <div className="flex items-center justify-between text-xs text-gray-500">
           <div className="flex items-center gap-2">
@@ -457,7 +458,13 @@ export const CctvLiveStreamWidget = ({ config }: Props) => {
               </>
             )}
           </div>
-          <span className={connectionStatus === "connected" ? "text-green-600 font-medium" : "text-red-500"}>
+          <span
+            className={
+              connectionStatus === "connected"
+                ? "text-green-600 font-medium"
+                : "text-red-500"
+            }
+          >
             {connectionStatus === "connected" ? "● LIVE" : "● OFFLINE"}
           </span>
         </div>

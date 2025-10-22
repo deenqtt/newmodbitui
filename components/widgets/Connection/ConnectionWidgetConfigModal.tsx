@@ -50,15 +50,15 @@ interface ConnectionWidgetConfig {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  config?: ConnectionWidgetConfig;
   onSave: (config: ConnectionWidgetConfig) => void;
+  initialConfig?: ConnectionWidgetConfig;
 }
 
 export const ConnectionWidgetConfigModal: React.FC<Props> = ({
   isOpen,
   onClose,
-  config,
   onSave,
+  initialConfig,
 }) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
@@ -79,7 +79,7 @@ export const ConnectionWidgetConfigModal: React.FC<Props> = ({
   };
 
   const [localConfig, setLocalConfig] = useState<ConnectionWidgetConfig>(
-    config || defaultConfig
+    initialConfig || defaultConfig
   );
 
   // State untuk key yang didapat dari MQTT
@@ -88,10 +88,10 @@ export const ConnectionWidgetConfigModal: React.FC<Props> = ({
   const subscribedTopicRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (config) {
-      setLocalConfig(config);
+    if (initialConfig) {
+      setLocalConfig(initialConfig);
     }
-  }, [config]);
+  }, [initialConfig]);
 
   // Fetch data perangkat saat modal dibuka
   useEffect(() => {

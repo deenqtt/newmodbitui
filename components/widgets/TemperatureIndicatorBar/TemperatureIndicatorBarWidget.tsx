@@ -15,6 +15,14 @@ import {
   Thermometer,
   Snowflake,
   Flame,
+  Gauge,
+  Wind,
+  Zap,
+  Droplets,
+  TrendingUp,
+  Activity,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -31,57 +39,201 @@ interface Props {
   };
 }
 
-// Temperature range analysis
-const getTemperatureInfo = (
+// ✅ UNIT TYPE DETECTION
+const detectUnitType = (units: string = ""): string => {
+  const normalized = units.toLowerCase().trim();
+
+  if (
+    /^(°c|°f|°k|c|f|k|celsius|fahrenheit|kelvin|degc|degf|degk)$/i.test(
+      normalized
+    )
+  ) {
+    return "temperature";
+  }
+
+  if (
+    /^(psi|pa|kpa|mpa|bar|mbar|atm|pascal|mmhg|inhg|torr)$/i.test(normalized)
+  ) {
+    return "pressure";
+  }
+
+  if (/^(m\/s|km\/h|mph|knot|knots|ft\/s|mps|kph)$/i.test(normalized)) {
+    return "speed";
+  }
+
+  if (/^(v|mv|kv|a|ma|ka|volt|amp|ampere)$/i.test(normalized)) {
+    return "electrical";
+  }
+
+  if (/^(%|percent|rh|humidity)$/i.test(normalized)) {
+    return "percentage";
+  }
+
+  if (/^(w|kw|mw|watt|kilowatt|megawatt)$/i.test(normalized)) {
+    return "power";
+  }
+
+  if (/^(l\/s|m3\/s|gpm|lpm|cfm)$/i.test(normalized)) {
+    return "flow";
+  }
+
+  if (/^(m|cm|mm|km|ft|in|mile)$/i.test(normalized)) {
+    return "distance";
+  }
+
+  if (/^(kg|g|mg|lb|oz|ton)$/i.test(normalized)) {
+    return "weight";
+  }
+
+  return "generic";
+};
+
+// ✅ DYNAMIC RANGE LABELS
+const getRangeInfo = (
   value: number,
   minValue: number,
-  maxValue: number
+  maxValue: number,
+  unitType: string
 ) => {
   const range = maxValue - minValue;
   const percentage = Math.max(0, Math.min(1, (value - minValue) / range));
 
-  // Temperature zones with more meaningful categorization
-  if (percentage < 0.2) {
-    return {
-      zone: "Very Cold",
-      color: "text-blue-600",
-      bgColor: "bg-blue-500",
-      icon: Snowflake,
-      description: "Below normal range",
-    };
-  } else if (percentage < 0.4) {
-    return {
-      zone: "Cool",
-      color: "text-cyan-600",
-      bgColor: "bg-cyan-500",
-      icon: Thermometer,
-      description: "Lower range",
-    };
-  } else if (percentage < 0.6) {
-    return {
-      zone: "Normal",
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-500",
-      icon: Thermometer,
-      description: "Optimal range",
-    };
-  } else if (percentage < 0.8) {
-    return {
-      zone: "Warm",
-      color: "text-orange-600",
-      bgColor: "bg-orange-500",
-      icon: Thermometer,
-      description: "Higher range",
-    };
-  } else {
-    return {
-      zone: "Hot",
-      color: "text-red-600",
-      bgColor: "bg-red-500",
-      icon: Flame,
-      description: "Above normal range",
-    };
+  const labelSets: Record<
+    string,
+    {
+      zones: Array<{ threshold: number; label: string; icon: any }>;
+      lowIcon: any;
+      highIcon: any;
+    }
+  > = {
+    temperature: {
+      zones: [
+        { threshold: 0.2, label: "Very Cold", icon: Snowflake },
+        { threshold: 0.4, label: "Cool", icon: Thermometer },
+        { threshold: 0.6, label: "Normal", icon: Thermometer },
+        { threshold: 0.8, label: "Warm", icon: Thermometer },
+        { threshold: 1.0, label: "Hot", icon: Flame },
+      ],
+      lowIcon: Snowflake,
+      highIcon: Flame,
+    },
+    pressure: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: Gauge },
+        { threshold: 0.4, label: "Low", icon: Gauge },
+        { threshold: 0.6, label: "Normal", icon: Gauge },
+        { threshold: 0.8, label: "High", icon: Gauge },
+        { threshold: 1.0, label: "Very High", icon: Gauge },
+      ],
+      lowIcon: Gauge,
+      highIcon: Gauge,
+    },
+    speed: {
+      zones: [
+        { threshold: 0.2, label: "Very Slow", icon: Wind },
+        { threshold: 0.4, label: "Slow", icon: Wind },
+        { threshold: 0.6, label: "Moderate", icon: Wind },
+        { threshold: 0.8, label: "Fast", icon: Wind },
+        { threshold: 1.0, label: "Very Fast", icon: Wind },
+      ],
+      lowIcon: Wind,
+      highIcon: Wind,
+    },
+    electrical: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: Zap },
+        { threshold: 0.4, label: "Low", icon: Zap },
+        { threshold: 0.6, label: "Normal", icon: Zap },
+        { threshold: 0.8, label: "High", icon: Zap },
+        { threshold: 1.0, label: "Very High", icon: Zap },
+      ],
+      lowIcon: Zap,
+      highIcon: Zap,
+    },
+    percentage: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: Droplets },
+        { threshold: 0.4, label: "Low", icon: Droplets },
+        { threshold: 0.6, label: "Moderate", icon: Droplets },
+        { threshold: 0.8, label: "High", icon: Droplets },
+        { threshold: 1.0, label: "Very High", icon: Droplets },
+      ],
+      lowIcon: Droplets,
+      highIcon: Droplets,
+    },
+    power: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: TrendingUp },
+        { threshold: 0.4, label: "Low", icon: TrendingUp },
+        { threshold: 0.6, label: "Moderate", icon: TrendingUp },
+        { threshold: 0.8, label: "High", icon: TrendingUp },
+        { threshold: 1.0, label: "Very High", icon: TrendingUp },
+      ],
+      lowIcon: TrendingUp,
+      highIcon: TrendingUp,
+    },
+    flow: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: Activity },
+        { threshold: 0.4, label: "Low", icon: Activity },
+        { threshold: 0.6, label: "Normal", icon: Activity },
+        { threshold: 0.8, label: "High", icon: Activity },
+        { threshold: 1.0, label: "Very High", icon: Activity },
+      ],
+      lowIcon: Activity,
+      highIcon: Activity,
+    },
+    generic: {
+      zones: [
+        { threshold: 0.2, label: "Very Low", icon: Activity },
+        { threshold: 0.4, label: "Low", icon: Activity },
+        { threshold: 0.6, label: "Medium", icon: Activity },
+        { threshold: 0.8, label: "High", icon: Activity },
+        { threshold: 1.0, label: "Very High", icon: Activity },
+      ],
+      lowIcon: Activity,
+      highIcon: Activity,
+    },
+  };
+
+  const labelSet = labelSets[unitType] || labelSets.generic;
+
+  let zoneInfo = labelSet.zones[0];
+  for (const zone of labelSet.zones) {
+    if (percentage <= zone.threshold) {
+      zoneInfo = zone;
+      break;
+    }
   }
+
+  // FIXED: Color mapping with dark mode support
+  let colorClass, bgColorClass;
+  if (percentage < 0.2) {
+    colorClass = "text-blue-600 dark:text-blue-400";
+    bgColorClass = "bg-blue-500";
+  } else if (percentage < 0.4) {
+    colorClass = "text-cyan-600 dark:text-cyan-400";
+    bgColorClass = "bg-cyan-500";
+  } else if (percentage < 0.6) {
+    colorClass = "text-emerald-600 dark:text-emerald-400";
+    bgColorClass = "bg-emerald-500";
+  } else if (percentage < 0.8) {
+    colorClass = "text-orange-600 dark:text-orange-400";
+    bgColorClass = "bg-orange-500";
+  } else {
+    colorClass = "text-red-600 dark:text-red-400";
+    bgColorClass = "bg-red-500";
+  }
+
+  return {
+    zone: zoneInfo.label,
+    color: colorClass,
+    bgColor: bgColorClass,
+    icon: zoneInfo.icon,
+    lowIcon: labelSet.lowIcon,
+    highIcon: labelSet.highIcon,
+    description: zoneInfo.label,
+  };
 };
 
 export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
@@ -95,58 +247,73 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
   const [topic, setTopic] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Responsive sizing setup
+  // FIXED: Responsive sizing - consistent with other widgets
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [titleFontSize, setTitleFontSize] = useState(14);
-  const [valueFontSize, setValueFontSize] = useState(24);
-  const [unitFontSize, setUnitFontSize] = useState(12);
-  const [labelFontSize, setLabelFontSize] = useState(10);
-  const [layoutMode, setLayoutMode] = useState<"compact" | "normal">("normal");
+  const [dynamicSizes, setDynamicSizes] = useState({
+    valueFontSize: 24,
+    unitFontSize: 14,
+    titleFontSize: 12,
+    labelFontSize: 10,
+    padding: 16,
+    headerHeight: 42,
+    barHeight: 12,
+  });
+  const [layoutMode, setLayoutMode] = useState<"mini" | "compact" | "normal">(
+    "normal"
+  );
 
-  // Enhanced responsive calculation
+  // FIXED: Enhanced responsive calculation - same as other widgets
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const updateDimensions = () => {
+    const updateLayout = () => {
       const rect = container.getBoundingClientRect();
       const { width, height } = rect;
-
       setDimensions({ width, height });
 
-      // Determine layout mode
-      const area = width * height;
-      const currentLayoutMode =
-        area < 30000 || height < 150 ? "compact" : "normal";
+      const headerHeight = Math.max(36, Math.min(height * 0.25, 56));
+      const availableHeight = height - headerHeight;
+
+      // FIXED: Better layout mode detection
+      const minDimension = Math.min(width, height);
+
+      let currentLayoutMode: "mini" | "compact" | "normal";
+      if (minDimension < 180 || availableHeight < 100) {
+        currentLayoutMode = "mini";
+      } else if (minDimension < 280 || availableHeight < 160) {
+        currentLayoutMode = "compact";
+      } else {
+        currentLayoutMode = "normal";
+      }
       setLayoutMode(currentLayoutMode);
 
-      // Improved scaling algorithm
-      const minDimension = Math.min(width, height);
-      const scaleFactor = Math.sqrt(area) / 120;
-      const minScaleFactor = Math.min(width / 180, height / 120);
-      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
-
-      const baseValueSize = Math.max(minDimension * 0.12, 16);
-      const maxValueSize = Math.min(width * 0.2, height * 0.25);
-      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
-
-      const newTitleSize = Math.max(
-        Math.min(newValueSize * 0.5, width * 0.08),
-        11
+      // FIXED: Dynamic sizing based on layout mode
+      const valueSize = Math.max(
+        20,
+        Math.min(width * 0.18, availableHeight * 0.25, 64)
       );
-      const newUnitSize = Math.max(newValueSize * 0.4, 10);
-      const newLabelSize = Math.max(newTitleSize * 0.8, 9);
+      const unitSize = Math.max(12, Math.min(valueSize * 0.5, 28));
+      const titleSize = Math.max(11, Math.min(headerHeight * 0.32, 15));
+      const labelSize = Math.max(9, Math.min(titleSize * 0.85, 13));
+      const padding = Math.max(12, Math.min(width * 0.04, 24));
+      const barHeight = Math.max(8, Math.min(availableHeight * 0.08, 16));
 
-      setValueFontSize(Math.round(newValueSize));
-      setTitleFontSize(Math.round(newTitleSize));
-      setUnitFontSize(Math.round(newUnitSize));
-      setLabelFontSize(Math.round(newLabelSize));
+      setDynamicSizes({
+        valueFontSize: Math.round(valueSize),
+        unitFontSize: Math.round(unitSize),
+        titleFontSize: Math.round(titleSize),
+        labelFontSize: Math.round(labelSize),
+        padding,
+        headerHeight,
+        barHeight,
+      });
     };
 
-    const resizeObserver = new ResizeObserver(updateDimensions);
+    const resizeObserver = new ResizeObserver(updateLayout);
     resizeObserver.observe(container);
-    updateDimensions();
+    updateLayout();
 
     return () => resizeObserver.disconnect();
   }, []);
@@ -197,7 +364,7 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
           }
         }
       } catch (e) {
-        console.error("Failed to parse MQTT payload for temp bar:", e);
+        console.error("Failed to parse MQTT payload:", e);
       }
     },
     [config.selectedKey, config.multiply, currentValue]
@@ -221,8 +388,8 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
   ]);
 
   const { minValue = 0, maxValue = 100, units = "°C" } = config;
+  const unitType = detectUnitType(units);
 
-  // Clean minimal status styling
   const getStatusStyles = () => {
     const baseStyles = {
       title: "text-slate-700 dark:text-slate-300",
@@ -234,13 +401,13 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500 dark:bg-emerald-400",
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
           pulse: false,
         };
       case "error":
         return {
           ...baseStyles,
-          indicator: "bg-red-500 dark:bg-red-400",
+          indicator: "bg-red-500 dark:bg-red-500",
           pulse: false,
           title: "text-red-600 dark:text-red-400",
           value: "text-red-700 dark:text-red-300",
@@ -249,7 +416,7 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
       case "waiting":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500 dark:bg-amber-400",
+          indicator: "bg-amber-500 dark:bg-amber-500",
           pulse: true,
           title: "text-slate-600 dark:text-slate-400",
           value: "text-slate-700 dark:text-slate-300",
@@ -292,42 +459,65 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
   const renderProgressBar = () => {
     if (currentValue === null) return null;
 
-    const tempInfo = getTemperatureInfo(currentValue, minValue, maxValue);
+    const rangeInfo = getRangeInfo(currentValue, minValue, maxValue, unitType);
+    const LowIcon = rangeInfo.lowIcon;
+    const HighIcon = rangeInfo.highIcon;
 
     return (
       <div className="space-y-2">
-        {/* Range labels */}
-        <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center gap-1">
-            <Snowflake className="w-3 h-3 text-blue-500" />
-            <span className="text-slate-500">{formatValue(minValue)}°</span>
+        {/* FIXED: Range labels with responsive sizing and dark mode */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-1.5">
+            <LowIcon
+              className="text-blue-500 dark:text-blue-400"
+              style={{
+                width: dynamicSizes.labelFontSize * 1.2,
+                height: dynamicSizes.labelFontSize * 1.2,
+              }}
+            />
+            <span
+              className="text-slate-500 dark:text-slate-400 font-medium"
+              style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+            >
+              {formatValue(minValue)}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-slate-500">{formatValue(maxValue)}°</span>
-            <Flame className="w-3 h-3 text-red-500" />
+          <div className="flex items-center gap-1.5">
+            <span
+              className="text-slate-500 dark:text-slate-400 font-medium"
+              style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+            >
+              {formatValue(maxValue)}
+            </span>
+            <HighIcon
+              className="text-red-500 dark:text-red-400"
+              style={{
+                width: dynamicSizes.labelFontSize * 1.2,
+                height: dynamicSizes.labelFontSize * 1.2,
+              }}
+            />
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* FIXED: Progress Bar with dark mode support */}
         <div className="relative">
           <div
-            className="w-full bg-slate-200 rounded-full overflow-hidden"
-            style={{ height: Math.max(8, dimensions.height * 0.06) }}
+            className="w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner"
+            style={{ height: dynamicSizes.barHeight }}
           >
             <div
-              className={`h-full ${tempInfo.bgColor} rounded-full transition-all duration-700 ease-out relative`}
+              className={`h-full ${rangeInfo.bgColor} rounded-full transition-all duration-700 ease-out relative`}
               style={{
                 width: `${Math.max(2, Math.min(100, percentage * 100))}%`,
               }}
             >
-              {/* Subtle animation for active state */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
             </div>
           </div>
 
-          {/* Current position indicator */}
+          {/* Position indicator */}
           <div
-            className="absolute top-0 w-0.5 h-full bg-slate-800 rounded-full transform -translate-x-0.5"
+            className="absolute top-0 w-1 h-full bg-slate-900 dark:bg-slate-100 rounded-full transform -translate-x-0.5 shadow-lg"
             style={{ left: `${percentage * 100}%` }}
           />
         </div>
@@ -344,17 +534,17 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
       return (
         <div className="flex flex-col items-center justify-center gap-3">
           <Loader2
-            className="animate-spin text-slate-400"
+            className="animate-spin text-slate-400 dark:text-slate-500"
             style={{
-              width: Math.max(dimensions.width / 10, 24),
-              height: Math.max(dimensions.width / 10, 24),
+              width: Math.max(dynamicSizes.valueFontSize * 1.2, 28),
+              height: Math.max(dynamicSizes.valueFontSize * 1.2, 28),
             }}
           />
           <p
             className={`font-medium ${styles.title}`}
-            style={{ fontSize: `${labelFontSize}px` }}
+            style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
           >
-            Loading temperature...
+            Loading data...
           </p>
         </div>
       );
@@ -364,15 +554,15 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
       return (
         <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
-            className="text-red-500"
+            className="text-red-500 dark:text-red-400"
             style={{
-              width: Math.max(dimensions.width / 10, 24),
-              height: Math.max(dimensions.width / 10, 24),
+              width: Math.max(dynamicSizes.valueFontSize * 1.2, 28),
+              height: Math.max(dynamicSizes.valueFontSize * 1.2, 28),
             }}
           />
           <p
             className={`font-semibold break-words ${styles.value}`}
-            style={{ fontSize: `${labelFontSize}px` }}
+            style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
           >
             {errorMessage}
           </p>
@@ -380,54 +570,70 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
       );
     }
 
-    const tempInfo = getTemperatureInfo(currentValue || 0, minValue, maxValue);
+    const rangeInfo = getRangeInfo(
+      currentValue || 0,
+      minValue,
+      maxValue,
+      unitType
+    );
+    const ZoneIcon = rangeInfo.icon;
 
     return (
-      <div className="w-full space-y-4">
-        {/* Main temperature display */}
+      <div className="w-full space-y-3">
+        {/* Main value display */}
         <div className="text-center space-y-2">
-          <div className="flex items-baseline justify-center gap-2">
+          <div className="flex items-baseline justify-center gap-2 flex-wrap">
             <span
               className={`font-bold tracking-tight transition-colors duration-300 ${styles.value}`}
-              style={{ fontSize: `${valueFontSize}px`, lineHeight: 0.9 }}
+              style={{
+                fontSize: `${dynamicSizes.valueFontSize}px`,
+                lineHeight: 0.9,
+              }}
             >
               {formatValue(currentValue)}
             </span>
             <span
               className={`font-medium ${styles.unit}`}
-              style={{ fontSize: `${unitFontSize}px`, lineHeight: 1 }}
+              style={{
+                fontSize: `${dynamicSizes.unitFontSize}px`,
+                lineHeight: 1,
+              }}
             >
               {units}
             </span>
           </div>
 
-          {/* Temperature zone indicator */}
-          <div className="flex items-center justify-center gap-2 px-3 py-1 bg-slate-50 rounded-full">
-            <tempInfo.icon
-              className={tempInfo.color}
-              style={{
-                width: Math.max(labelFontSize * 1.2, 12),
-                height: Math.max(labelFontSize * 1.2, 12),
-              }}
-            />
-            <span
-              className={`font-medium ${tempInfo.color}`}
-              style={{ fontSize: `${labelFontSize}px` }}
-            >
-              {tempInfo.zone}
-            </span>
-          </div>
+          {/* FIXED: Zone indicator with dark mode */}
+          {layoutMode !== "mini" && (
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200/50 dark:border-slate-700/50 inline-flex">
+              <ZoneIcon
+                className={rangeInfo.color}
+                style={{
+                  width: Math.max(dynamicSizes.labelFontSize * 1.3, 13),
+                  height: Math.max(dynamicSizes.labelFontSize * 1.3, 13),
+                }}
+              />
+              <span
+                className={`font-semibold ${rangeInfo.color}`}
+                style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+              >
+                {rangeInfo.zone}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Progress Bar */}
-        {layoutMode === "normal" && renderProgressBar()}
+        {layoutMode !== "mini" && renderProgressBar()}
 
-        {/* Additional info for normal mode */}
+        {/* Additional info */}
         {layoutMode === "normal" && lastUpdate && (
           <div className="text-center">
             <p
-              className="text-slate-400"
-              style={{ fontSize: `${Math.max(labelFontSize * 0.9, 8)}px` }}
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                fontSize: `${Math.max(dynamicSizes.labelFontSize * 0.85, 8)}px`,
+              }}
             >
               Updated {formatTime(lastUpdate)}
             </p>
@@ -451,60 +657,82 @@ export const TemperatureIndicatorBarWidget = ({ config }: Props) => {
         group hover:scale-[1.01] transform-gpu
       `}
       style={{
-        minWidth: 200,
-        minHeight: 120,
+        minWidth: 100,
+        minHeight: 80,
       }}
     >
-      {/* Status indicators */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-        <Thermometer
-          className="text-slate-400"
-          style={{
-            width: Math.max(titleFontSize * 0.8, 12),
-            height: Math.max(titleFontSize * 0.8, 12),
-          }}
-        />
-
-        <div
-          className={`rounded-full transition-all duration-300 ${
-            styles.indicator
-          } ${styles.pulse ? "animate-pulse" : ""}`}
-          style={{
-            width: Math.max(titleFontSize * 0.6, 8),
-            height: Math.max(titleFontSize * 0.6, 8),
-          }}
-        />
-      </div>
-
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 pr-16">
+      {/* FIXED: Header - consistent with other widgets */}
+      <div
+        className="absolute top-0 left-0 right-0 px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
         <h3
-          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
+          className={`font-medium truncate transition-colors duration-200 ${styles.title}`}
           style={{
-            fontSize: `${titleFontSize}px`,
+            fontSize: `${dynamicSizes.titleFontSize}px`,
             lineHeight: 1.3,
+            flex: 1,
           }}
           title={config.customName}
         >
           {config.customName}
         </h3>
+
+        {/* FIXED: Status indicators with wifi */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+          <Thermometer
+            className="text-slate-400 dark:text-slate-500"
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+            }}
+          />
+
+          {connectionStatus === "Connected" ? (
+            <Wifi
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          ) : (
+            <WifiOff
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          )}
+
+          <div
+            className={`rounded-full ${styles.indicator} ${
+              styles.pulse ? "animate-pulse" : ""
+            } transition-all duration-300`}
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+            }}
+          />
+        </div>
       </div>
 
-      {/* Main content area */}
+      {/* FIXED: Main content with proper spacing */}
       <div
-        className="absolute inset-0 flex items-center justify-center"
+        className="w-full h-full flex items-center justify-center"
         style={{
-          paddingTop: titleFontSize * 2.5,
-          paddingBottom: 16,
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingTop: dynamicSizes.headerHeight + dynamicSizes.padding * 0.5,
+          paddingBottom: dynamicSizes.padding,
+          paddingLeft: dynamicSizes.padding,
+          paddingRight: dynamicSizes.padding,
         }}
       >
         {renderContent()}
       </div>
 
-      {/* Minimal hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Minimal hover effect */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

@@ -34,9 +34,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
-  // Properti untuk membedakan 'last_month' dan 'current_month'
   period: "last_month" | "current_month";
   title: string;
+  initialConfig?: {
+    widgetTitle: string;
+    loggingConfigId: string;
+    units?: string;
+    multiply?: number;
+    period: "last_month" | "current_month";
+  }; // ✅ TAMBAH PROP BARU
 }
 
 export const EnergyUsageConfigModal = ({
@@ -45,6 +51,7 @@ export const EnergyUsageConfigModal = ({
   onSave,
   period,
   title,
+  initialConfig, // ✅ DESTRUCTURE PROP BARU
 }: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,14 +62,29 @@ export const EnergyUsageConfigModal = ({
   const [units, setUnits] = useState("kWh");
   const [multiply, setMultiply] = useState("1");
 
+  // ✅ TAMBAH STATE UNTUK TRACK EDIT MODE
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // ✅ EFFECT BARU: PRE-FILL DATA JIKA ADA initialConfig
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "");
+      setSelectedConfigId(initialConfig.loggingConfigId || null);
+      setUnits(initialConfig.units || "kWh");
+      setMultiply(String(initialConfig.multiply || 1));
+    } else if (isOpen) {
+      setIsEditMode(false);
+      // Reset ke default values
       setWidgetTitle("");
       setSelectedConfigId(null);
       setUnits("kWh");
       setMultiply("1");
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -99,10 +121,14 @@ export const EnergyUsageConfigModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-xl">{title}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {/* ✅ UBAH TITLE SESUAI MODE */}
+            {isEditMode ? `Edit ${title}` : title}
+          </DialogTitle>
           <DialogDescription>
-            Select a pre-defined logging configuration to calculate energy
-            usage.
+            {isEditMode
+              ? "Update your energy usage widget configuration."
+              : "Select a pre-defined logging configuration to calculate energy usage."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 p-6">
@@ -160,7 +186,8 @@ export const EnergyUsageConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {/* ✅ UBAH TEXT BUTTON SESUAI MODE */}
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

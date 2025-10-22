@@ -131,14 +131,15 @@ class NodeTenantLocationMqttListener {
         jsonPayload = { message: messagePayload };
       }
 
-      // Simpan ke database
-      const newPayload = await prisma.nodeLocationMqttPayload.create({
-        data: {
-          locationId: location.id,
-          topic: topic,
-          payload: jsonPayload,
-        },
-      });
+            // Simpan ke database dengan timestamp yang benar
+            const newPayload = await prisma.nodeLocationMqttPayload.create({
+                data: {
+                    locationId: location.id,
+                    topic: topic,
+                    payload: jsonPayload,
+                    receivedAt: new Date()  // Set timestamp secara eksplisit
+                }
+            });
 
       console.log(`[NodeTenantLocation MQTT] ✅ Saved payload for ${location.name} (${location.id}) - Topic: ${topic}`);
 

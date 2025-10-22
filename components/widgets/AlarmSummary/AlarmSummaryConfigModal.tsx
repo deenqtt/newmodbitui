@@ -19,16 +19,30 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+  };
 }
 
-export const AlarmSummaryConfigModal = ({ isOpen, onClose, onSave }: Props) => {
-  const [widgetTitle, setWidgetTitle] = useState("Active Alarms");
+export const AlarmSummaryConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || "Active Alarms"
+  );
 
   useEffect(() => {
     if (isOpen) {
-      setWidgetTitle("Active Alarms");
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+      } else {
+        setWidgetTitle("Active Alarms");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   const handleSave = () => {
     if (!widgetTitle) {
@@ -62,7 +76,7 @@ export const AlarmSummaryConfigModal = ({ isOpen, onClose, onSave }: Props) => {
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
+          <Button type="submit" onClick={handleSave} disabled={!widgetTitle}>
             Save Widget
           </Button>
         </DialogFooter>

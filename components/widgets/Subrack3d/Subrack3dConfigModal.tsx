@@ -30,25 +30,78 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    subrackType: string;
+    topics: string[]; // Array of topic strings
+  };
 }
 
-export const Subrack3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
-  const [customName, setCustomName] = useState("");
-  const [deviceUniqId, setDeviceUniqId] = useState("");
-  const [subrackType, setSubrackType] = useState("");
+export const Subrack3dConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
+  const [customName, setCustomName] = useState(initialConfig?.customName || "");
+  const [deviceUniqId, setDeviceUniqId] = useState(
+    initialConfig?.deviceUniqId || ""
+  );
+  const [subrackType, setSubrackType] = useState(
+    initialConfig?.subrackType || ""
+  );
   const [topics, setTopics] = useState<TopicConfig[]>([]);
   const [error, setError] = useState("");
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setCustomName("");
-      setDeviceUniqId("");
-      setSubrackType("");
-      setTopics([]);
+      if (initialConfig) {
+        setCustomName(initialConfig.customName);
+        setDeviceUniqId(initialConfig.deviceUniqId);
+        setSubrackType(initialConfig.subrackType);
+        // Reconstruct TopicConfig[] from initialConfig.topics (string[])
+        let initialTopics: TopicConfig[] = [];
+        if (initialConfig.subrackType === "Normal Subrack") {
+          initialTopics = [
+            { title: "Optocoupler", topic: initialConfig.topics[0] || "" },
+            { title: "Relay", topic: initialConfig.topics[1] || "" },
+            { title: "Drycontact", topic: initialConfig.topics[2] || "" },
+          ];
+        } else if (initialConfig.subrackType === "Subrack With 18 Mini Relay") {
+          initialTopics = [
+            { title: "Relay 1", topic: initialConfig.topics[0] || "" },
+            { title: "Relay 2", topic: initialConfig.topics[1] || "" },
+            { title: "Relay 3", topic: initialConfig.topics[2] || "" },
+          ];
+        } else if (initialConfig.subrackType === "Subrack With 42 DI/DO") {
+          initialTopics = [
+            { title: "Optocoupler 1", topic: initialConfig.topics[0] || "" },
+            { title: "Optocoupler 2", topic: initialConfig.topics[1] || "" },
+            { title: "Optocoupler 3", topic: initialConfig.topics[2] || "" },
+          ];
+        } else if (initialConfig.subrackType === "Subrack With 42 Drycontact") {
+          initialTopics = [
+            { title: "Drycontact 1", topic: initialConfig.topics[0] || "" },
+            { title: "Drycontact 2", topic: initialConfig.topics[1] || "" },
+            { title: "Drycontact 3", topic: initialConfig.topics[2] || "" },
+          ];
+        } else {
+          initialTopics = [
+            { title: "Unknown Device", topic: initialConfig.topics[0] || "" },
+          ];
+        }
+        setTopics(initialTopics);
+      } else {
+        setCustomName("");
+        setDeviceUniqId("");
+        setSubrackType("");
+        setTopics([]);
+      }
       setError("");
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   // Update topics when subrackType changes
   useEffect(() => {
@@ -217,7 +270,17 @@ export const Subrack3dConfigModal = ({ isOpen, onClose, onSave }: Props) => {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Save Configuration</Button>
+            <Button
+              type="submit"
+              disabled={
+                !customName ||
+                !deviceUniqId ||
+                !subrackType ||
+                topics.some((t) => !t.topic)
+              }
+            >
+              Save Configuration
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

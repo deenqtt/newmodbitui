@@ -49,12 +49,21 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    cctvId: string;
+    monitorId: string;
+    maxVideos: number;
+    autoRefresh: boolean;
+    refreshInterval?: number;
+  };
 }
 
 export const CctvMonitorVideosConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [cameras, setCameras] = useState<CctvCamera[]>([]);
   const [monitors, setMonitors] = useState<MonitorData[]>([]);
@@ -62,20 +71,41 @@ export const CctvMonitorVideosConfigModal = ({
   const [isLoadingMonitors, setIsLoadingMonitors] = useState(false);
 
   // Form state
-  const [widgetTitle, setWidgetTitle] = useState("");
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-  const [selectedMonitorId, setSelectedMonitorId] = useState<string>("");
-  const [maxVideos, setMaxVideos] = useState("10");
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState("30");
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || ""
+  );
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(
+    initialConfig?.cctvId || ""
+  );
+  const [selectedMonitorId, setSelectedMonitorId] = useState<string>(
+    initialConfig?.monitorId || ""
+  );
+  const [maxVideos, setMaxVideos] = useState(
+    String(initialConfig?.maxVideos) || "10"
+  );
+  const [autoRefresh, setAutoRefresh] = useState(
+    initialConfig?.autoRefresh ?? true
+  );
+  const [refreshInterval, setRefreshInterval] = useState(
+    String(initialConfig?.refreshInterval) || "30"
+  );
 
   // Fetch cameras on modal open
   useEffect(() => {
     if (isOpen) {
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setSelectedCameraId(initialConfig.cctvId);
+        setSelectedMonitorId(initialConfig.monitorId);
+        setMaxVideos(String(initialConfig.maxVideos));
+        setAutoRefresh(initialConfig.autoRefresh);
+        setRefreshInterval(String(initialConfig.refreshInterval || "30"));
+      } else {
+        resetForm();
+      }
       fetchCameras();
-      resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   // Fetch monitors when camera is selected
   useEffect(() => {
@@ -106,11 +136,11 @@ export const CctvMonitorVideosConfigModal = ({
       }
       const camerasData = await response.json();
       // Filter cameras that have apiKey and group (required for monitor API)
-      const validCameras = camerasData.filter((cam: CctvCamera) => 
-        cam.apiKey && cam.group
+      const validCameras = camerasData.filter(
+        (cam: CctvCamera) => cam.apiKey && cam.group
       );
       setCameras(validCameras);
-      
+
       if (validCameras.length === 0) {
         Swal.fire({
           icon: "warning",
@@ -128,20 +158,21 @@ export const CctvMonitorVideosConfigModal = ({
   const fetchMonitors = async (cameraId: string) => {
     setIsLoadingMonitors(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/cctv/${cameraId}/monitors`);
-      
+      const response = await fetch(
+        `${API_BASE_URL}/api/cctv/${cameraId}/monitors`
+      );
+
       if (!response.ok) {
         throw new Error(`Failed to fetch monitors: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || "Failed to fetch monitors");
       }
-      
+
       setMonitors(data.monitors || []);
-      
     } catch (error: any) {
       console.error("Error fetching monitors:", error);
       setMonitors([]);
@@ -161,12 +192,12 @@ export const CctvMonitorVideosConfigModal = ({
       Swal.fire("Validation Error", "Widget title is required", "warning");
       return;
     }
-    
+
     if (!selectedCameraId) {
       Swal.fire("Validation Error", "Please select a camera", "warning");
       return;
     }
-    
+
     if (!selectedMonitorId) {
       Swal.fire("Validation Error", "Please select a monitor", "warning");
       return;
@@ -174,13 +205,24 @@ export const CctvMonitorVideosConfigModal = ({
 
     const maxVidsNum = parseInt(maxVideos);
     if (isNaN(maxVidsNum) || maxVidsNum < 1 || maxVidsNum > 100) {
-      Swal.fire("Validation Error", "Max videos must be between 1 and 100", "warning");
+      Swal.fire(
+        "Validation Error",
+        "Max videos must be between 1 and 100",
+        "warning"
+      );
       return;
     }
 
     const refreshNum = parseInt(refreshInterval);
-    if (autoRefresh && (isNaN(refreshNum) || refreshNum < 10 || refreshNum > 300)) {
-      Swal.fire("Validation Error", "Refresh interval must be between 10 and 300 seconds", "warning");
+    if (
+      autoRefresh &&
+      (isNaN(refreshNum) || refreshNum < 10 || refreshNum > 300)
+    ) {
+      Swal.fire(
+        "Validation Error",
+        "Refresh interval must be between 10 and 300 seconds",
+        "warning"
+      );
       return;
     }
 
@@ -196,8 +238,8 @@ export const CctvMonitorVideosConfigModal = ({
     onSave(config);
   };
 
-  const selectedCamera = cameras.find(c => c.id === selectedCameraId);
-  const selectedMonitor = monitors.find(m => m.mid === selectedMonitorId);
+  const selectedCamera = cameras.find((c) => c.id === selectedCameraId);
+  const selectedMonitor = monitors.find((m) => m.mid === selectedMonitorId);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -208,7 +250,8 @@ export const CctvMonitorVideosConfigModal = ({
             Configure CCTV Monitor Videos Widget
           </DialogTitle>
           <DialogDescription>
-            Display recorded videos from a specific camera monitor using Shinobi NVR API.
+            Display recorded videos from a specific camera monitor using Shinobi
+            NVR API.
           </DialogDescription>
         </DialogHeader>
 
@@ -254,7 +297,8 @@ export const CctvMonitorVideosConfigModal = ({
             )}
             {cameras.length === 0 && !isLoadingCameras && (
               <p className="text-xs text-muted-foreground">
-                No cameras with API Key and Group found. Configure camera with Shinobi NVR settings first.
+                No cameras with API Key and Group found. Configure camera with
+                Shinobi NVR settings first.
               </p>
             )}
           </div>
@@ -271,13 +315,15 @@ export const CctvMonitorVideosConfigModal = ({
                 disabled={!selectedCameraId || monitors.length === 0}
               >
                 <SelectTrigger id="monitor">
-                  <SelectValue placeholder={
-                    !selectedCameraId 
-                      ? "Select a camera first" 
-                      : monitors.length === 0 
-                        ? "No monitors found" 
+                  <SelectValue
+                    placeholder={
+                      !selectedCameraId
+                        ? "Select a camera first"
+                        : monitors.length === 0
+                        ? "No monitors found"
                         : "Select a monitor"
-                  } />
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {monitors.map((monitor) => (
@@ -285,8 +331,12 @@ export const CctvMonitorVideosConfigModal = ({
                       <div className="flex items-center gap-2">
                         <Video className="h-4 w-4" />
                         <span>{monitor.name}</span>
-                        <Badge 
-                          variant={monitor.status === 'recording' ? 'default' : 'secondary'}
+                        <Badge
+                          variant={
+                            monitor.status === "recording"
+                              ? "default"
+                              : "secondary"
+                          }
                           className="text-xs"
                         >
                           {monitor.status}
@@ -305,7 +355,9 @@ export const CctvMonitorVideosConfigModal = ({
               <h4 className="text-sm font-medium mb-2">Selected Monitor</h4>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div>Camera: {selectedCamera.name}</div>
-                <div>Monitor: {selectedMonitor.name} (ID: {selectedMonitor.mid})</div>
+                <div>
+                  Monitor: {selectedMonitor.name} (ID: {selectedMonitor.mid})
+                </div>
                 <div>Status: {selectedMonitor.status}</div>
                 <div>Streams: {selectedMonitor.streams.length} available</div>
               </div>
@@ -317,7 +369,7 @@ export const CctvMonitorVideosConfigModal = ({
           {/* Display Options */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium">Display Options</h4>
-            
+
             {/* Max Videos */}
             <div className="grid gap-2">
               <Label htmlFor="maxVideos">Maximum Videos to Display</Label>
@@ -348,7 +400,9 @@ export const CctvMonitorVideosConfigModal = ({
             {/* Refresh Interval */}
             {autoRefresh && (
               <div className="grid gap-2">
-                <Label htmlFor="refreshInterval">Refresh Interval (seconds)</Label>
+                <Label htmlFor="refreshInterval">
+                  Refresh Interval (seconds)
+                </Label>
                 <Input
                   id="refreshInterval"
                   type="number"
@@ -367,13 +421,23 @@ export const CctvMonitorVideosConfigModal = ({
         </div>
 
         <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isLoadingCameras || isLoadingMonitors}
+          >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             onClick={handleSave}
-            disabled={!selectedCameraId || !selectedMonitorId}
+            disabled={
+              !selectedCameraId ||
+              !selectedMonitorId ||
+              isLoadingCameras ||
+              isLoadingMonitors
+            }
           >
             Save Widget
           </Button>

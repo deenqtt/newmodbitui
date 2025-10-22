@@ -1,6 +1,0 @@
-- [x] Analyze DataPointConfigModal component code
-- [x] Investigate the API endpoint /api/devices/for-selection
-- [x] Check Next.js configuration for production mode
-- [x] Identify why device list doesn't load in production (cookie auth issue)
-- [x] Fix explicit cookie handling for production
-- [ ] Test the fix in production mode

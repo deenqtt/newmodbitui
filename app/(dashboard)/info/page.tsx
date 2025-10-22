@@ -305,12 +305,10 @@ export default function InfoPage() {
   ];
 
   return (
-    <SidebarInset>
+    <div>
       {/* Header */}
       <header className="flex h-16 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="h-4" />
           <FileQuestion className="w-5 h-5 text-muted-foreground" />
           <h1 className="text-lg font-semibold">System Information</h1>
         </div>
@@ -528,6 +526,6 @@ export default function InfoPage() {
           </section>
         </main>
       </div>
-    </SidebarInset>
+    </div>
   );
 }

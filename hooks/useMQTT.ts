@@ -1,222 +1,162 @@
-"use client";
+import { useState, useEffect, useCallback } from 'react';
+import mqtt, { MqttClient } from "mqtt";
+import { getAppConfig } from "@/lib/config";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import {
-  connectMQTT,
-  getMQTTClient,
-  getConnectionState,
-  isClientConnected,
-} from "@/lib/mqttClient";
-import type { MqttClient } from "mqtt";
-
-interface UseMQTTOptions {
-  topics?: string[];
-  autoSubscribe?: boolean;
-  enableLogging?: boolean;
+interface AlarmData {
+  nodeName: string;
+  baseTopic: string;
+  publishedAt: string;
+  totalRecords: number;
+  alarmLogs: Array<{
+    id: string;
+    status: 'ACTIVE' | 'ACKNOWLEDGED' | 'CLEARED';
+    triggeringValue: string;
+    timestamp: number;
+    clearedAt?: number | null;
+    alarmConfigId: string;
+    alarmConfig: {
+      customName: string;
+      alarmType: 'CRITICAL' | 'MAJOR' | 'MINOR';
+      keyType: 'THRESHOLD' | 'BIT_VALUE';
+      key: string;
+      deviceUniqId: string;
+      minValue?: number;
+      maxValue?: number;
+      maxOnly: number;
+    };
+  }>;
 }
 
-export function useMQTT(options: UseMQTTOptions = {}) {
-  const { topics = [], autoSubscribe = true, enableLogging = false } = options;
+interface LocationAlarmCount {
+  locationId: string;
+  locationName: string;
+  totalAlarms: number;
+  activeAlarms: number;
+  clearedAlarms: number;
+}
 
-  const [connectionStatus, setConnectionStatus] =
-    useState<string>("Disconnected");
-  const [isOnline, setIsOnline] = useState(false);
-  const clientRef = useRef<MqttClient | null>(null);
-  const subscribedTopicsRef = useRef<Set<string>>(new Set());
-  const messageHandlersRef = useRef<
-    Map<string, (topic: string, message: Buffer) => void>
-  >(new Map());
+export const useMQTTAlarms = (locations: Array<{ id: string; name: string; topic?: string | null }>) => {
+  const [alarmCounts, setAlarmCounts] = useState<Record<string, LocationAlarmCount>>({});
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Throttled logging
-  const log = useCallback(
-    (message: string, type: "log" | "error" = "log") => {
-      if (enableLogging) {
-        if (type === "error") {
-          // console.error(`[MQTT Hook] ${message}`);
-        } else {
-          // console.log(`[MQTT Hook] ${message}`);
-        }
-      }
-    },
-    [enableLogging]
-  );
+  const processAlarmData = useCallback((topic: string, alarmData: AlarmData) => {
+    // Topic format: iot/{location_node_name}/Alarm
+    // Need to match with location.topic (without /Alarm suffix)
+    const originalTopic = topic.replace('/Alarm', '');
 
-  // Initialize MQTT connection
-  useEffect(() => {
-    try {
-      const client = connectMQTT();
-      clientRef.current = client;
+    const location = locations.find(loc => loc.topic === originalTopic);
 
-      const handleConnect = () => {
-        setConnectionStatus("Connected");
-        setIsOnline(true);
-
-        // Auto-subscribe to topics if enabled
-        if (autoSubscribe && topics.length > 0) {
-          subscribeToTopics(topics);
-        }
-      };
-
-      const handleError = (err: Error) => {
-        setConnectionStatus(`Error: ${err.message}`);
-        setIsOnline(false);
-      };
-
-      const handleClose = () => {
-        setConnectionStatus("Disconnected");
-        setIsOnline(false);
-        subscribedTopicsRef.current.clear();
-      };
-
-      const handleOffline = () => {
-        setConnectionStatus("Offline");
-        setIsOnline(false);
-      };
-
-      const handleReconnect = () => {
-        setConnectionStatus("Reconnecting");
-        setIsOnline(false);
-      };
-
-      // Set up event listeners
-      client.on("connect", handleConnect);
-      client.on("error", handleError);
-      client.on("close", handleClose);
-      client.on("offline", handleOffline);
-      client.on("reconnect", handleReconnect);
-
-      // Check initial connection state
-      if (client.connected) {
-        handleConnect();
-      }
-
-      return () => {
-        // Cleanup event listeners
-        client.off("connect", handleConnect);
-        client.off("error", handleError);
-        client.off("close", handleClose);
-        client.off("offline", handleOffline);
-        client.off("reconnect", handleReconnect);
-
-        // Unsubscribe from topics
-        Array.from(subscribedTopicsRef.current).forEach((topic) => {
-          unsubscribeFromTopic(topic);
-        });
-      };
-    } catch (error) {
-      log(`Failed to initialize MQTT: ${error}`, "error");
-      setConnectionStatus("Failed to initialize");
+    if (!location) {
+      console.warn(`[MQTT] No location found for topic: ${originalTopic}`);
+      return;
     }
-  }, [topics, autoSubscribe, log]);
 
-  // Subscribe to topics
-  const subscribeToTopics = useCallback(
-    (topicList: string[]) => {
-      const client = clientRef.current;
-      if (!client || !client.connected) {
-        log("Cannot subscribe: client not connected", "error");
-        return;
-      }
+    // Create alarm counts only for this specific location
+    // Include all alarm statuses: ACTIVE, ACKNOWLEDGED, CLEARED
+    const counts: LocationAlarmCount = {
+      locationId: location.id,
+      locationName: location.name,
+      totalAlarms: alarmData.totalRecords,
+      activeAlarms: alarmData.alarmLogs.filter(log => log.status === 'ACTIVE' || log.status === 'ACKNOWLEDGED').length,
+      clearedAlarms: alarmData.alarmLogs.filter(log => log.status === 'CLEARED').length,
+    };
 
-      topicList.forEach((topic) => {
-        if (!subscribedTopicsRef.current.has(topic)) {
-          client.subscribe(topic, (err) => {
+    // Only update this specific location's alarm counts
+    setAlarmCounts(prev => ({
+      ...prev,
+      [location.id]: counts
+    }));
+
+    setLastUpdate(new Date());
+  }, [locations]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !locations.length) {
+      return;
+    }
+
+    let client: any = null;
+    let reconnectTimeout: NodeJS.Timeout | undefined;
+
+    const initializeMQTT = () => {
+      try {
+        // Subscribe to all location alarm topics: {LOCATION_TOPIC}/Alarm
+        const topics = locations
+          .filter(loc => loc.topic) // Only locations with topics
+          .map(loc => `${loc.topic}/Alarm`);
+
+        // Get MQTT broker URL from app config (same as lib/mqttClient.ts)
+        const { mqttBrokerUrl } = getAppConfig();
+
+        client = mqtt.connect(mqttBrokerUrl, {
+          clientId: `alarm-monitor-${Math.random().toString(16).substring(2, 8)}`,
+          clean: true,
+          connectTimeout: 4000,
+          reconnectPeriod: 1000,
+        });
+
+        client.on('connect', () => {
+          console.log('MQTT connected for alarm monitoring');
+          setConnectionStatus('connected');
+
+          // Subscribe to all alarm topics
+          client.subscribe([...new Set(topics)], { qos: 1 }, (err: any) => {
             if (err) {
-              log(`Failed to subscribe to ${topic}: ${err.message}`, "error");
+              console.error('MQTT subscription error:', err);
             } else {
-              subscribedTopicsRef.current.add(topic);
-              log(`Subscribed to ${topic}`);
+              console.log('Subscribed to alarm topics:', topics);
             }
           });
-        }
-      });
-    },
-    [log]
-  );
+        });
 
-  // Unsubscribe from topic
-  const unsubscribeFromTopic = useCallback(
-    (topic: string) => {
-      const client = clientRef.current;
-      if (client && subscribedTopicsRef.current.has(topic)) {
-        client.unsubscribe(topic, (err) => {
-          if (err) {
-            log(`Failed to unsubscribe from ${topic}: ${err.message}`, "error");
-          } else {
-            subscribedTopicsRef.current.delete(topic);
-            messageHandlersRef.current.delete(topic);
-            log(`Unsubscribed from ${topic}`);
+        client.on('message', (topic: string, message: Buffer) => {
+          try {
+            const alarmData: AlarmData = JSON.parse(message.toString());
+            processAlarmData(topic, alarmData);
+          } catch (error) {
+            console.error('Error parsing MQTT message:', error);
           }
         });
+
+        client.on('disconnect', () => {
+          console.log('MQTT disconnected');
+          setConnectionStatus('disconnected');
+        });
+
+        client.on('error', (error: any) => {
+          console.error('MQTT connection error:', error);
+          setConnectionStatus('disconnected');
+        });
+
+      } catch (error) {
+        console.error('Failed to initialize MQTT:', error);
+        setConnectionStatus('disconnected');
       }
-    },
-    [log]
-  );
+    };
 
-  // Add message handler for specific topic
-  const addMessageHandler = useCallback(
-    (topic: string, handler: (topic: string, message: Buffer) => void) => {
-      messageHandlersRef.current.set(topic, handler);
+    initializeMQTT();
 
-      const client = clientRef.current;
+    // Cleanup function
+    return () => {
       if (client) {
-        // Remove existing handler if any
-        const existingHandler = messageHandlersRef.current.get(topic);
-        if (existingHandler) {
-          client.off("message", existingHandler);
-        }
-
-        // Add new handler
-        const wrappedHandler = (receivedTopic: string, message: Buffer) => {
-          if (receivedTopic === topic) {
-            handler(receivedTopic, message);
-          }
-        };
-
-        client.on("message", wrappedHandler);
+        client.end();
       }
-    },
-    []
-  );
-
-  // Publish message
-  const publishMessage = useCallback(
-    (
-      topic: string,
-      message: string | object,
-      options: { qos?: 0 | 1 | 2; retain?: boolean } = {}
-    ) => {
-      const client = clientRef.current;
-      if (!client || !client.connected) {
-        log("Cannot publish: client not connected", "error");
-        return false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
       }
+    };
+  }, [locations, processAlarmData]);
 
-      const payload =
-        typeof message === "string" ? message : JSON.stringify(message);
-
-      client.publish(topic, payload, options, (err) => {
-        if (err) {
-          log(`Failed to publish to ${topic}: ${err.message}`, "error");
-        } else {
-          log(`Published to ${topic}`);
-        }
-      });
-
-      return true;
-    },
-    [log]
-  );
+  const refreshAlarms = useCallback(() => {
+    // Optional: Trigger manual refresh if needed
+    console.log('Manual alarm refresh requested');
+  }, []);
 
   return {
-    client: clientRef.current,
+    alarmCounts,
     connectionStatus,
-    isOnline,
-    isConnected: isClientConnected(),
-    subscribeToTopics,
-    unsubscribeFromTopic,
-    addMessageHandler,
-    publishMessage,
-    subscribedTopics: Array.from(subscribedTopicsRef.current),
+    lastUpdate,
+    refreshAlarms,
   };
-}
+};

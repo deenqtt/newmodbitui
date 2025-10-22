@@ -14,13 +14,14 @@ import {
   Loader2,
   AlertTriangle,
   Calculator,
-  TrendingUp,
-  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Configuration types
 interface OperandConfig {
   deviceUniqId: string;
   selectedKey: string;
@@ -83,7 +84,6 @@ const useOperandValues = (operands: OperandConfig[]) => {
             ? JSON.parse(payload.value)
             : payload.value || {};
 
-        // Find matching operands for this topic
         operands.forEach((op, index) => {
           if (
             topics[op.deviceUniqId] === topic &&
@@ -97,7 +97,7 @@ const useOperandValues = (operands: OperandConfig[]) => {
           }
         });
       } catch (e) {
-        console.error("Failed to parse MQTT payload for calculation:", e);
+        console.error("Failed to parse MQTT payload:", e);
       }
     },
     [operands, topics]
@@ -121,7 +121,13 @@ const useOperandValues = (operands: OperandConfig[]) => {
     handleMqttMessage,
   ]);
 
-  return { values: Object.values(values), status, lastUpdate };
+  return {
+    valuesList: Object.values(values),
+    valuesMap: values,
+    status,
+    lastUpdate,
+    connectionStatus,
+  };
 };
 
 // Calculation functions
@@ -144,23 +150,79 @@ const calculateResult = (values: number[], type: string): number | null => {
   }
 };
 
+// Get calculation symbol and info
+const getCalculationInfo = (
+  calculation: string,
+  operandCount: number
+): { symbol: string; name: string; description: string } => {
+  switch (calculation) {
+    case "SUM":
+      return {
+        symbol: "Σ",
+        name: "Sum",
+        description: `Total of ${operandCount} values`,
+      };
+    case "AVERAGE":
+      return {
+        symbol: "μ",
+        name: "Average",
+        description: `Mean of ${operandCount} values`,
+      };
+    case "MIN":
+      return {
+        symbol: "↓",
+        name: "Minimum",
+        description: `Lowest of ${operandCount} values`,
+      };
+    case "MAX":
+      return {
+        symbol: "↑",
+        name: "Maximum",
+        description: `Highest of ${operandCount} values`,
+      };
+    case "DIFFERENCE":
+      return {
+        symbol: "Δ",
+        name: "Difference",
+        description: "Value A - Value B",
+      };
+    default:
+      return {
+        symbol: "Σ",
+        name: "Calculation",
+        description: "Computing...",
+      };
+  }
+};
+
 export const CalculatedParameterWidget = ({ config }: Props) => {
-  const { values, status, lastUpdate } = useOperandValues(
-    config.operands || []
-  );
+  const { valuesList, valuesMap, status, lastUpdate, connectionStatus } =
+    useOperandValues(config.operands || []);
   const result = useMemo(
-    () => calculateResult(values, config.calculation),
-    [values, config.calculation]
+    () => calculateResult(valuesList, config.calculation),
+    [valuesList, config.calculation]
   );
 
-  // Responsive sizing
+  // State for operand preview
+  const [showOperands, setShowOperands] = useState(false);
+
+  // FIXED: Responsive sizing - consistent with other widgets
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [titleFontSize, setTitleFontSize] = useState(14);
-  const [valueFontSize, setValueFontSize] = useState(24);
-  const [unitFontSize, setUnitFontSize] = useState(12);
-  const [layoutMode, setLayoutMode] = useState<"compact" | "normal">("normal");
+  const [dynamicSizes, setDynamicSizes] = useState({
+    titleFontSize: 14,
+    valueFontSize: 24,
+    unitFontSize: 12,
+    labelFontSize: 10,
+    padding: 16,
+    headerHeight: 44,
+    badgeSize: 24,
+  });
+  const [layoutMode, setLayoutMode] = useState<"mini" | "compact" | "normal">(
+    "normal"
+  );
 
+  // FIXED: Enhanced responsive calculation - same as other widgets
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -170,31 +232,43 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
       const { width, height } = rect;
       setDimensions({ width, height });
 
-      // Determine layout mode
-      const area = width * height;
-      const currentLayoutMode =
-        area < 25000 || height < 130 ? "compact" : "normal";
+      const headerHeight = Math.max(36, Math.min(height * 0.25, 56));
+      const availableHeight = height - headerHeight;
+
+      // FIXED: Layout mode detection - 3 modes
+      const minDimension = Math.min(width, height);
+      let currentLayoutMode: "mini" | "compact" | "normal";
+
+      if (minDimension < 160 || availableHeight < 100) {
+        currentLayoutMode = "mini";
+      } else if (minDimension < 240 || availableHeight < 160) {
+        currentLayoutMode = "compact";
+      } else {
+        currentLayoutMode = "normal";
+      }
+
       setLayoutMode(currentLayoutMode);
 
-      // Improved scaling algorithm
-      const minDimension = Math.min(width, height);
-      const scaleFactor = Math.sqrt(area) / 120;
-      const minScaleFactor = Math.min(width / 180, height / 120);
-      const finalScale = Math.min(scaleFactor, minScaleFactor, 2);
-
-      const baseValueSize = Math.max(minDimension * 0.15, 18);
-      const maxValueSize = Math.min(width * 0.3, height * 0.4);
-      const newValueSize = Math.min(baseValueSize * finalScale, maxValueSize);
-
-      const newTitleSize = Math.max(
-        Math.min(newValueSize * 0.45, width * 0.08),
-        12
+      // FIXED: Dynamic sizing based on layout mode
+      const valueSize = Math.max(
+        18,
+        Math.min(width * 0.2, availableHeight * 0.28, 64)
       );
-      const newUnitSize = Math.max(newValueSize * 0.4, 10);
+      const unitSize = Math.max(12, Math.min(valueSize * 0.45, 28));
+      const titleSize = Math.max(11, Math.min(headerHeight * 0.32, 15));
+      const labelSize = Math.max(9, Math.min(titleSize * 0.85, 12));
+      const padding = Math.max(12, Math.min(width * 0.04, 24));
+      const badgeSize = Math.max(20, Math.min(titleSize * 1.8, 28));
 
-      setValueFontSize(Math.round(newValueSize));
-      setTitleFontSize(Math.round(newTitleSize));
-      setUnitFontSize(Math.round(newUnitSize));
+      setDynamicSizes({
+        titleFontSize: Math.round(titleSize),
+        valueFontSize: Math.round(valueSize),
+        unitFontSize: Math.round(unitSize),
+        labelFontSize: Math.round(labelSize),
+        padding,
+        headerHeight,
+        badgeSize: Math.round(badgeSize),
+      });
     };
 
     const resizeObserver = new ResizeObserver(updateDimensions);
@@ -204,90 +278,43 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Clean minimal status styling
+  // FIXED: Status styling - consistent with other widgets
   const getStatusStyles = () => {
     const baseStyles = {
-      title: "text-slate-700",
-      value: "text-slate-900",
-      unit: "text-slate-500",
+      title: "text-slate-700 dark:text-slate-300",
+      value: "text-slate-900 dark:text-slate-100",
+      unit: "text-slate-500 dark:text-slate-400",
+      label: "text-slate-600 dark:text-slate-400",
     };
 
     switch (status) {
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500",
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
           pulse: false,
         };
       case "error":
         return {
           ...baseStyles,
-          indicator: "bg-red-500",
+          indicator: "bg-red-500 dark:bg-red-500",
           pulse: false,
-          title: "text-red-600",
-          value: "text-red-700",
+          title: "text-red-600 dark:text-red-400",
+          value: "text-red-700 dark:text-red-300",
         };
       case "loading":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500",
+          indicator: "bg-amber-500 dark:bg-amber-500",
           pulse: true,
-          title: "text-slate-600",
-          value: "text-slate-700",
+          title: "text-slate-600 dark:text-slate-400",
+          value: "text-slate-700 dark:text-slate-300",
         };
       default:
         return {
           ...baseStyles,
-          indicator: "bg-slate-400",
+          indicator: "bg-slate-400 dark:bg-slate-500",
           pulse: false,
-        };
-    }
-  };
-
-  // Get calculation info for better display
-  const getCalculationInfo = () => {
-    switch (config.calculation) {
-      case "SUM":
-        return {
-          symbol: "∑",
-          name: "Sum",
-          description: `Total of ${values.length} values`,
-          icon: BarChart3,
-        };
-      case "AVERAGE":
-        return {
-          symbol: "μ",
-          name: "Average",
-          description: `Mean of ${values.length} values`,
-          icon: TrendingUp,
-        };
-      case "MIN":
-        return {
-          symbol: "↓",
-          name: "Minimum",
-          description: `Lowest of ${values.length} values`,
-          icon: TrendingUp,
-        };
-      case "MAX":
-        return {
-          symbol: "↑",
-          name: "Maximum",
-          description: `Highest of ${values.length} values`,
-          icon: TrendingUp,
-        };
-      case "DIFFERENCE":
-        return {
-          symbol: "Δ",
-          name: "Difference",
-          description: "Value A - Value B",
-          icon: Calculator,
-        };
-      default:
-        return {
-          symbol: "Σ",
-          name: "Calculation",
-          description: "Computing...",
-          icon: Calculator,
         };
     }
   };
@@ -295,7 +322,6 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
   const formatValue = (value: number | null) => {
     if (value === null) return "—";
 
-    // Smart number formatting
     if (Math.abs(value) >= 1000000) {
       return (
         (value / 1000000).toLocaleString(undefined, {
@@ -323,28 +349,28 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
     const diff = now.getTime() - date.getTime();
 
     if (diff < 30000) return "now";
-    if (diff < 60000) return `${Math.floor(diff / 1000)}s`;
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+    if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const renderContent = () => {
     const styles = getStatusStyles();
-    const calcInfo = getCalculationInfo();
+    const calcInfo = getCalculationInfo(config.calculation, valuesList.length);
 
     if (status === "loading") {
       return (
         <div className="flex flex-col items-center justify-center gap-3">
           <Loader2
-            className="animate-spin text-slate-400"
+            className="animate-spin text-slate-400 dark:text-slate-500"
             style={{
-              width: Math.max(dimensions.width / 8, 28),
-              height: Math.max(dimensions.width / 8, 28),
+              width: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
+              height: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
             }}
           />
           <p
             className={`font-medium ${styles.title}`}
-            style={{ fontSize: `${titleFontSize}px` }}
+            style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
           >
             Loading operands...
           </p>
@@ -356,15 +382,17 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
       return (
         <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
-            className="text-red-500"
+            className="text-red-500 dark:text-red-400"
             style={{
-              width: Math.max(dimensions.width / 8, 28),
-              height: Math.max(dimensions.width / 8, 28),
+              width: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
+              height: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
             }}
           />
           <p
             className={`font-semibold break-words ${styles.value}`}
-            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
+            style={{
+              fontSize: `${Math.max(dynamicSizes.labelFontSize * 0.9, 10)}px`,
+            }}
           >
             Configuration Error
           </p>
@@ -377,19 +405,19 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
         <div className="flex flex-col items-center justify-center gap-3">
           <div className="relative">
             <Calculator
-              className="text-slate-400"
+              className="text-slate-400 dark:text-slate-500"
               style={{
-                width: Math.max(dimensions.width / 8, 28),
-                height: Math.max(dimensions.width / 8, 28),
+                width: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
+                height: Math.max(dynamicSizes.valueFontSize * 0.7, 28),
               }}
             />
             <div className="absolute -top-1 -right-1">
-              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500 dark:text-amber-400" />
             </div>
           </div>
           <p
             className={`font-medium ${styles.title}`}
-            style={{ fontSize: `${titleFontSize}px` }}
+            style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
           >
             Calculating {calcInfo.name.toLowerCase()}...
           </p>
@@ -401,11 +429,11 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
       <div className="flex flex-col items-center justify-center text-center w-full gap-3">
         {/* Main result display */}
         <div className="space-y-1">
-          <div className="flex items-baseline justify-center gap-2 w-full">
+          <div className="flex items-baseline justify-center gap-2 w-full flex-wrap">
             <span
               className={`font-bold tracking-tight transition-all duration-300 ${styles.value}`}
               style={{
-                fontSize: `${valueFontSize}px`,
+                fontSize: `${dynamicSizes.valueFontSize}px`,
                 lineHeight: 0.9,
               }}
             >
@@ -415,7 +443,7 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
               <span
                 className={`font-medium transition-colors duration-200 ${styles.unit}`}
                 style={{
-                  fontSize: `${unitFontSize}px`,
+                  fontSize: `${dynamicSizes.unitFontSize}px`,
                   lineHeight: 1,
                 }}
               >
@@ -425,29 +453,95 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
           </div>
         </div>
 
-        {/* Calculation context */}
+        {/* FIXED: Calculation context with border */}
         {layoutMode === "normal" && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
             <span
-              className="font-bold text-slate-600"
-              style={{ fontSize: `${Math.max(titleFontSize * 1.1, 14)}px` }}
+              className="font-bold text-slate-600 dark:text-slate-300"
+              style={{
+                fontSize: `${Math.max(dynamicSizes.labelFontSize * 1.2, 13)}px`,
+              }}
             >
               {calcInfo.symbol}
             </span>
             <span
-              className="text-slate-600 font-medium"
-              style={{ fontSize: `${Math.max(titleFontSize * 0.9, 10)}px` }}
+              className="text-slate-600 dark:text-slate-300 font-medium"
+              style={{
+                fontSize: `${Math.max(
+                  dynamicSizes.labelFontSize * 0.95,
+                  10
+                )}px`,
+              }}
             >
               {calcInfo.description}
             </span>
           </div>
         )}
 
-        {/* Update time for normal mode */}
+        {/* FIXED: Operand preview button - better styling */}
+        {valuesList.length > 0 && layoutMode === "normal" && (
+          <button
+            onClick={() => setShowOperands(!showOperands)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-700/50 transition-colors"
+            style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+          >
+            {showOperands ? (
+              <ChevronUp
+                className="text-slate-500 dark:text-slate-400"
+                style={{
+                  width: dynamicSizes.labelFontSize * 1.2,
+                  height: dynamicSizes.labelFontSize * 1.2,
+                }}
+              />
+            ) : (
+              <ChevronDown
+                className="text-slate-500 dark:text-slate-400"
+                style={{
+                  width: dynamicSizes.labelFontSize * 1.2,
+                  height: dynamicSizes.labelFontSize * 1.2,
+                }}
+              />
+            )}
+            <span className="font-medium text-slate-600 dark:text-slate-300">
+              {showOperands ? "Hide" : "Show"} operands
+            </span>
+          </button>
+        )}
+
+        {/* Operand values - collapsible */}
+        {showOperands && valuesList.length > 0 && (
+          <div className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200/50 dark:border-slate-700/50 text-left space-y-1.5">
+            {valuesList.map((val, idx) => (
+              <div
+                key={idx}
+                className="flex justify-between items-center"
+                style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+              >
+                <span className="font-semibold text-slate-600 dark:text-slate-400">
+                  {String.fromCharCode(65 + idx)}:
+                </span>
+                <span className="font-mono font-medium text-slate-900 dark:text-slate-100">
+                  {formatValue(val)}
+                </span>
+              </div>
+            ))}
+            <div
+              className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center font-semibold text-slate-700 dark:text-slate-300"
+              style={{ fontSize: `${dynamicSizes.labelFontSize}px` }}
+            >
+              <span>Result:</span>
+              <span className="font-mono">{formatValue(result)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Update time */}
         {layoutMode === "normal" && lastUpdate && (
           <p
-            className="text-slate-400"
-            style={{ fontSize: `${Math.max(titleFontSize * 0.8, 9)}px` }}
+            className={`${styles.label}`}
+            style={{
+              fontSize: `${Math.max(dynamicSizes.labelFontSize * 0.9, 9)}px`,
+            }}
           >
             Updated {formatTime(lastUpdate)}
           </p>
@@ -457,76 +551,106 @@ export const CalculatedParameterWidget = ({ config }: Props) => {
   };
 
   const styles = getStatusStyles();
-  const calcInfo = getCalculationInfo();
+  const calcInfo = getCalculationInfo(config.calculation, valuesList.length);
 
   return (
     <div
       ref={containerRef}
       className={`
         w-full h-full relative overflow-hidden cursor-move
-        bg-white
-        border border-slate-200/60 rounded-xl
+        bg-card
+        border border-border/60 rounded-xl
         shadow-sm hover:shadow-md
         transition-all duration-300 ease-out
         group hover:scale-[1.01] transform-gpu
       `}
       style={{
-        minWidth: 160,
-        minHeight: 100,
+        minWidth: 100,
+        minHeight: 80,
       }}
     >
-      {/* Status indicators */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-        {/* Calculation symbol */}
-        <div className="flex items-center justify-center w-6 h-6 bg-slate-100 rounded-full">
-          <span
-            className="font-bold text-slate-600"
-            style={{ fontSize: `${Math.max(titleFontSize * 0.8, 10)}px` }}
-          >
-            {calcInfo.symbol}
-          </span>
-        </div>
-
-        <div
-          className={`rounded-full transition-all duration-300 ${
-            styles.indicator
-          } ${styles.pulse ? "animate-pulse" : ""}`}
-          style={{
-            width: Math.max(titleFontSize * 0.6, 8),
-            height: Math.max(titleFontSize * 0.6, 8),
-          }}
-        />
-      </div>
-
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 pr-20">
+      {/* FIXED: Header - consistent with other widgets */}
+      <div
+        className="absolute top-0 left-0 right-0 px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
         <h3
-          className={`font-medium truncate text-left transition-colors duration-200 ${styles.title}`}
+          className={`font-medium truncate transition-colors duration-200 ${styles.title} flex-1`}
           style={{
-            fontSize: `${titleFontSize}px`,
+            fontSize: `${dynamicSizes.titleFontSize}px`,
             lineHeight: 1.3,
           }}
           title={config.title}
         >
           {config.title}
         </h3>
+
+        {/* FIXED: Calculation symbol + Wifi + Status */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+          {/* FIXED: Calculation badge with responsive sizing */}
+          <div
+            className="flex items-center justify-center bg-blue-100 dark:bg-blue-900/40 rounded-lg border border-blue-200/50 dark:border-blue-800/50"
+            style={{
+              width: dynamicSizes.badgeSize,
+              height: dynamicSizes.badgeSize,
+            }}
+          >
+            <span
+              className="font-bold text-blue-600 dark:text-blue-400"
+              style={{
+                fontSize: `${Math.max(dynamicSizes.labelFontSize * 1.1, 12)}px`,
+              }}
+            >
+              {calcInfo.symbol}
+            </span>
+          </div>
+
+          {/* FIXED: Wifi status */}
+          {connectionStatus === "Connected" ? (
+            <Wifi
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          ) : (
+            <WifiOff
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          )}
+
+          <div
+            className={`rounded-full transition-all duration-300 ${
+              styles.indicator
+            } ${styles.pulse ? "animate-pulse" : ""}`}
+            style={{
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+            }}
+          />
+        </div>
       </div>
 
-      {/* Main content area */}
+      {/* FIXED: Main content with proper spacing */}
       <div
-        className="absolute inset-0 flex items-center justify-center"
+        className="w-full h-full flex items-center justify-center overflow-y-auto"
         style={{
-          paddingTop: titleFontSize * 2.5,
-          paddingBottom: 16,
-          paddingLeft: 16,
-          paddingRight: 16,
+          paddingTop: dynamicSizes.headerHeight + dynamicSizes.padding * 0.5,
+          paddingBottom: dynamicSizes.padding,
+          paddingLeft: dynamicSizes.padding,
+          paddingRight: dynamicSizes.padding,
         }}
       >
         {renderContent()}
       </div>
 
       {/* Minimal hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

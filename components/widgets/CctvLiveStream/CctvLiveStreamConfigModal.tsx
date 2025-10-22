@@ -49,12 +49,21 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    cctvId: string;
+    monitorId: string;
+    autoPlay: boolean;
+    showControls: boolean;
+    quality: "high" | "medium" | "low";
+  };
 }
 
 export const CctvLiveStreamConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [cameras, setCameras] = useState<CctvCamera[]>([]);
   const [monitors, setMonitors] = useState<MonitorData[]>([]);
@@ -62,20 +71,39 @@ export const CctvLiveStreamConfigModal = ({
   const [isLoadingMonitors, setIsLoadingMonitors] = useState(false);
 
   // Form state
-  const [widgetTitle, setWidgetTitle] = useState("");
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-  const [selectedMonitorId, setSelectedMonitorId] = useState<string>("");
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [quality, setQuality] = useState<'high' | 'medium' | 'low'>('medium');
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || ""
+  );
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(
+    initialConfig?.cctvId || ""
+  );
+  const [selectedMonitorId, setSelectedMonitorId] = useState<string>(
+    initialConfig?.monitorId || ""
+  );
+  const [autoPlay, setAutoPlay] = useState(initialConfig?.autoPlay ?? false);
+  const [showControls, setShowControls] = useState(
+    initialConfig?.showControls ?? true
+  );
+  const [quality, setQuality] = useState<"high" | "medium" | "low">(
+    initialConfig?.quality || "medium"
+  );
 
   // Fetch cameras on modal open
   useEffect(() => {
     if (isOpen) {
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setSelectedCameraId(initialConfig.cctvId);
+        setSelectedMonitorId(initialConfig.monitorId);
+        setAutoPlay(initialConfig.autoPlay);
+        setShowControls(initialConfig.showControls);
+        setQuality(initialConfig.quality);
+      } else {
+        resetForm();
+      }
       fetchCameras();
-      resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   // Fetch monitors when camera is selected
   useEffect(() => {
@@ -93,7 +121,7 @@ export const CctvLiveStreamConfigModal = ({
     setSelectedMonitorId("");
     setAutoPlay(false);
     setShowControls(true);
-    setQuality('medium');
+    setQuality("medium");
     setMonitors([]);
   };
 
@@ -106,11 +134,11 @@ export const CctvLiveStreamConfigModal = ({
       }
       const camerasData = await response.json();
       // Filter cameras that have apiKey and group (required for streaming)
-      const validCameras = camerasData.filter((cam: CctvCamera) => 
-        cam.apiKey && cam.group
+      const validCameras = camerasData.filter(
+        (cam: CctvCamera) => cam.apiKey && cam.group
       );
       setCameras(validCameras);
-      
+
       if (validCameras.length === 0) {
         Swal.fire({
           icon: "warning",
@@ -128,25 +156,27 @@ export const CctvLiveStreamConfigModal = ({
   const fetchMonitors = async (cameraId: string) => {
     setIsLoadingMonitors(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/cctv/${cameraId}/monitors`);
-      
+      const response = await fetch(
+        `${API_BASE_URL}/api/cctv/${cameraId}/monitors`
+      );
+
       if (!response.ok) {
         throw new Error(`Failed to fetch monitors: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (!data.success) {
         throw new Error(data.message || "Failed to fetch monitors");
       }
-      
+
       // Filter monitors that have streams available
-      const monitorsWithStreams = data.monitors.filter((m: MonitorData) => 
-        m.streams && m.streams.length > 0
+      const monitorsWithStreams = data.monitors.filter(
+        (m: MonitorData) => m.streams && m.streams.length > 0
       );
-      
+
       setMonitors(monitorsWithStreams);
-      
+
       if (monitorsWithStreams.length === 0) {
         Swal.fire({
           icon: "info",
@@ -154,7 +184,6 @@ export const CctvLiveStreamConfigModal = ({
           text: "No monitors with available streams found for this camera.",
         });
       }
-      
     } catch (error: any) {
       console.error("Error fetching monitors:", error);
       setMonitors([]);
@@ -174,12 +203,12 @@ export const CctvLiveStreamConfigModal = ({
       Swal.fire("Validation Error", "Widget title is required", "warning");
       return;
     }
-    
+
     if (!selectedCameraId) {
       Swal.fire("Validation Error", "Please select a camera", "warning");
       return;
     }
-    
+
     if (!selectedMonitorId) {
       Swal.fire("Validation Error", "Please select a monitor", "warning");
       return;
@@ -197,8 +226,8 @@ export const CctvLiveStreamConfigModal = ({
     onSave(config);
   };
 
-  const selectedCamera = cameras.find(c => c.id === selectedCameraId);
-  const selectedMonitor = monitors.find(m => m.mid === selectedMonitorId);
+  const selectedCamera = cameras.find((c) => c.id === selectedCameraId);
+  const selectedMonitor = monitors.find((m) => m.mid === selectedMonitorId);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -255,7 +284,8 @@ export const CctvLiveStreamConfigModal = ({
             )}
             {cameras.length === 0 && !isLoadingCameras && (
               <p className="text-xs text-muted-foreground">
-                No cameras with streaming API configuration found. Configure camera with Shinobi NVR settings first.
+                No cameras with streaming API configuration found. Configure
+                camera with Shinobi NVR settings first.
               </p>
             )}
           </div>
@@ -272,13 +302,15 @@ export const CctvLiveStreamConfigModal = ({
                 disabled={!selectedCameraId || monitors.length === 0}
               >
                 <SelectTrigger id="monitor">
-                  <SelectValue placeholder={
-                    !selectedCameraId 
-                      ? "Select a camera first" 
-                      : monitors.length === 0 
-                        ? "No streaming monitors found" 
+                  <SelectValue
+                    placeholder={
+                      !selectedCameraId
+                        ? "Select a camera first"
+                        : monitors.length === 0
+                        ? "No streaming monitors found"
                         : "Select a monitor"
-                  } />
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {monitors.map((monitor) => (
@@ -286,14 +318,19 @@ export const CctvLiveStreamConfigModal = ({
                       <div className="flex items-center gap-2">
                         <Video className="h-4 w-4" />
                         <span>{monitor.name}</span>
-                        <Badge 
-                          variant={monitor.status === 'recording' ? 'default' : 'secondary'}
+                        <Badge
+                          variant={
+                            monitor.status === "recording"
+                              ? "default"
+                              : "secondary"
+                          }
                           className="text-xs"
                         >
                           {monitor.status}
                         </Badge>
                         <Badge variant="outline" className="text-xs">
-                          {monitor.streams.length} stream{monitor.streams.length !== 1 ? 's' : ''}
+                          {monitor.streams.length} stream
+                          {monitor.streams.length !== 1 ? "s" : ""}
                         </Badge>
                       </div>
                     </SelectItem>
@@ -309,10 +346,14 @@ export const CctvLiveStreamConfigModal = ({
               <h4 className="text-sm font-medium mb-2">Selected Stream</h4>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div>Camera: {selectedCamera.name}</div>
-                <div>Monitor: {selectedMonitor.name} (ID: {selectedMonitor.mid})</div>
+                <div>
+                  Monitor: {selectedMonitor.name} (ID: {selectedMonitor.mid})
+                </div>
                 <div>Status: {selectedMonitor.status}</div>
                 <div>Available Streams: {selectedMonitor.streams.length}</div>
-                <div className="text-green-600 font-medium">✓ Ready for live streaming</div>
+                <div className="text-green-600 font-medium">
+                  ✓ Ready for live streaming
+                </div>
               </div>
             </div>
           )}
@@ -322,7 +363,7 @@ export const CctvLiveStreamConfigModal = ({
           {/* Stream Options */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium">Stream Settings</h4>
-            
+
             {/* Auto Play */}
             <div className="flex items-center space-x-2">
               <Switch
@@ -351,7 +392,9 @@ export const CctvLiveStreamConfigModal = ({
               <Label htmlFor="quality">Stream Quality</Label>
               <Select
                 value={quality}
-                onValueChange={(value: 'high' | 'medium' | 'low') => setQuality(value)}
+                onValueChange={(value: "high" | "medium" | "low") =>
+                  setQuality(value)
+                }
               >
                 <SelectTrigger id="quality">
                   <SelectValue />
@@ -361,21 +404,27 @@ export const CctvLiveStreamConfigModal = ({
                     <div className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
                       <span>High Quality</span>
-                      <Badge variant="outline" className="text-xs">Best</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Best
+                      </Badge>
                     </div>
                   </SelectItem>
                   <SelectItem value="medium">
                     <div className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
                       <span>Medium Quality</span>
-                      <Badge variant="outline" className="text-xs">Balanced</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Balanced
+                      </Badge>
                     </div>
                   </SelectItem>
                   <SelectItem value="low">
                     <div className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
                       <span>Low Quality</span>
-                      <Badge variant="outline" className="text-xs">Fast</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Fast
+                      </Badge>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -388,16 +437,26 @@ export const CctvLiveStreamConfigModal = ({
         </div>
 
         <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isLoadingCameras || isLoadingMonitors}
+          >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             onClick={handleSave}
-            disabled={!selectedCameraId || !selectedMonitorId}
+            disabled={
+              !selectedCameraId ||
+              !selectedMonitorId ||
+              isLoadingCameras ||
+              isLoadingMonitors
+            }
           >
             <Video className="h-4 w-4 mr-2" />
-            Create Live Stream
+            Save Live Stream
           </Button>
         </DialogFooter>
       </DialogContent>

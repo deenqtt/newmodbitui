@@ -12,10 +12,11 @@ import { useMqtt } from "@/contexts/MqttContext";
 import {
   Loader2,
   AlertTriangle,
-  Activity,
   TrendingUp,
   TrendingDown,
   Minus,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -27,7 +28,6 @@ interface Props {
     selectedKey: string;
     multiply?: number;
     units?: string;
-    responsiveSettings?: import("@/hooks/useResponsiveWidget").ResponsiveWidgetSettings;
   };
 }
 
@@ -46,64 +46,62 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   const [topic, setTopic] = useState<string | null>(null);
   const [trend, setTrend] = useState<"up" | "down" | "stable" | null>(null);
 
-  // Responsive sizing
+  // Responsive sizing - SAMA SEPERTI ICON WIDGET
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [titleFontSize, setTitleFontSize] = useState(14);
-  const [valueFontSize, setValueFontSize] = useState(24);
-  const [unitFontSize, setUnitFontSize] = useState(12);
+  const [dynamicSizes, setDynamicSizes] = useState({
+    valueFontSize: 24,
+    unitFontSize: 14,
+    titleFontSize: 12,
+    padding: 16,
+    headerHeight: 40,
+    trendIconSize: 16,
+  });
 
-  // Use responsive settings for sizing
+  // Enhanced responsive calculation - CONSISTENT DENGAN ICON WIDGET
   useLayoutEffect(() => {
-    if (!config.responsiveSettings) return;
-
     const container = containerRef.current;
     if (!container) return;
 
-    const updateDimensions = () => {
+    const updateLayout = () => {
       const rect = container.getBoundingClientRect();
       const { width, height } = rect;
       setDimensions({ width, height });
 
-      const responsive = config.responsiveSettings!;
+      // Calculate header height
+      const headerHeight = Math.max(36, Math.min(height * 0.25, 56));
+      const availableHeight = height - headerHeight;
 
-      // Use responsive settings for font scaling
-      const baseFontSize = responsive.isMobile
-        ? responsive.fontSizeScale * 20
-        : responsive.isTablet
-        ? responsive.fontSizeScale * 26
-        : responsive.fontSizeScale * 32;
+      // Dynamic sizing based on available space
+      const minDimension = Math.min(width, height);
+      const area = width * height;
 
-      // Responsive font sizes based on device type
-      const valueSize = responsive.isMobile
-        ? Math.min(baseFontSize * 0.7, width * 0.25)
-        : responsive.isTablet
-        ? Math.min(baseFontSize * 0.9, width * 0.3)
-        : Math.min(baseFontSize, width * 0.35);
+      // Value font size - larger than icon widget since no icon
+      const valueSize = Math.max(
+        22,
+        Math.min(width * 0.22, availableHeight * 0.28, 72)
+      );
+      const unitSize = Math.max(14, Math.min(valueSize * 0.5, 32));
+      const titleSize = Math.max(11, Math.min(headerHeight * 0.35, 16));
+      const padding = Math.max(16, Math.min(width * 0.04, 32));
+      const trendSize = Math.max(14, Math.min(titleSize * 1.4, 20));
 
-      const titleSize = responsive.isMobile
-        ? Math.max(valueSize * 0.5, 11)
-        : responsive.isTablet
-        ? Math.max(valueSize * 0.55, 14)
-        : Math.max(valueSize * 0.6, 16);
-
-      const unitSize = responsive.isMobile
-        ? Math.max(valueSize * 0.4, 9)
-        : responsive.isTablet
-        ? Math.max(valueSize * 0.45, 11)
-        : Math.max(valueSize * 0.5, 13);
-
-      setValueFontSize(Math.round(Math.max(valueSize, responsive.isMobile ? 18 : 20)));
-      setTitleFontSize(Math.round(Math.max(titleSize, responsive.isMobile ? 10 : 12)));
-      setUnitFontSize(Math.round(Math.max(unitSize, responsive.isMobile ? 8 : 10)));
+      setDynamicSizes({
+        valueFontSize: Math.round(valueSize),
+        unitFontSize: Math.round(unitSize),
+        titleFontSize: Math.round(titleSize),
+        padding,
+        headerHeight,
+        trendIconSize: Math.round(trendSize),
+      });
     };
 
-    const resizeObserver = new ResizeObserver(updateDimensions);
+    const resizeObserver = new ResizeObserver(updateLayout);
     resizeObserver.observe(container);
-    updateDimensions();
+    updateLayout();
 
     return () => resizeObserver.disconnect();
-  }, [config.responsiveSettings]);
+  }, []);
 
   useEffect(() => {
     if (!config.deviceUniqId) {
@@ -196,7 +194,6 @@ export const SingleValueCardWidget = ({ config }: Props) => {
   ]);
 
   const getStatusStyles = () => {
-    // Clean minimal approach - always white background, hanya status di indicator dan text
     const baseStyles = {
       title: "text-slate-700 dark:text-slate-300",
       value: "text-slate-900 dark:text-slate-100",
@@ -207,15 +204,14 @@ export const SingleValueCardWidget = ({ config }: Props) => {
       case "ok":
         return {
           ...baseStyles,
-          indicator: "bg-emerald-500 dark:bg-emerald-400",
+          indicator: "bg-emerald-500 dark:bg-emerald-500",
           pulse: false,
         };
       case "error":
         return {
           ...baseStyles,
-          indicator: "bg-red-500 dark:bg-red-400",
+          indicator: "bg-red-500 dark:bg-red-500",
           pulse: false,
-          // Sedikit hint warna di text untuk error
           title: "text-red-600 dark:text-red-400",
           value: "text-red-700 dark:text-red-300",
         };
@@ -223,7 +219,7 @@ export const SingleValueCardWidget = ({ config }: Props) => {
       case "waiting":
         return {
           ...baseStyles,
-          indicator: "bg-amber-500 dark:bg-amber-400",
+          indicator: "bg-amber-500 dark:bg-amber-500",
           pulse: true,
           title: "text-slate-600 dark:text-slate-400",
           value: "text-slate-700 dark:text-slate-300",
@@ -270,26 +266,26 @@ export const SingleValueCardWidget = ({ config }: Props) => {
     if (!trend || status !== "ok") return null;
 
     const trendConfig = {
-      up: { icon: TrendingUp, color: "text-emerald-500" },
-      down: { icon: TrendingDown, color: "text-red-500" },
-      stable: { icon: Minus, color: "text-slate-400" },
+      up: { icon: TrendingUp, color: "text-emerald-500 dark:text-emerald-400" },
+      down: { icon: TrendingDown, color: "text-red-500 dark:text-red-400" },
+      stable: { icon: Minus, color: "text-slate-400 dark:text-slate-500" },
     };
 
     const { icon: Icon, color } = trendConfig[trend];
 
     return (
       <div
-        className="flex items-center justify-center p-1.5 rounded-full bg-white shadow-sm border border-slate-200/50"
+        className="flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50"
         style={{
-          width: Math.max(titleFontSize * 1.8, 20),
-          height: Math.max(titleFontSize * 1.8, 20),
+          width: Math.max(dynamicSizes.trendIconSize * 1.6, 22),
+          height: Math.max(dynamicSizes.trendIconSize * 1.6, 22),
         }}
       >
         <Icon
           className={color}
           style={{
-            width: Math.max(titleFontSize * 0.9, 12),
-            height: Math.max(titleFontSize * 0.9, 12),
+            width: Math.max(dynamicSizes.trendIconSize * 0.9, 14),
+            height: Math.max(dynamicSizes.trendIconSize * 0.9, 14),
           }}
         />
       </div>
@@ -306,16 +302,16 @@ export const SingleValueCardWidget = ({ config }: Props) => {
         <div className="flex flex-col items-center justify-center gap-3">
           <div className="relative">
             <Loader2
-              className="animate-spin text-slate-400"
+              className="animate-spin text-slate-400 dark:text-slate-500"
               style={{
-                width: Math.max(dimensions.width / 8, 28),
-                height: Math.max(dimensions.width / 8, 28),
+                width: Math.max(dynamicSizes.valueFontSize * 1.2, 32),
+                height: Math.max(dynamicSizes.valueFontSize * 1.2, 32),
               }}
             />
           </div>
           <p
             className={`font-medium ${styles.title}`}
-            style={{ fontSize: `${titleFontSize}px` }}
+            style={{ fontSize: `${dynamicSizes.titleFontSize}px` }}
           >
             Loading data...
           </p>
@@ -327,15 +323,17 @@ export const SingleValueCardWidget = ({ config }: Props) => {
       return (
         <div className="flex flex-col items-center justify-center gap-3 text-center px-2">
           <AlertTriangle
-            className="text-red-500"
+            className="text-red-500 dark:text-red-400"
             style={{
-              width: Math.max(dimensions.width / 8, 28),
-              height: Math.max(dimensions.width / 8, 28),
+              width: Math.max(dynamicSizes.valueFontSize * 1.2, 32),
+              height: Math.max(dynamicSizes.valueFontSize * 1.2, 32),
             }}
           />
           <p
             className={`font-semibold break-words ${styles.value}`}
-            style={{ fontSize: `${Math.max(titleFontSize * 0.9, 11)}px` }}
+            style={{
+              fontSize: `${Math.max(dynamicSizes.titleFontSize * 0.9, 11)}px`,
+            }}
           >
             {errorMessage}
           </p>
@@ -345,11 +343,11 @@ export const SingleValueCardWidget = ({ config }: Props) => {
 
     return (
       <div className="flex flex-col items-center justify-center text-center w-full gap-1">
-        <div className="flex items-baseline justify-center gap-2 w-full">
+        <div className="flex items-baseline justify-center gap-2 w-full flex-wrap">
           <span
             className={`font-bold tracking-tight transition-all duration-300 ${styles.value}`}
             style={{
-              fontSize: `${valueFontSize}px`,
+              fontSize: `${dynamicSizes.valueFontSize}px`,
               lineHeight: 0.9,
             }}
           >
@@ -359,7 +357,7 @@ export const SingleValueCardWidget = ({ config }: Props) => {
             <span
               className={`font-medium transition-colors duration-200 ${styles.unit}`}
               style={{
-                fontSize: `${unitFontSize}px`,
+                fontSize: `${dynamicSizes.unitFontSize}px`,
                 lineHeight: 1,
               }}
             >
@@ -373,149 +371,91 @@ export const SingleValueCardWidget = ({ config }: Props) => {
 
   const styles = getStatusStyles();
 
-  // Get responsive padding and styling
-  const responsivePadding = config.responsiveSettings?.paddingClass || "p-4";
-  const responsiveCursor = config.responsiveSettings ? "cursor-pointer" : "cursor-move";
-  const responsiveHover = config.responsiveSettings?.isMobile ? "" : "group hover:scale-[1.01] hover:shadow-md";
-
-  const responsive = config.responsiveSettings!;
-  const isSmallMobile = responsive.isSmallMobile;
-  const isTouchOnly = responsive.isSmallMobile || responsive.isMobile || responsive.isLargeMobile;
-
-  // Enhanced responsive sizing
-  useLayoutEffect(() => {
-    if (!responsive) return;
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const updateDimensions = () => {
-      const rect = container.getBoundingClientRect();
-      const { width, height } = rect;
-      setDimensions({ width, height });
-
-      // More sophisticated font scaling based on device capabilities
-      const baseFontSize = responsive.isSmallMobile
-        ? responsive.fontSizeScale * 16
-        : responsive.isMobile
-        ? responsive.fontSizeScale * 18
-        : responsive.isLargeMobile
-        ? responsive.fontSizeScale * 20
-        : responsive.isSmallTablet
-        ? responsive.fontSizeScale * 22
-        : responsive.fontSizeScale * 24;
-
-      const valueSize = responsive.isSmallMobile
-        ? Math.min(baseFontSize * 0.6, width * 0.2)
-        : responsive.isMobile
-        ? Math.min(baseFontSize * 0.7, width * 0.22)
-        : responsive.isLargeMobile
-        ? Math.min(baseFontSize * 0.75, width * 0.25)
-        : Math.min(baseFontSize * 0.85, width * 0.28);
-
-      const titleSize = responsive.isSmallMobile
-        ? Math.max(valueSize * 0.45, 8)
-        : responsive.isMobile
-        ? Math.max(valueSize * 0.5, 10)
-        : responsive.isLargeMobile
-        ? Math.max(valueSize * 0.55, 11)
-        : Math.max(valueSize * 0.6, 12);
-
-      const unitSize = responsive.isSmallMobile
-        ? Math.max(valueSize * 0.35, 7)
-        : responsive.isMobile
-        ? Math.max(valueSize * 0.4, 8)
-        : Math.max(valueSize * 0.45, 10);
-
-      setValueFontSize(Math.round(Math.max(valueSize, responsive.isSmallMobile ? 14 : responsive.isMobile ? 16 : 18)));
-      setTitleFontSize(Math.round(Math.max(titleSize, responsive.isSmallMobile ? 8 : responsive.isMobile ? 9 : 10)));
-      setUnitFontSize(Math.round(Math.max(unitSize, responsive.isSmallMobile ? 6 : responsive.isMobile ? 7 : 8)));
-    };
-
-    const resizeObserver = new ResizeObserver(updateDimensions);
-    resizeObserver.observe(container);
-    updateDimensions();
-
-    return () => resizeObserver.disconnect();
-  }, [responsive]);
-
   return (
     <div
       ref={containerRef}
       className={`
-        w-full h-full relative overflow-hidden ${responsive.touchMode ? 'cursor-pointer' : 'cursor-move'}
+        w-full h-full relative overflow-hidden cursor-move
         bg-card
         border border-border/60 rounded-xl
-        shadow-sm transition-all duration-300 ease-out transform-gpu
-        ${!isTouchOnly ? 'group hover:scale-[1.01] hover:shadow-md' : ''}
-        ${responsive.layoutDensity === 'ultra-compact' ? 'rounded-lg' : ''}
-        ${responsive.compactMode ? 'shadow-none border-border/40' : ''}
+        shadow-sm hover:shadow-md
+        transition-all duration-300 ease-out
+        group hover:scale-[1.01] transform-gpu
       `}
       style={{
-        minWidth: responsive.isSmallMobile ? 80 : responsive.isMobile ? 100 : responsive.isLargeMobile ? 110 : 120,
-        minHeight: responsive.isSmallMobile ? 50 : responsive.isMobile ? 60 : responsive.isLargeMobile ? 65 : 80,
+        minWidth: 100,
+        minHeight: 80,
       }}
     >
-      {/* Enhanced status indicators */}
-      <div className={`absolute ${isSmallMobile ? 'top-0.5 right-0.5' : responsive.isMobile ? 'top-1 right-1' : 'top-2 right-2'} z-10`}>
-        <div className={`flex items-center ${responsive.gapClass}`}>
-          {responsive.showIcons && responsive.enableAnimations !== false && renderTrendIndicator()}
+      {/* Header - SAMA SEPERTI ICON WIDGET */}
+      <div
+        className="absolute top-0 left-0 right-0 px-4 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between flex-shrink-0 border-b border-slate-200/40 dark:border-slate-700/40"
+        style={{ height: `${dynamicSizes.headerHeight}px` }}
+      >
+        <h3
+          className={`font-medium truncate transition-colors duration-200 ${styles.title}`}
+          style={{
+            fontSize: `${dynamicSizes.titleFontSize}px`,
+            lineHeight: 1.3,
+            flex: 1,
+          }}
+          title={config.customName}
+        >
+          {config.customName}
+        </h3>
+
+        {/* Status indicators in header */}
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+          {/* Trend indicator */}
+          {renderTrendIndicator()}
+
+          {/* Wifi status */}
+          {connectionStatus === "Connected" ? (
+            <Wifi
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          ) : (
+            <WifiOff
+              className="text-slate-400 dark:text-slate-500"
+              style={{
+                width: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+                height: Math.max(dynamicSizes.titleFontSize * 0.9, 12),
+              }}
+            />
+          )}
+
+          {/* Status dot */}
           <div
-            className={`rounded-full transition-all duration-300 ${
-              styles.indicator
-            } ${styles.pulse && responsive.enableAnimations !== false ? "animate-pulse" : ""}`}
+            className={`rounded-full ${styles.indicator} ${
+              styles.pulse ? "animate-pulse" : ""
+            } transition-all duration-300`}
             style={{
-              width: Math.max(titleFontSize * 0.5, isSmallMobile ? 4 : responsive.isMobile ? 6 : 8),
-              height: Math.max(titleFontSize * 0.5, isSmallMobile ? 4 : responsive.isMobile ? 6 : 8),
+              width: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
+              height: Math.max(dynamicSizes.titleFontSize * 0.65, 8),
             }}
           />
         </div>
       </div>
 
-      {/* Responsive header with enhanced touch targets */}
-      <div className={`absolute top-0 left-0 right-0 ${responsive.paddingClass} ${
-        isSmallMobile ? `pr-8 ${responsive.compactMode ? 'py-1' : 'py-1'}` :
-        responsive.isMobile ? 'pr-10' : 'pr-12'
-      }`}>
-        {responsive.showLabels && (
-          <h3
-            className={`font-medium ${responsive.truncateText ? 'truncate' : ''} text-left transition-colors duration-200 ${styles.title} ${responsive.fontSizeClass}`}
-            style={{
-              fontSize: isSmallMobile ? `${Math.max(titleFontSize * 0.9, 8)}px` :
-                        responsive.isMobile ? `${Math.max(titleFontSize * 0.95, 9)}px` : `${titleFontSize}px`,
-              lineHeight: responsive.lineHeightScale,
-            }}
-            title={config.customName}
-          >
-            {config.customName}
-          </h3>
-        )}
-      </div>
-
-      {/* Enhanced content area with responsive padding */}
+      {/* Main content area */}
       <div
-        className={`absolute inset-0 flex items-center justify-center ${
-          responsive.layoutDirection === 'vertical' ? 'flex-col justify-center' : 'justify-center'
-        }`}
+        className="w-full h-full flex items-center justify-center"
         style={{
-          paddingTop: responsive.showLabels ? (titleFontSize * responsive.spacingScale * 2.8) : '0.5rem',
-          paddingBottom: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
-          paddingLeft: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
-          paddingRight: responsive.isSmallMobile ? 4 : responsive.isMobile ? 8 : responsive.isLargeMobile ? 10 : 16,
+          paddingTop: dynamicSizes.headerHeight + dynamicSizes.padding * 0.5,
+          paddingBottom: dynamicSizes.padding,
+          paddingLeft: dynamicSizes.padding,
+          paddingRight: dynamicSizes.padding,
         }}
       >
         {renderContent()}
       </div>
 
-      {/* Conditional hover effects - only on non-touch devices */}
-      {!isTouchOnly && responsive.enableAnimations !== false && (
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/3 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      )}
-
-      {/* Touch feedback for touch devices */}
-      {responsive.touchMode && responsive.enableAnimations !== false && (
-        <div className="absolute inset-0 bg-slate-900/5 active:bg-slate-900/10 pointer-events-none rounded-xl opacity-0 active:opacity-100 transition-opacity duration-150" />
-      )}
+      {/* Minimal hover effect */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/2 dark:from-slate-900/5 via-transparent to-transparent pointer-events-none rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
     </div>
   );
 };

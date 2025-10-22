@@ -597,8 +597,14 @@ def main():
 
         # --- Setup Server MQTT Client ---
         log_simple("Connecting to Server MQTT broker...")
-        setup_mqtt_server_client() # This also sets global SERVER_BROKER/PORT and connects
-        mqtt_server.loop_start()
+        try:
+            setup_mqtt_server_client() # This also sets global SERVER_BROKER/PORT and connects
+            mqtt_server.loop_start()
+        except Exception as e:
+            server_broker_connected = False
+            log_simple(f"Failed to connect to server MQTT broker: {e}", "ERROR")
+            send_error_to_log_service(f"Failed to set up MQTT server client: {e}", "ERROR", "MQTTServerSetup", 210)
+            # Continue without server broker
 
         # Wait a moment for connections to establish
         time.sleep(2)

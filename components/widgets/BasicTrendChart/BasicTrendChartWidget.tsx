@@ -101,9 +101,12 @@ export const BasicTrendChartWidget = ({ config }: Props) => {
             </span>
           </p>
         </div>
-        <div className="flex-1 -m-1 mt-2">
+        <div className="flex-1 p-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
+            <AreaChart
+              data={data}
+              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+            >
               <Tooltip
                 contentStyle={{ display: "none" }}
                 cursor={{

@@ -37,6 +37,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
 // Komponen kecil untuk memilih Device -> Key
@@ -77,8 +78,9 @@ const KeySelector = ({
   );
 
   useEffect(() => {
-    if (keySubTopicRef.current && keySubTopicRef.current !== selectedTopic) {
-      unsubscribe(keySubTopicRef.current, handleMqttMessage);
+    const currentSubTopic = keySubTopicRef.current;
+    if (currentSubTopic && currentSubTopic !== selectedTopic) {
+      unsubscribe(currentSubTopic, handleMqttMessage);
       keySubTopicRef.current = null;
     }
     if (selectedTopic && selectedTopic !== keySubTopicRef.current) {
@@ -114,7 +116,11 @@ const KeySelector = ({
         <div className="grid gap-2">
           <Label>Data Key</Label>
           <Select
-            onValueChange={(key) => onSelectionChange(selectedTopic, key)}
+            onValueChange={(key) => {
+              if (selectedTopic) {
+                onSelectionChange(selectedTopic, key);
+              }
+            }}
             value={selectedKey || ""}
             disabled={!selectedTopic || availableKeys.length === 0}
           >
@@ -141,9 +147,11 @@ export const BreakerStatusConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const { publish, subscribe, unsubscribe, isReady } = useMqtt();
   const [widgetTitle, setWidgetTitle] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
   const [deviceType, setDeviceType] = useState<"modbus" | "i2c" | null>(null);
   const [devices, setDevices] = useState<MqttDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
@@ -161,12 +169,33 @@ export const BreakerStatusConfigModal = ({
   const [tripKey, setTripKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      setTimeout(() => {
-        /* Reset states */
-      }, 300);
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "");
+      setIsTripEnabled(initialConfig.isTripEnabled || false);
+      if (initialConfig.monitoring) {
+        setMonitoringTopic(initialConfig.monitoring.deviceTopic || null);
+        setMonitoringKey(initialConfig.monitoring.selectedKey || null);
+        setOnValue(initialConfig.monitoring.onValue || "1");
+        setOffValue(initialConfig.monitoring.offValue || "0");
+      }
+      if (initialConfig.trip) {
+        setTripTopic(initialConfig.trip.deviceTopic || null);
+        setTripKey(initialConfig.trip.selectedKey || null);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
+      setWidgetTitle("");
+      setDeviceType(null);
+      setMonitoringTopic(null);
+      setMonitoringKey(null);
+      setOnValue("1");
+      setOffValue("0");
+      setIsTripEnabled(false);
+      setTripTopic(null);
+      setTripKey(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   const handleDeviceListResponse = useCallback(
     (topic: string, payloadString: string) => {
@@ -249,10 +278,12 @@ export const BreakerStatusConfigModal = ({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Breaker Status
+            {isEditMode ? "Edit Breaker Status" : "Configure Breaker Status"}
           </DialogTitle>
           <DialogDescription>
-            Configure monitoring and optional trip parameters for the breaker.
+            {isEditMode
+              ? "Update your breaker status widget configuration."
+              : "Configure monitoring and optional trip parameters for the breaker."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 p-6 max-h-[70vh] overflow-y-auto">
@@ -345,7 +376,7 @@ export const BreakerStatusConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -31,20 +31,32 @@ interface BillConfig {
   customName: string;
 }
 
+// ✅ 1. MODIFIKASI PROPS: Tambahkan `initialConfig`
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    billConfigId: string;
+    chartType: string;
+    timeRange: string;
+    color: string;
+    hasAnimation: boolean;
+    refreshInterval: number;
+  };
 }
 
 export const PowerAnalyzerChartConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig, // ✅ DESTRUCTURE PROP BARU
 }: Props) => {
   const [billConfigs, setBillConfigs] = useState<BillConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // State untuk form
   const [widgetTitle, setWidgetTitle] = useState("");
   const [selectedBillConfigId, setSelectedBillConfigId] = useState<
     string | null
@@ -55,17 +67,13 @@ export const PowerAnalyzerChartConfigModal = ({
   const [hasAnimation, setHasAnimation] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState("5");
 
-  useEffect(() => {
-    if (isOpen) {
-      // Reset state
-      setWidgetTitle("");
-      setSelectedBillConfigId(null);
-      setChartType("line");
-      setTimeRange("24h");
-      setColor("#8884d8");
-      setHasAnimation(true);
-      setRefreshInterval("5");
+  // ✅ 2. TAMBAH STATE UNTUK TRACK EDIT MODE
+  const [isEditMode, setIsEditMode] = useState(false);
 
+  // ✅ 3. UBAH LOGIKA `useEffect` UNTUK HANDLE EDIT DAN CREATE
+  useEffect(() => {
+    // Selalu fetch data saat modal dibuka
+    if (isOpen) {
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -73,7 +81,6 @@ export const PowerAnalyzerChartConfigModal = ({
           if (!response.ok)
             throw new Error("Failed to fetch bill configurations");
           setBillConfigs(await response.json());
-          // --- PERBAIKAN: Menambahkan { setelah catch ---
         } catch (error: any) {
           Swal.fire("Error", error.message, "error");
           onClose();
@@ -82,8 +89,39 @@ export const PowerAnalyzerChartConfigModal = ({
         }
       };
       fetchConfigs();
+
+      // Cek apakah ini mode EDIT atau mode CREATE
+      if (initialConfig) {
+        // --- MODE EDIT: Isi form dengan data yang ada ---
+        setIsEditMode(true);
+        setWidgetTitle(initialConfig.widgetTitle || "");
+        setSelectedBillConfigId(initialConfig.billConfigId || null);
+        setChartType(initialConfig.chartType || "line");
+        setTimeRange(initialConfig.timeRange || "24h");
+        setColor(initialConfig.color || "#8884d8");
+        // Gunakan nullish coalescing (??) untuk boolean, jaga-jaga jika nilainya false
+        setHasAnimation(initialConfig.hasAnimation ?? true);
+        setRefreshInterval(String(initialConfig.refreshInterval || 5));
+      } else {
+        // --- MODE CREATE: Reset form ke state default ---
+        setIsEditMode(false);
+        setWidgetTitle("");
+        setSelectedBillConfigId(null);
+        setChartType("line");
+        setTimeRange("24h");
+        setColor("#8884d8");
+        setHasAnimation(true);
+        setRefreshInterval("5");
+      }
+    } else {
+      // Saat modal ditutup, reset semuanya setelah delay
+      setTimeout(() => {
+        setIsEditMode(false);
+        setWidgetTitle("");
+        setSelectedBillConfigId(null);
+      }, 200);
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, initialConfig, onClose]);
 
   const handleSave = () => {
     if (!widgetTitle || !selectedBillConfigId) {
@@ -105,11 +143,16 @@ export const PowerAnalyzerChartConfigModal = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
+          {/* ✅ 4. UBAH JUDUL MODAL SESUAI MODE */}
           <DialogTitle className="text-xl">
-            Configure Power Analyzer Chart
+            {isEditMode
+              ? "Edit Power Analyzer Chart"
+              : "Configure Power Analyzer Chart"}
           </DialogTitle>
           <DialogDescription>
-            Select a bill configuration and customize the chart.
+            {isEditMode
+              ? "Update your widget configuration below."
+              : "Select a bill configuration and customize the chart."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
@@ -216,8 +259,9 @@ export const PowerAnalyzerChartConfigModal = ({
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
+          {/* ✅ 5. UBAH TEKS TOMBOL SIMPAN SESUAI MODE */}
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

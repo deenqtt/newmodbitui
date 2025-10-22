@@ -156,6 +156,7 @@ export const MultiSeriesChartWidget = ({ config }: Props) => {
             strokeWidth={2}
             dot={false}
             isAnimationActive={config.hasAnimation}
+            connectNulls={true}
           />
         ))}
       </ChartComponent>

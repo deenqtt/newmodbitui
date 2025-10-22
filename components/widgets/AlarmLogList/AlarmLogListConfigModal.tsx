@@ -26,18 +26,36 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    logLimit: number;
+  };
 }
 
-export const AlarmLogListConfigModal = ({ isOpen, onClose, onSave }: Props) => {
-  const [widgetTitle, setWidgetTitle] = useState("Alarm Log");
-  const [logLimit, setLogLimit] = useState("10"); // Jumlah log yang ditampilkan
+export const AlarmLogListConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || "Alarm Log"
+  );
+  const [logLimit, setLogLimit] = useState(
+    String(initialConfig?.logLimit) || "10"
+  ); // Jumlah log yang ditampilkan
 
   useEffect(() => {
     if (isOpen) {
-      setWidgetTitle("Alarm Log");
-      setLogLimit("10");
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setLogLimit(String(initialConfig.logLimit));
+      } else {
+        setWidgetTitle("Alarm Log");
+        setLogLimit("10");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   const handleSave = () => {
     if (!widgetTitle) {
@@ -88,7 +106,7 @@ export const AlarmLogListConfigModal = ({ isOpen, onClose, onSave }: Props) => {
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
+          <Button type="submit" onClick={handleSave} disabled={!widgetTitle}>
             Save Widget
           </Button>
         </DialogFooter>

@@ -23,18 +23,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import Swal from "sweetalert2";
 import { useMqtt } from "@/contexts/MqttContext";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2, Info } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-// Tipe untuk setiap operand dalam kalkulasi
 interface Operand {
-  id: string; // ID unik sementara untuk list di React
+  id: string;
   deviceUniqId: string | null;
   selectedKey: string | null;
 }
 
-// Tipe untuk data perangkat dari API
 interface DeviceForSelection {
   uniqId: string;
   name: string;
@@ -45,26 +43,54 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    title: string;
+    calculation: string;
+    units: string;
+    operands: Array<{
+      deviceUniqId: string;
+      selectedKey: string;
+    }>;
+  };
 }
 
-// Komponen Form untuk satu operand
+// Calculation descriptions
+const CALCULATION_DESCRIPTIONS: Record<string, string> = {
+  SUM: "Add all values together: A + B + C + ...",
+  AVERAGE: "Calculate mean: (A + B + C + ...) / count",
+  MIN: "Find the lowest value",
+  MAX: "Find the highest value",
+  DIFFERENCE: "Subtract second from first: A - B",
+};
+
+// Operand Form Component
 const OperandForm = ({
   operand,
   updateOperand,
   removeOperand,
   allDevices,
   isLoadingDevices,
+  isEditMode,
+  operandIndex,
 }: {
   operand: Operand;
   updateOperand: (id: string, field: keyof Operand, value: any) => void;
   removeOperand: (id: string) => void;
   allDevices: DeviceForSelection[];
   isLoadingDevices: boolean;
+  isEditMode: boolean;
+  operandIndex: number;
 }) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isEditMode && operand.selectedKey) {
+      setAvailableKeys([operand.selectedKey]);
+    }
+  }, [isEditMode, operand.selectedKey]);
 
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
@@ -72,7 +98,12 @@ const OperandForm = ({
         const payload = JSON.parse(payloadString);
         const innerPayload =
           typeof payload.value === "string" ? JSON.parse(payload.value) : {};
-        setAvailableKeys(Object.keys(innerPayload));
+
+        setAvailableKeys((prevKeys) => {
+          const newKeys = Object.keys(innerPayload);
+          const allKeys = [...new Set([...prevKeys, ...newKeys])];
+          return allKeys;
+        });
       } catch (e) {
         console.error("Failed to parse MQTT payload in operand form:", e);
       } finally {
@@ -96,7 +127,9 @@ const OperandForm = ({
     }
 
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
@@ -114,18 +147,28 @@ const OperandForm = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
 
   const handleDeviceChange = (value: string) => {
     updateOperand(operand.id, "deviceUniqId", value);
-    updateOperand(operand.id, "selectedKey", null); // Reset key
+    updateOperand(operand.id, "selectedKey", null);
+    setAvailableKeys([]);
   };
 
   return (
-    <div className="flex items-start gap-2 p-4 border rounded-lg bg-muted/50">
+    <div className="flex items-start gap-3 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+      {/* Operand label */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+        <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+          {String.fromCharCode(65 + operandIndex)}
+        </span>
+      </div>
+
+      {/* Form fields */}
       <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <Label>Device</Label>
+          <Label className="text-slate-700 dark:text-slate-300">Device</Label>
           {isLoadingDevices ? (
             <Skeleton className="h-10 w-full" />
           ) : (
@@ -133,10 +176,10 @@ const OperandForm = ({
               onValueChange={handleDeviceChange}
               value={operand.deviceUniqId || ""}
             >
-              <SelectTrigger>
+              <SelectTrigger className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600">
                 <SelectValue placeholder="Select a device" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
                 {allDevices.map((d) => (
                   <SelectItem key={d.uniqId} value={d.uniqId}>
                     {d.name}
@@ -147,7 +190,7 @@ const OperandForm = ({
           )}
         </div>
         <div className="grid gap-2">
-          <Label>Data Key</Label>
+          <Label className="text-slate-700 dark:text-slate-300">Data Key</Label>
           <Select
             onValueChange={(value) =>
               updateOperand(operand.id, "selectedKey", value)
@@ -155,12 +198,12 @@ const OperandForm = ({
             value={operand.selectedKey || ""}
             disabled={!operand.deviceUniqId || availableKeys.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600 disabled:opacity-50">
               <SelectValue
                 placeholder={isWaitingForKey ? "Waiting..." : "Select a key"}
               />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
               {availableKeys.map((k) => (
                 <SelectItem key={k} value={k}>
                   {k}
@@ -170,13 +213,15 @@ const OperandForm = ({
           </Select>
         </div>
       </div>
+
+      {/* Remove button */}
       <Button
         variant="ghost"
         size="icon"
-        className="mt-6"
+        className="mt-6 text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
         onClick={() => removeOperand(operand.id)}
       >
-        <Trash2 className="h-4 w-4 text-destructive" />
+        <Trash2 className="h-4 w-4" />
       </Button>
     </div>
   );
@@ -186,6 +231,7 @@ export const CalculatedParameterConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
@@ -193,15 +239,36 @@ export const CalculatedParameterConfigModal = ({
   const [widgetTitle, setWidgetTitle] = useState("");
   const [calculationType, setCalculationType] = useState("SUM");
   const [units, setUnits] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.title || "");
+      setCalculationType(initialConfig.calculation || "SUM");
+      setUnits(initialConfig.units || "");
+
+      const loadedOperands: Operand[] = initialConfig.operands.map(
+        (op, index) => ({
+          id: `op-${Date.now()}-${index}`,
+          deviceUniqId: op.deviceUniqId || null,
+          selectedKey: op.selectedKey || null,
+        })
+      );
+
+      setOperands(loadedOperands);
+    } else if (isOpen) {
+      setIsEditMode(false);
       setOperands([]);
       setWidgetTitle("");
       setCalculationType("SUM");
       setUnits("");
-      addOperand(); // Mulai dengan satu operand
+      addOperand();
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchDevices = async () => {
         setIsLoadingDevices(true);
         try {
@@ -234,7 +301,6 @@ export const CalculatedParameterConfigModal = ({
 
   const removeOperand = (id: string) => {
     if (operands.length > 1) {
-      // Jaga agar minimal ada 1
       setOperands((prev) => prev.filter((op) => op.id !== id));
     }
   };
@@ -258,7 +324,7 @@ export const CalculatedParameterConfigModal = ({
       if (!op.deviceUniqId || !op.selectedKey) {
         Swal.fire(
           "Incomplete",
-          `Please complete all fields for all operands.`,
+          "Please complete all fields for all operands.",
           "warning"
         );
         return;
@@ -278,52 +344,87 @@ export const CalculatedParameterConfigModal = ({
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Calculated Parameter
+            {isEditMode
+              ? "Edit Calculated Parameter"
+              : "Configure Calculated Parameter"}
           </DialogTitle>
           <DialogDescription>
-            Define a calculation based on multiple real-time data points.
+            {isEditMode
+              ? "Update your calculated parameter configuration."
+              : "Define a calculation based on multiple real-time data points."}
           </DialogDescription>
         </DialogHeader>
+
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          {/* Title and Units */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Widget Title</Label>
+              <Label className="text-slate-700 dark:text-slate-300">
+                Widget Title
+              </Label>
               <Input
                 value={widgetTitle}
                 onChange={(e) => setWidgetTitle(e.target.value)}
                 placeholder="e.g., Total Power Consumption"
+                className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
               />
             </div>
             <div className="grid gap-2">
-              <Label>Units</Label>
+              <Label className="text-slate-700 dark:text-slate-300">
+                Units
+              </Label>
               <Input
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
                 placeholder="e.g., kW, %"
+                className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
               />
             </div>
           </div>
+
+          {/* Calculation Type */}
           <div className="grid gap-2">
-            <Label>Calculation Type</Label>
+            <Label className="text-slate-700 dark:text-slate-300">
+              Calculation Type
+            </Label>
             <Select onValueChange={setCalculationType} value={calculationType}>
-              <SelectTrigger>
+              <SelectTrigger className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SUM">SUM (A + B + ...)</SelectItem>
+              <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
+                <SelectItem value="SUM">SUM - Add all values</SelectItem>
                 <SelectItem value="AVERAGE">
-                  AVERAGE ((A + B + ...) / n)
+                  AVERAGE - Calculate mean
                 </SelectItem>
-                <SelectItem value="MIN">MIN (Minimum of A, B, ...)</SelectItem>
-                <SelectItem value="MAX">MAX (Maximum of A, B, ...)</SelectItem>
-                <SelectItem value="DIFFERENCE">DIFFERENCE (A - B)</SelectItem>
+                <SelectItem value="MIN">MIN - Lowest value</SelectItem>
+                <SelectItem value="MAX">MAX - Highest value</SelectItem>
+                <SelectItem value="DIFFERENCE">
+                  DIFFERENCE - First minus second
+                </SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Calculation Description */}
+            <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mt-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                {CALCULATION_DESCRIPTIONS[calculationType]}
+              </p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Operands</Label>
-            <div className="space-y-4">
-              {operands.map((op) => (
+
+          {/* Operands Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-slate-700 dark:text-slate-300 text-base font-semibold">
+                Data Sources (Operands)
+              </Label>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {operands.length} source{operands.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {operands.map((op, index) => (
                 <OperandForm
                   key={op.id}
                   operand={op}
@@ -331,21 +432,44 @@ export const CalculatedParameterConfigModal = ({
                   removeOperand={removeOperand}
                   allDevices={devices}
                   isLoadingDevices={isLoadingDevices}
+                  isEditMode={isEditMode}
+                  operandIndex={index}
                 />
               ))}
             </div>
           </div>
-          <Button variant="outline" onClick={addOperand} className="w-full">
+
+          {/* Add Operand Button */}
+          <Button
+            variant="outline"
+            onClick={addOperand}
+            className="w-full dark:border-slate-600 dark:hover:bg-slate-800"
+          >
             <PlusCircle className="h-4 w-4 mr-2" />
-            Add Operand
+            Add Data Source
           </Button>
+
+          {/* Helper text */}
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+            Tip: Use 2+ sources. For DIFFERENCE, order matters (A - B).
+          </p>
         </div>
-        <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+
+        <DialogFooter className="px-6 pb-6 sm:justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            className="dark:hover:bg-slate-800"
+          >
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
-            Save Widget
+          <Button
+            type="submit"
+            onClick={handleSave}
+            className="dark:bg-blue-600 dark:hover:bg-blue-700"
+          >
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -34,12 +34,20 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    loggingConfigId: string;
+    targetValue: number;
+    units?: string;
+    multiply?: number;
+  };
 }
 
 export const EnergyTargetGapConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,19 +55,31 @@ export const EnergyTargetGapConfigModal = ({
   // State untuk form
   const [widgetTitle, setWidgetTitle] = useState("");
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
-  const [targetValue, setTargetValue] = useState("1000"); // <-- State baru
+  const [targetValue, setTargetValue] = useState("1000");
   const [units, setUnits] = useState("kWh");
   const [multiply, setMultiply] = useState("1");
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "");
+      setSelectedConfigId(initialConfig.loggingConfigId || null);
+      setTargetValue(String(initialConfig.targetValue || 1000));
+      setUnits(initialConfig.units || "kWh");
+      setMultiply(String(initialConfig.multiply || 1));
+    } else if (isOpen) {
+      setIsEditMode(false);
       setWidgetTitle("");
       setSelectedConfigId(null);
       setTargetValue("1000");
       setUnits("kWh");
       setMultiply("1");
+    }
+  }, [isOpen, initialConfig]);
 
+  useEffect(() => {
+    if (isOpen) {
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -98,11 +118,14 @@ export const EnergyTargetGapConfigModal = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Energy Target Gap
+            {isEditMode
+              ? "Edit Energy Target Gap"
+              : "Configure Energy Target Gap"}
           </DialogTitle>
           <DialogDescription>
-            Set a target and track energy usage against it for the current
-            month.
+            {isEditMode
+              ? "Update your energy target gap widget configuration."
+              : "Set a target and track energy usage against it for the current month."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 p-6">
@@ -170,7 +193,7 @@ export const EnergyTargetGapConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

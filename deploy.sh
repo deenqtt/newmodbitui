@@ -101,6 +101,20 @@ else
     SEED_MAINTENANCE=true
 fi
 
+if [[ -n "${SEED_ALARM_CONFIGS}" ]]; then
+    SEED_ALARM_CONFIGS=$(echo "${SEED_ALARM_CONFIGS}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_ALARM_CONFIGS}" == "true" || "${SEED_ALARM_CONFIGS}" == "1" ]] && SEED_ALARM_CONFIGS=true || SEED_ALARM_CONFIGS=false
+else
+    SEED_ALARM_CONFIGS=true
+fi
+
+if [[ -n "${SEED_MENU_PRESETS}" ]]; then
+    SEED_MENU_PRESETS=$(echo "${SEED_MENU_PRESETS}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_MENU_PRESETS}" == "true" || "${SEED_MENU_PRESETS}" == "1" ]] && SEED_MENU_PRESETS=true || SEED_MENU_PRESETS=false
+else
+    SEED_MENU_PRESETS=true
+fi
+
 # Log functions
 log() {
     echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
@@ -318,10 +332,12 @@ run_database_seeding() {
     local seeder_envs=""
     [ "$SEED_USERS" = false ] && seeder_envs="$seeder_envs SEED_USERS=false"
     [ "$SEED_MENU" = false ] && seeder_envs="$seeder_envs SEED_MENU=false"
+    [ "$SEED_MENU_PRESETS" = false ] && seeder_envs="$seeder_envs SEED_MENU_PRESETS=false"
     [ "$SEED_DASHBOARD" = false ] && seeder_envs="$seeder_envs SEED_DASHBOARD=false"
     [ "$SEED_DEVICES" = false ] && seeder_envs="$seeder_envs SEED_DEVICES=false"
     [ "$SEED_LAYOUT2D" = false ] && seeder_envs="$seeder_envs SEED_LAYOUT2D=false"
     [ "$SEED_LOGGING_CONFIGS" = false ] && seeder_envs="$seeder_envs SEED_LOGGING_CONFIGS=false"
+    [ "$SEED_ALARM_CONFIGS" = false ] && seeder_envs="$seeder_envs SEED_ALARM_CONFIGS=false"
     [ "$SEED_MAINTENANCE" = false ] && seeder_envs="$seeder_envs SEED_MAINTENANCE=false"
 
     log "Running seeding with configuration:"
@@ -352,8 +368,14 @@ run_database_seeding() {
         if [ "$SEED_LOGGING_CONFIGS" = true ]; then
             echo -e "   ${GREEN}✓${NC} Logging Configs seeded (8 configs)"
         fi
+        if [ "$SEED_ALARM_CONFIGS" = true ]; then
+            echo -e "   ${GREEN}✓${NC} Alarm Configurations seeded (19 configs + 8 demo logs)"
+        fi
         if [ "$SEED_MAINTENANCE" = true ]; then
             echo -e "   ${GREEN}✓${NC} Maintenance seeded (2 schedules)"
+        fi
+        if [ "$SEED_MENU_PRESETS" = true ]; then
+            echo -e "   ${GREEN}✓${NC} Menu Presets seeded (2 presets)"
         fi
         echo ""
 

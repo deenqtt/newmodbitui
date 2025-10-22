@@ -36,40 +36,77 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    selectedKey: string;
+    units?: string;
+    multiply?: number;
+    timeUnit?: string;
+  };
 }
+
+// Time unit conversion factors to hours
+const TIME_UNIT_CONVERSIONS: Record<string, number> = {
+  seconds: 1 / 3600,
+  minutes: 1 / 60,
+  hours: 1,
+  days: 24,
+};
 
 export const RunningHoursLogConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const { subscribe, unsubscribe } = useMqtt();
   const [devices, setDevices] = useState<DeviceForSelection[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
-  // State untuk form
+  // Form state
   const [customName, setCustomName] = useState("");
   const [selectedDeviceUniqId, setSelectedDeviceUniqId] = useState<
     string | null
   >(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [units, setUnits] = useState("Hours"); // Default unit
+  const [timeUnit, setTimeUnit] = useState<string>("seconds");
   const [multiply, setMultiply] = useState("1");
 
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const [isWaitingForKey, setIsWaitingForKey] = useState(false);
   const subscribedTopicRef = useRef<string | null>(null);
 
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Pre-fill data if editing
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setCustomName(initialConfig.customName || "");
+      setSelectedDeviceUniqId(initialConfig.deviceUniqId || null);
+      setSelectedKey(initialConfig.selectedKey || null);
+      setTimeUnit(initialConfig.timeUnit || "seconds");
+      setMultiply(String(initialConfig.multiply || 1));
+
+      if (initialConfig.selectedKey) {
+        setAvailableKeys([initialConfig.selectedKey]);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
       setCustomName("");
       setSelectedDeviceUniqId(null);
       setSelectedKey(null);
-      setUnits("Hours");
+      setTimeUnit("seconds");
       setMultiply("1");
       setAvailableKeys([]);
+      setIsWaitingForKey(false);
+    }
+  }, [isOpen, initialConfig]);
 
+  // Fetch devices
+  useEffect(() => {
+    if (isOpen) {
       const fetchDevices = async () => {
         setIsLoadingDevices(true);
         try {
@@ -89,13 +126,19 @@ export const RunningHoursLogConfigModal = ({
     }
   }, [isOpen, onClose]);
 
+  // Handle MQTT message
   const handleMqttMessage = useCallback(
     (topic: string, payloadString: string) => {
       try {
         const payload = JSON.parse(payloadString);
         const innerPayload =
           typeof payload.value === "string" ? JSON.parse(payload.value) : {};
-        setAvailableKeys(Object.keys(innerPayload));
+
+        setAvailableKeys((prevKeys) => {
+          const newKeys = Object.keys(innerPayload);
+          const allKeys = [...new Set([...prevKeys, ...newKeys])];
+          return allKeys;
+        });
       } catch (e) {
         console.error("Failed to parse MQTT payload:", e);
       } finally {
@@ -107,6 +150,7 @@ export const RunningHoursLogConfigModal = ({
     [unsubscribe]
   );
 
+  // Subscribe to device topic
   useEffect(() => {
     const selectedDevice = devices.find(
       (d) => d.uniqId === selectedDeviceUniqId
@@ -119,7 +163,9 @@ export const RunningHoursLogConfigModal = ({
     }
 
     if (newTopic && newTopic !== subscribedTopicRef.current) {
-      setAvailableKeys([]);
+      if (!isEditMode) {
+        setAvailableKeys([]);
+      }
       setIsWaitingForKey(true);
       subscribe(newTopic, handleMqttMessage);
       subscribedTopicRef.current = newTopic;
@@ -137,11 +183,13 @@ export const RunningHoursLogConfigModal = ({
     subscribe,
     unsubscribe,
     handleMqttMessage,
+    isEditMode,
   ]);
 
   const handleDeviceChange = (value: string) => {
     setSelectedDeviceUniqId(value);
     setSelectedKey(null);
+    setAvailableKeys([]);
   };
 
   const handleSave = () => {
@@ -149,12 +197,19 @@ export const RunningHoursLogConfigModal = ({
       Swal.fire("Incomplete", "Please fill all required fields.", "warning");
       return;
     }
+
+    // Calculate multiplier based on time unit
+    const timeUnitFactor = TIME_UNIT_CONVERSIONS[timeUnit] || 1;
+    const customMultiplier = parseFloat(multiply) || 1;
+    const finalMultiplier = timeUnitFactor * customMultiplier;
+
     onSave({
       customName,
       deviceUniqId: selectedDeviceUniqId,
       selectedKey,
-      units,
-      multiply: parseFloat(multiply) || 1,
+      units: "Hours",
+      multiply: finalMultiplier,
+      timeUnit,
     });
   };
 
@@ -163,21 +218,30 @@ export const RunningHoursLogConfigModal = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Running Hours Log
+            {isEditMode
+              ? "Edit Running Hours Log"
+              : "Configure Running Hours Log"}
           </DialogTitle>
           <DialogDescription>
-            Select a device and the key that contains the running hours data.
+            {isEditMode
+              ? "Update your running hours log widget configuration."
+              : "Select a device and the key that contains the running hours data."}
           </DialogDescription>
         </DialogHeader>
+
         <div className="grid gap-6 p-6 max-h-[70vh] overflow-y-auto">
+          {/* Widget Title */}
           <div className="grid gap-2">
             <Label>Widget Title</Label>
             <Input
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
               placeholder="e.g., Genset A Running Time"
+              className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
             />
           </div>
+
+          {/* Device Selection */}
           <div className="grid gap-2">
             <Label>Device</Label>
             {isLoadingDevices ? (
@@ -187,10 +251,10 @@ export const RunningHoursLogConfigModal = ({
                 onValueChange={handleDeviceChange}
                 value={selectedDeviceUniqId || ""}
               >
-                <SelectTrigger>
+                <SelectTrigger className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
                   <SelectValue placeholder="Select a device" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
                   {devices.map((d) => (
                     <SelectItem key={d.uniqId} value={d.uniqId}>
                       {d.name}
@@ -200,6 +264,8 @@ export const RunningHoursLogConfigModal = ({
               </Select>
             )}
           </div>
+
+          {/* Data Key Selection */}
           <div className="grid gap-2">
             <Label>Data Key</Label>
             <Select
@@ -207,14 +273,14 @@ export const RunningHoursLogConfigModal = ({
               value={selectedKey || ""}
               disabled={!selectedDeviceUniqId || availableKeys.length === 0}
             >
-              <SelectTrigger>
+              <SelectTrigger className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
                 <SelectValue
                   placeholder={
                     isWaitingForKey ? "Waiting for data..." : "Select a key"
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
                 {availableKeys.map((k) => (
                   <SelectItem key={k} value={k}>
                     {k}
@@ -222,32 +288,114 @@ export const RunningHoursLogConfigModal = ({
                 ))}
               </SelectContent>
             </Select>
+            {selectedDeviceUniqId &&
+              !isWaitingForKey &&
+              availableKeys.length === 0 &&
+              !isEditMode && (
+                <p className="text-xs text-muted-foreground">
+                  No keys received. Ensure the device is publishing data.
+                </p>
+              )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Units</Label>
-              <Input
-                value={units}
-                onChange={(e) => setUnits(e.target.value)}
-                placeholder="e.g., Hours"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Multiplier</Label>
-              <Input
-                type="number"
-                value={multiply}
-                onChange={(e) => setMultiply(e.target.value)}
-              />
-            </div>
+
+          {/* Time Unit Info Box */}
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">
+              Time Unit Conversion
+            </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+              Select the time unit of your data. It will automatically convert
+              to hours for display. For example, if your device sends seconds,
+              select "Seconds" and it will show as hours.
+            </p>
           </div>
+
+          {/* Time Unit Selection */}
+          <div className="grid gap-2">
+            <Label>Data Time Unit</Label>
+            <Select value={timeUnit} onValueChange={setTimeUnit}>
+              <SelectTrigger className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="dark:bg-slate-800 dark:text-slate-100">
+                <SelectItem value="seconds">Seconds</SelectItem>
+                <SelectItem value="minutes">Minutes</SelectItem>
+                <SelectItem value="hours">Hours</SelectItem>
+                <SelectItem value="days">Days</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              What unit is the raw value in?
+            </p>
+          </div>
+
+          {/* Custom Multiplier */}
+          <div className="grid gap-2">
+            <Label>Custom Multiplier (Optional)</Label>
+            <Input
+              type="number"
+              value={multiply}
+              onChange={(e) => setMultiply(e.target.value)}
+              placeholder="Default: 1"
+              step="0.1"
+              className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700"
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Apply additional multiplier to the value. Leave as 1 if not
+              needed.
+            </p>
+          </div>
+
+          {/* Preview */}
+          {selectedKey && (
+            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Preview
+              </p>
+              <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                <p>
+                  <span className="font-medium">Key:</span> {selectedKey}
+                </p>
+                <p>
+                  <span className="font-medium">Conversion:</span> {timeUnit} →
+                  hours
+                </p>
+                <p>
+                  <span className="font-medium">Multiplier:</span>{" "}
+                  {(
+                    TIME_UNIT_CONVERSIONS[timeUnit] *
+                    (parseFloat(multiply) || 1)
+                  ).toFixed(6)}
+                </p>
+                <p className="text-slate-500 dark:text-slate-500">
+                  Example: 3600 {timeUnit} ={" "}
+                  {(
+                    3600 *
+                    TIME_UNIT_CONVERSIONS[timeUnit] *
+                    (parseFloat(multiply) || 1)
+                  ).toFixed(2)}{" "}
+                  hours
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-        <DialogFooter className="px-6 pb-6 sm:justify-end">
-          <Button type="button" variant="ghost" onClick={onClose}>
+
+        <DialogFooter className="px-6 pb-6 sm:justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            className="dark:hover:bg-slate-800"
+          >
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
-            Save Widget
+          <Button
+            type="submit"
+            onClick={handleSave}
+            className="dark:bg-blue-600 dark:hover:bg-blue-700"
+          >
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

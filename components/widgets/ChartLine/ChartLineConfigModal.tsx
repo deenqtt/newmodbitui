@@ -35,9 +35,15 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
-export const ChartLineConfigModal = ({ isOpen, onClose, onSave }: Props) => {
+export const ChartLineConfigModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialConfig,
+}: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -49,10 +55,20 @@ export const ChartLineConfigModal = ({ isOpen, onClose, onSave }: Props) => {
   const [lineColor, setLineColor] = useState("#8884d8");
   const [hasAnimation, setHasAnimation] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState("5"); // dalam menit
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      // Reset state
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "");
+      setSelectedConfigId(initialConfig.loggingConfigId || null);
+      setUnits(initialConfig.units || "");
+      setTimeRange(initialConfig.timeRange || "24h");
+      setLineColor(initialConfig.lineColor || "#8884d8");
+      setHasAnimation(initialConfig.hasAnimation === false ? false : true);
+      setRefreshInterval(String(initialConfig.refreshInterval || 5));
+    } else if (isOpen) {
+      setIsEditMode(false);
       setWidgetTitle("");
       setSelectedConfigId(null);
       setUnits("");
@@ -60,7 +76,9 @@ export const ChartLineConfigModal = ({ isOpen, onClose, onSave }: Props) => {
       setLineColor("#8884d8");
       setHasAnimation(true);
       setRefreshInterval("5");
+    }
 
+    if (isOpen) {
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -103,9 +121,13 @@ export const ChartLineConfigModal = ({ isOpen, onClose, onSave }: Props) => {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-xl">Configure Line Chart</DialogTitle>
+          <DialogTitle className="text-xl">
+            {isEditMode ? "Edit Line Chart" : "Configure Line Chart"}
+          </DialogTitle>
           <DialogDescription>
-            Select a data source and customize the chart's appearance.
+            {isEditMode
+              ? "Update your line chart widget configuration."
+              : "Select a data source and customize the chart's appearance."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
@@ -206,7 +228,7 @@ export const ChartLineConfigModal = ({ isOpen, onClose, onSave }: Props) => {
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -25,29 +25,47 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    customName: string;
+    deviceUniqId: string;
+    topic: string;
+    subrackType: string;
+  };
 }
 
 export const Modular3dDeviceViewConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
-  const [customName, setCustomName] = useState("");
-  const [deviceUniqId, setDeviceUniqId] = useState("");
-  const [topic, setTopic] = useState(""); // <-- Tambahkan topic
-  const [subrackType, setSubrackType] = useState("");
+  const [customName, setCustomName] = useState(initialConfig?.customName || "");
+  const [deviceUniqId, setDeviceUniqId] = useState(
+    initialConfig?.deviceUniqId || ""
+  );
+  const [topic, setTopic] = useState(initialConfig?.topic || ""); // <-- Tambahkan topic
+  const [subrackType, setSubrackType] = useState(
+    initialConfig?.subrackType || ""
+  );
   const [error, setError] = useState("");
 
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setCustomName("");
-      setDeviceUniqId("");
-      setTopic(""); // <-- Reset topic
-      setSubrackType("");
+      if (initialConfig) {
+        setCustomName(initialConfig.customName);
+        setDeviceUniqId(initialConfig.deviceUniqId);
+        setTopic(initialConfig.topic);
+        setSubrackType(initialConfig.subrackType);
+      } else {
+        setCustomName("");
+        setDeviceUniqId("");
+        setTopic(""); // <-- Reset topic
+        setSubrackType("");
+      }
       setError("");
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +169,12 @@ export const Modular3dDeviceViewConfigModal = ({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Save Configuration</Button>
+            <Button
+              type="submit"
+              disabled={!customName || !deviceUniqId || !topic || !subrackType}
+            >
+              Save Configuration
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

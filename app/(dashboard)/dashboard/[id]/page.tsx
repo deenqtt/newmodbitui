@@ -22,9 +22,9 @@ import {
   ChevronRight,
   LayoutGrid,
   Sparkles,
+  Edit, // <-- TAMBAH IMPORT ICON EDIT
 } from "lucide-react";
 import _ from "lodash";
-
 
 import { mainWidgets, widgets, getWidgetCount } from "@/lib/widget-data";
 import { showToast } from "@/lib/toast-utils";
@@ -114,6 +114,9 @@ export default function DashboardEditorPage({
   const [configuringWidget, setConfiguringWidget] = useState<{
     name: string;
   } | null>(null);
+  // ✅ TAMBAHAN STATE BARU UNTUK EDIT MODE
+  const [editingWidget, setEditingWidget] = useState<WidgetLayout | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const hasUnsavedChanges = useMemo(
     () => !_.isEqual(initialLayout, layout),
@@ -188,12 +191,15 @@ export default function DashboardEditorPage({
     const widgetData = widgets.find((w) => w.name === widgetName);
     if (widgetData) {
       setConfiguringWidget(widgetData);
+      setIsEditMode(false); // ✅ Set ke CREATE mode
+      setEditingWidget(null); // ✅ Clear editing widget
+
       if (
         [
           "Single Value Card",
           "Icon Status Card",
           "Grouped Icon Status",
-          "Analogue gauges",
+          "Analog Gauges",
           "Temperature Indicator Bar",
           "Calculated Parameter Card",
           "Running Hours Log",
@@ -243,119 +249,182 @@ export default function DashboardEditorPage({
       ) {
         setIsConfigModalOpen(true);
       } else {
-        showToast.info(`Configuration for "${widgetName}" is not implemented yet.`);
+        showToast.info(
+          `Configuration for "${widgetName}" is not implemented yet.`
+        );
       }
     }
     setIsSheetOpen(false);
   };
-
+  // ✅ HANDLER BARU UNTUK EDIT WIDGET
+  const handleEditWidgetClick = (widgetItem: WidgetLayout) => {
+    const widgetData = widgets.find((w) => w.name === widgetItem.widgetType);
+    if (widgetData) {
+      setConfiguringWidget(widgetData);
+      setEditingWidget(widgetItem); // ✅ Set widget yang mau di-edit
+      setIsEditMode(true); // ✅ Set ke EDIT mode
+      setIsConfigModalOpen(true);
+    }
+  };
   const handleSaveWidgetConfig = (configData: any) => {
     if (!configuringWidget) return;
+    // ✅ CEK APAKAH EDIT MODE ATAU CREATE MODE
+    if (isEditMode && editingWidget) {
+      // MODE EDIT: Update existing widget
+      const updatedLayout = layout.map((item) => {
+        if (item.i === editingWidget.i) {
+          return {
+            ...item,
+            config: configData,
+          };
+        }
+        return item;
+      });
+      setLayout(updatedLayout);
+      showToast.success("Widget updated successfully!");
+    } else {
+      // --- PERBAIKAN: Atur ukuran default dan minimal di sini ---
+      let defaultWidth = 4;
+      let defaultHeight = 4;
+      let minW = 2;
+      let minH = 2;
 
-    // --- PERBAIKAN: Atur ukuran default dan minimal di sini ---
-    let defaultWidth = 4;
-    let defaultHeight = 4;
-    let minW = 2;
-    let minH = 2;
+      switch (configuringWidget.name) {
+        case "Dashboard Shortcut":
+          defaultWidth = 2;
+          defaultHeight = 6;
+          minW = 2;
+          minH = 5;
+          break;
+        case "Access Controller Status":
+          defaultWidth = 3;
+          defaultHeight = 5;
+          minW = 3;
+          minH = 5;
+          break;
+        case "Single Value Card":
+          defaultWidth = 2;
+          defaultHeight = 4;
+          minW = 2;
+          minH = 4;
+          break;
+        case "Breaker Status":
+          defaultWidth = 2;
+          defaultHeight = 4;
+          minW = 2;
+          minH = 4;
+          break;
+        case "Multi-Protocol Monitor":
+          defaultWidth = 3;
+          defaultHeight = 7;
+          minW = 3;
+          minH = 7;
+          break;
+        case "Icon Status Card":
+          defaultWidth = 2;
+          defaultHeight = 4;
+          minW = 2;
+          minH = 4;
+          break;
+        case "Grouped Icon Status":
+          defaultWidth = 4;
+          defaultHeight = 5;
+          minW = 3;
+          minH = 4;
+          break;
+        case "Basic Trend Chart":
+          defaultWidth = 2;
+          defaultHeight = 4;
+          minW = 2;
+          minH = 4;
+          break;
+        // Chart besar bisa punya minimal lebih besar
+        case "Power Generate Chart":
+        case "Multi-Series Chart":
+          defaultWidth = 6;
+          defaultHeight = 5;
+          minW = 4;
+          minH = 4;
+          break;
+        case "CCTV Monitor Videos":
+          defaultWidth = 4;
+          defaultHeight = 8;
+          minW = 3;
+          minH = 6;
+          break;
+        case "CCTV Live Stream":
+          defaultWidth = 6;
+          defaultHeight = 6;
+          minW = 4;
+          minH = 4;
+          break;
+        case "Maintenance List":
+          defaultWidth = 6;
+          defaultHeight = 8;
+          minW = 4;
+          minH = 6;
+          break;
+        case "Maintenance Calendar":
+          defaultWidth = 8;
+          defaultHeight = 8;
+          minW = 6;
+          minH = 6;
+          break;
+        case "Maintenance Statistics":
+          defaultWidth = 6;
+          defaultHeight = 6;
+          minW = 4;
+          minH = 4;
+          break;
 
-    switch (configuringWidget.name) {
-      case "Access Controller Status":
-        defaultWidth = 4;
-        defaultHeight = 6;
-        minW = 3;
-        minH = 5;
-        break;
-      case "Single Value Card":
-        defaultWidth = 2;
-        defaultHeight = 2;
-        break;
-      case "Icon Status Card":
-        defaultWidth = 3;
-        defaultHeight = 2;
-        break;
-      case "Grouped Icon Status":
-        defaultWidth = 4;
-        defaultHeight = 5;
-        minW = 3;
-        minH = 4;
-        break;
-      case "Basic Trend Chart":
-        defaultWidth = 3;
-        defaultHeight = 3;
-        break;
-      // Chart besar bisa punya minimal lebih besar
-      case "Power Generate Chart":
-      case "Multi-Series Chart":
-        defaultWidth = 6;
-        defaultHeight = 5;
-        minW = 4;
-        minH = 4;
-        break;
-      case "CCTV Monitor Videos":
-        defaultWidth = 4;
-        defaultHeight = 8;
-        minW = 3;
-        minH = 6;
-        break;
-      case "CCTV Live Stream":
-        defaultWidth = 6;
-        defaultHeight = 6;
-        minW = 4;
-        minH = 4;
-        break;
-      case "Maintenance List":
-        defaultWidth = 6;
-        defaultHeight = 8;
-        minW = 4;
-        minH = 6;
-        break;
-      case "Maintenance Calendar":
-        defaultWidth = 8;
-        defaultHeight = 8;
-        minW = 6;
-        minH = 6;
-        break;
-      case "Maintenance Statistics":
-        defaultWidth = 6;
-        defaultHeight = 6;
-        minW = 4;
-        minH = 4;
-        break;
+        case "Thermal Camera":
+          defaultWidth = 4;
+          defaultHeight = 6;
+          minW = 3;
+          minH = 4;
 
-      case "Thermal Camera":
-        defaultWidth = 4;
-        defaultHeight = 6;
-        minW = 3;
-        minH = 4;
+        case "Process":
+          defaultWidth = 3;
+          defaultHeight = 3;
+          minW = 1;
+          minH = 1;
 
-      case "Process":
-        defaultWidth = 3;
-        defaultHeight = 3;
-        minW = 1;
-        minH = 1;
+          break;
+        case "Alarm Summary":
+          defaultWidth = 3;
+          defaultHeight = 4;
+          minW = 3;
+          minH = 4;
 
-        break;
+          break;
+      }
+
+      // Ensure minW and minH are not larger than w and h
+      const safeMinW = Math.min(minW, defaultWidth);
+      const safeMinH = Math.min(minH, defaultHeight);
+
+      const newItem: WidgetLayout = {
+        i: `${configuringWidget.name.replace(
+          /\s+/g,
+          "-"
+        )}-widget-${Date.now()}`,
+        x: (layout.length * defaultWidth) % 12,
+        y: Infinity,
+        w: defaultWidth,
+        h: defaultHeight,
+        minW: safeMinW,
+        minH: safeMinH,
+        widgetType: configuringWidget.name,
+        config: configData,
+      };
+      setLayout([...layout, newItem]);
+      showToast.success("Widget added successfully!");
     }
-
-    // Ensure minW and minH are not larger than w and h
-    const safeMinW = Math.min(minW, defaultWidth);
-    const safeMinH = Math.min(minH, defaultHeight);
-
-    const newItem: WidgetLayout = {
-      i: `${configuringWidget.name.replace(/\s+/g, "-")}-widget-${Date.now()}`,
-      x: (layout.length * defaultWidth) % 12,
-      y: Infinity,
-      w: defaultWidth,
-      h: defaultHeight,
-      minW: safeMinW,
-      minH: safeMinH,
-      widgetType: configuringWidget.name,
-      config: configData,
-    };
-
-    setLayout([...layout, newItem]);
+    // ✅ RESET STATE
     setIsConfigModalOpen(false);
     setConfiguringWidget(null);
+    setEditingWidget(null);
+    setIsEditMode(false);
   };
 
   const removeWidget = (widgetId: string) =>
@@ -367,7 +436,11 @@ export default function DashboardEditorPage({
       return;
     }
     // Use confirm dialog instead of Swal
-    if (window.confirm("You have unsaved changes! Click OK to save and exit, or Cancel to discard changes and exit.")) {
+    if (
+      window.confirm(
+        "You have unsaved changes! Click OK to save and exit, or Cancel to discard changes and exit."
+      )
+    ) {
       handleSaveLayout().then(() => router.push("/manage-dashboard"));
     } else {
       router.push("/manage-dashboard");
@@ -393,353 +466,670 @@ export default function DashboardEditorPage({
 
   return (
     <div className="bg-slate-50 dark:bg-slate-900 min-h-screen">
+      {/* MODAL CONFIG - Sekarang dengan props tambahan untuk edit mode */}
       {isConfigModalOpen && configuringWidget?.name === "Single Value Card" && (
         <SingleValueCardConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          } // ✅ PASS INITIAL CONFIG
         />
       )}
+
       {isConfigModalOpen && configuringWidget?.name === "Icon Status Card" && (
         <IconStatusCardConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          } // ✅ TAMBAH INI
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Grouped Icon Status" && (
           <GroupedIconStatusConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
-      {isConfigModalOpen && configuringWidget?.name === "Analogue gauges" && (
+      {isConfigModalOpen && configuringWidget?.name === "Analog Gauges" && (
         <AnalogueGaugeConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Temperature Indicator Bar" && (
           <TemperatureIndicatorBarConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Calculated Parameter Card" && (
           <CalculatedParameterConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "Running Hours Log" && (
         <RunningHoursLogConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Energy Usage – Last Month" && (
           <EnergyUsageConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
             period="last_month"
             title="Configure Last Month Usage"
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Energy Usage – Current Month" && (
           <EnergyUsageConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
             period="current_month"
             title="Configure Current Month Usage"
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "Energy Target Gap" && (
         <EnergyTargetGapConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen && configuringWidget?.name === "Breaker Status" && (
         <BreakerStatusConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Multi-Protocol Monitor" && (
           <MultiProtocolMonitorConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "Chart Line" && (
         <ChartLineConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen && configuringWidget?.name === "Chart Bar" && (
         <ChartBarConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Multi-Series Chart" && (
           <MultiSeriesChartConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "Basic Trend Chart" && (
         <BasicTrendChartConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Power Analyzer Chart" && (
           <PowerAnalyzerChartConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Energy Target Chart" && (
           <EnergyTargetChartConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Power Generate Chart" && (
           <PowerGenerateChartConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Button Control Modbus" && (
           <ButtonControlModbusConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Button Control Modular" && (
           <ButtonControlModularConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "Alarm Log List" && (
         <AlarmLogListConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen && configuringWidget?.name === "Alarm Summary" && (
         <AlarmSummaryConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Dashboard Shortcut" && (
           <DashboardShortcutConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Camera Last Snapshot" && (
           <CameraSnapshotConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Access Controller Status" && (
           <AccessControllerStatusConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Lock Access Control" && (
           <LockAccessControlConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Modular 3D Device View" && (
           <Modular3dDeviceViewConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "3D Subrack View" && (
         <Subrack3dConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "3D Containment View" && (
           <Containment3dConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "3D Container View" && (
         <Container3dConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "LoRaWAN Device Data" && (
           <LoRaWANDeviceConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "CCTV Monitor Videos" && (
           <CctvMonitorVideosConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen && configuringWidget?.name === "CCTV Live Stream" && (
         <CctvLiveStreamConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen && configuringWidget?.name === "Maintenance List" && (
         <MaintenanceListConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Maintenance Calendar" && (
           <MaintenanceCalendarConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "Maintenance Statistics" && (
           <MaintenanceStatisticsConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
       {isConfigModalOpen &&
         configuringWidget?.name === "3D Rack Server View" && (
           <RackServer3dConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
 
       {isConfigModalOpen && configuringWidget?.name === "Zigbee Device" && (
         <ZigbeeDeviceConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Thermal Camera" && (
         <ThermalCameraConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Process" && (
         <ProcessConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Process Box" && (
         <ProcessConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Process Cylinder" && (
         <ProcessConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Process Circle" && (
         <ProcessConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
       {isConfigModalOpen && configuringWidget?.name === "Process Triangle" && (
         <ProcessConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
           onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
         />
       )}
 
@@ -747,18 +1137,18 @@ export default function DashboardEditorPage({
         configuringWidget?.name === "Process Connection" && (
           <ProcessConnectionConfigModal
             isOpen={isConfigModalOpen}
-            onClose={() => setIsConfigModalOpen(false)}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingWidget(null);
+              setIsEditMode(false);
+            }}
             onSave={handleSaveWidgetConfig}
+            initialConfig={
+              isEditMode && editingWidget ? editingWidget.config : undefined
+            }
           />
         )}
 
-      {isConfigModalOpen && configuringWidget?.name === "Connection" && (
-        <ConnectionWidgetConfigModal
-          isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
-          onSave={handleSaveWidgetConfig}
-        />
-      )}
 
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
@@ -894,7 +1284,17 @@ export default function DashboardEditorPage({
                     key={item.i}
                     className="bg-background rounded-lg shadow-sm border flex flex-col group overflow-hidden relative"
                   >
-                    <div className="absolute top-1 right-1 z-10">
+                    {/* ✅ BUTTON CONTAINER - EDIT & DELETE */}
+                    <div className="absolute top-1 right-1 z-10 flex gap-1">
+                      {/* BUTTON EDIT */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="no-drag h-6 w-6 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 hover:bg-background/80 rounded-full"
+                        onClick={() => handleEditWidgetClick(item)}
+                      >
+                        <Edit className="h-4 w-4 text-blue-600" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -921,8 +1321,8 @@ export default function DashboardEditorPage({
                 Empty Dashboard
               </h3>
               <p className="text-muted-foreground mt-1 mb-4 max-w-sm">
-                Start building your dashboard by adding your first widget
-                from the library.
+                Start building your dashboard by adding your first widget from
+                the library.
               </p>
               <Button size="lg" onClick={() => setIsSheetOpen(true)}>
                 <PlusCircle className="h-5 w-5 mr-2" />

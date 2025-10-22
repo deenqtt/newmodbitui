@@ -21,11 +21,13 @@ LOG_FILE="$PROJECT_ROOT/reset-db.log"
 # Default configurations
 DEFAULT_ENABLE_USERS=true
 DEFAULT_ENABLE_MENU=true
+DEFAULT_ENABLE_MENU_PRESETS=true
 DEFAULT_ENABLE_DASHBOARD=true
 DEFAULT_ENABLE_DEVICES=true
 DEFAULT_ENABLE_LAYOUT2D=true
 DEFAULT_ENABLE_LOGGING_CONFIGS=true
 DEFAULT_ENABLE_MAINTENANCE=true
+DEFAULT_ENABLE_ALARM_CONFIGS=true
 
 # Logging function
 log() {
@@ -106,11 +108,13 @@ show_help() {
 # Parse command line arguments
 ENABLE_USERS=$DEFAULT_ENABLE_USERS
 ENABLE_MENU=$DEFAULT_ENABLE_MENU
+ENABLE_MENU_PRESETS=$DEFAULT_ENABLE_MENU_PRESETS
 ENABLE_DASHBOARD=$DEFAULT_ENABLE_DASHBOARD
 ENABLE_DEVICES=$DEFAULT_ENABLE_DEVICES
 ENABLE_LAYOUT2D=$DEFAULT_ENABLE_LAYOUT2D
 ENABLE_LOGGING_CONFIGS=$DEFAULT_ENABLE_LOGGING_CONFIGS
 ENABLE_MAINTENANCE=$DEFAULT_ENABLE_MAINTENANCE
+ENABLE_ALARM_CONFIGS=$DEFAULT_ENABLE_ALARM_CONFIGS
 DO_DB_RESET=true
 DO_DB_BACKUP=false
 
@@ -194,6 +198,7 @@ show_configuration() {
     echo -e "${BLUE}Seeding Configuration:${NC}"
     echo -e "   Users: $([ "$ENABLE_USERS" = true ] && echo 'ENABLED' || echo 'DISABLED')"
     echo -e "   Menu: $([ "$ENABLE_MENU" = true ] && echo 'ENABLED' || echo 'DISABLED')"
+    echo -e "   Menu Presets: $([ "$ENABLE_MENU_PRESETS" = true ] && echo 'ENABLED' || echo 'DISABLED')"
     echo -e "   Dashboard: $([ "$ENABLE_DASHBOARD" = true ] && echo 'ENABLED' || echo 'DISABLED')"
     echo -e "   Devices: $([ "$ENABLE_DEVICES" = true ] && echo 'ENABLED' || echo 'DISABLED')"
     echo ""
@@ -313,14 +318,16 @@ run_seeders() {
 
     # 🔄 First run tenant and node location seeders (required by others)
     log "Running prerequisite seeders..."
-    if node scripts/seed-tenants.js >/dev/null 2>&1; then
+    log "Seeding tenants..."
+    if node scripts/seed-tenants.js; then
         log_success "Tenants seeded successfully"
     else
         log_error "Tenant seeding failed"
         exit 1
     fi
 
-    if node scripts/seed-node-locations.js >/dev/null 2>&1; then
+    log "Seeding node locations..."
+    if node scripts/seed-node-locations.js; then
         log_success "Node locations seeded successfully"
     else
         log_error "Node locations seeding failed"
@@ -328,7 +335,8 @@ run_seeders() {
     fi
 
     # 🔄 Now run the main seeder with proper environment variables
-    local seeder_env_vars=""
+    # Note: RESET_DB=false because we already reset the database earlier
+    local seeder_env_vars="RESET_DB=false"
     [ "$ENABLE_USERS" = false ] && seeder_env_vars="$seeder_env_vars SEED_USERS=false"
     [ "$ENABLE_MENU" = false ] && seeder_env_vars="$seeder_env_vars SEED_MENU=false"
     [ "$ENABLE_DASHBOARD" = false ] && seeder_env_vars="$seeder_env_vars SEED_DASHBOARD=false"
@@ -336,12 +344,13 @@ run_seeders() {
     [ "$ENABLE_LAYOUT2D" = false ] && seeder_env_vars="$seeder_env_vars SEED_LAYOUT2D=false"
     [ "$ENABLE_LOGGING_CONFIGS" = false ] && seeder_env_vars="$seeder_env_vars SEED_LOGGING_CONFIGS=false"
     [ "$ENABLE_MAINTENANCE" = false ] && seeder_env_vars="$seeder_env_vars SEED_MAINTENANCE=false"
+    [ "$ENABLE_ALARM_CONFIGS" = false ] && seeder_env_vars="$seeder_env_vars SEED_ALARM_CONFIGS=false"
 
     log "Running seed command with environment: $seeder_env_vars"
 
     if [ -z "$seeder_env_vars" ]; then
         # No environment variables to set, run directly
-        if node scripts/seed-init.js >/dev/null 2>&1; then
+        if node scripts/seed-init.js; then
             log_success "Seeding completed successfully"
         else
             log_error "Seeding failed"
@@ -349,7 +358,7 @@ run_seeders() {
         fi
     else
         # Run with environment variables
-        if eval "$seeder_env_vars node scripts/seed-init.js" >/dev/null 2>&1; then
+        if eval "$seeder_env_vars node scripts/seed-init.js"; then
             log_success "Seeding completed successfully"
         else
             log_error "Seeding failed"
@@ -434,6 +443,10 @@ show_completion_summary() {
 
     if [ "$ENABLE_MENU" = true ]; then
         echo -e "   ✅ Menu System seeded (70+ menu items)"
+    fi
+
+    if [ "$ENABLE_MENU_PRESETS" = true ]; then
+        echo -e "   ✅ Menu Presets seeded (3 presets)"
     fi
 
     if [ "$ENABLE_DASHBOARD" = true ]; then

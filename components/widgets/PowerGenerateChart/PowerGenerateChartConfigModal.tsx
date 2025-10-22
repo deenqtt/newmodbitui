@@ -35,35 +35,65 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: {
+    widgetTitle: string;
+    loggingConfigId: string;
+    units: string;
+    timeRange: string;
+    chartColor: string;
+    hasAnimation: boolean;
+    refreshInterval: number;
+  };
 }
 
 export const PowerGenerateChartConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // State untuk form
-  const [widgetTitle, setWidgetTitle] = useState("");
-  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
-  const [units, setUnits] = useState("kW");
-  const [timeRange, setTimeRange] = useState("24h");
-  const [chartColor, setChartColor] = useState("#22c55e"); // Warna hijau
-  const [hasAnimation, setHasAnimation] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState("5");
+  const [widgetTitle, setWidgetTitle] = useState(
+    initialConfig?.widgetTitle || ""
+  );
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(
+    initialConfig?.loggingConfigId || null
+  );
+  const [units, setUnits] = useState(initialConfig?.units || "kW");
+  const [timeRange, setTimeRange] = useState(initialConfig?.timeRange || "24h");
+  const [chartColor, setChartColor] = useState(
+    initialConfig?.chartColor || "#22c55e"
+  ); // Warna hijau
+  const [hasAnimation, setHasAnimation] = useState(
+    initialConfig?.hasAnimation ?? true
+  );
+  const [refreshInterval, setRefreshInterval] = useState(
+    String(initialConfig?.refreshInterval) || "5"
+  );
 
   useEffect(() => {
     if (isOpen) {
-      // Reset state
-      setWidgetTitle("");
-      setSelectedConfigId(null);
-      setUnits("kW");
-      setTimeRange("24h");
-      setChartColor("#22c55e");
-      setHasAnimation(true);
-      setRefreshInterval("5");
+      // Set initial values if in edit mode, otherwise reset
+      if (initialConfig) {
+        setWidgetTitle(initialConfig.widgetTitle);
+        setSelectedConfigId(initialConfig.loggingConfigId);
+        setUnits(initialConfig.units);
+        setTimeRange(initialConfig.timeRange);
+        setChartColor(initialConfig.chartColor);
+        setHasAnimation(initialConfig.hasAnimation);
+        setRefreshInterval(String(initialConfig.refreshInterval));
+      } else {
+        setWidgetTitle("");
+        setSelectedConfigId(null);
+        setUnits("kW");
+        setTimeRange("24h");
+        setChartColor("#22c55e");
+        setHasAnimation(true);
+        setRefreshInterval("5");
+      }
 
       const fetchConfigs = async () => {
         setIsLoading(true);
@@ -81,7 +111,7 @@ export const PowerGenerateChartConfigModal = ({
       };
       fetchConfigs();
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, initialConfig]);
 
   const handleSave = () => {
     if (!widgetTitle || !selectedConfigId) {
@@ -210,7 +240,11 @@ export const PowerGenerateChartConfigModal = ({
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave}>
+          <Button
+            type="submit"
+            onClick={handleSave}
+            disabled={isLoading || !widgetTitle || !selectedConfigId}
+          >
             Save Widget
           </Button>
         </DialogFooter>

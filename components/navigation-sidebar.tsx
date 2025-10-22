@@ -24,6 +24,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMenu } from "@/contexts/MenuContext";
 import { useRouter } from "next/navigation";
 import { getIconWithFallback } from "@/lib/icon-library";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@radix-ui/react-select";
 
 // Dynamic icon mapping function with all Lucide icons from dynamic import
 const getIconComponent = (iconName: string) => {
@@ -41,7 +43,7 @@ export const NavigationSidebar = memo(function NavigationSidebar({
   const prefetchedRoutesRef = useRef<Set<string>>(new Set());
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
-  const { menuData, loading, error } = useMenu();
+  const { menuData, loading, error, activePreset } = useMenu();
   const { logout, user, isAuthenticated, isLoggingOut } = useAuth();
 
   // Toggle group open/close state
@@ -79,11 +81,12 @@ export const NavigationSidebar = memo(function NavigationSidebar({
             <div className="flex h-8 w-8 items-center border-gray-400 justify-center rounded-lg bg-primary text-primary-foreground">
               <BlocksIcon className="h-5 w-5" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-semibold text-sidebar-foreground">
                 Nexus
               </h1>
               <p className="text-xs text-sidebar-foreground/70">{appName}</p>
+              
             </div>
           </div>
           <ThemeToggle />
@@ -94,6 +97,13 @@ export const NavigationSidebar = memo(function NavigationSidebar({
         className="bg-background overflow-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
+        {activePreset && (
+                <div className="flex items-center gap-1 mt-4">
+                  <Badge variant="outline" className="text-xs px-1.5 py-0 bg-primary/10 text-primary border-primary/20">
+                    {activePreset.name}
+                  </Badge>
+                </div>
+              )}
         {loading ? (
           <div className="flex flex-col items-center justify-center p-4 space-y-3">
             <Loader2 className="w-8 h-8 animate-spin text-sidebar-foreground/50" />
@@ -106,7 +116,7 @@ export const NavigationSidebar = memo(function NavigationSidebar({
           </div>
         ) : menuData?.menuGroups && menuData.menuGroups.length > 0 ? (
           menuData.menuGroups
-            .filter((group) => group.isActive === true)
+            .filter((group) => activePreset ? true : (group.isActive === true)) // Skip isActive filter when preset is active
             .map((group, groupIndex) => {
             const groupId = group.id || `group-${groupIndex}`;
             if (collapsible) {
@@ -131,7 +141,7 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                       <SidebarGroupContent>
                         <SidebarMenu>
                           {(group.menuItems || group.items || [])
-                            .filter((item) => item.isActive !== false)
+                            .filter((item) => activePreset ? true : (item.isActive !== false)) // Skip isActive filter when preset is active
                             .map((item, itemIndex) => {
                             const IconComponent = getIconComponent(item.icon || 'BarChart3');
                             return (
@@ -175,7 +185,7 @@ export const NavigationSidebar = memo(function NavigationSidebar({
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {(group.menuItems || group.items || [])
-                        .filter((item) => item.isActive !== false)
+                        .filter((item) => activePreset ? true : (item.isActive !== false)) // Skip isActive filter when preset is active
                         .map((item, itemIndex) => {
                         const IconComponent = getIconComponent(item.icon || 'BarChart3');
                         return (

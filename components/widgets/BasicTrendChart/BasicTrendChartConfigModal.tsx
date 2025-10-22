@@ -34,12 +34,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
 export const BasicTrendChartConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const [loggingConfigs, setLoggingConfigs] = useState<LoggingConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,15 +51,10 @@ export const BasicTrendChartConfigModal = ({
   const [timeRange, setTimeRange] = useState("24h");
   const [chartColor, setChartColor] = useState("#10b981"); // Warna hijau
   const [units, setUnits] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setWidgetTitle("");
-      setSelectedConfigId(null);
-      setTimeRange("24h");
-      setChartColor("#10b981");
-      setUnits("");
-
       const fetchConfigs = async () => {
         setIsLoading(true);
         try {
@@ -73,8 +70,24 @@ export const BasicTrendChartConfigModal = ({
         }
       };
       fetchConfigs();
+
+      if (initialConfig) {
+        setIsEditMode(true);
+        setWidgetTitle(initialConfig.widgetTitle || "");
+        setSelectedConfigId(initialConfig.loggingConfigId || null);
+        setTimeRange(initialConfig.timeRange || "24h");
+        setChartColor(initialConfig.chartColor || "#10b981");
+        setUnits(initialConfig.units || "");
+      } else {
+        setIsEditMode(false);
+        setWidgetTitle("");
+        setSelectedConfigId(null);
+        setTimeRange("24h");
+        setChartColor("#10b981");
+        setUnits("");
+      }
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, initialConfig, onClose]);
 
   const handleSave = () => {
     if (!widgetTitle || !selectedConfigId) {
@@ -99,10 +112,14 @@ export const BasicTrendChartConfigModal = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Basic Trend Chart
+            {isEditMode
+              ? "Edit Basic Trend Chart"
+              : "Configure Basic Trend Chart"}
           </DialogTitle>
           <DialogDescription>
-            Select a data source to display a simple trend chart.
+            {isEditMode
+              ? "Update your basic trend chart widget configuration."
+              : "Select a data source to display a simple trend chart."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 p-6">
@@ -174,7 +191,7 @@ export const BasicTrendChartConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>

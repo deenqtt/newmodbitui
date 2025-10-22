@@ -46,6 +46,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
+  initialConfig?: any;
 }
 
 const ALLOWED_PART_NUMBERS = [
@@ -61,9 +62,11 @@ export const MultiProtocolMonitorConfigModal = ({
   isOpen,
   onClose,
   onSave,
+  initialConfig,
 }: Props) => {
   const { publish, subscribe, unsubscribe, isReady } = useMqtt();
   const [widgetTitle, setWidgetTitle] = useState("Multi-Protocol Monitor");
+  const [isEditMode, setIsEditMode] = useState(false);
   const [deviceType, setDeviceType] = useState<"modbus" | "i2c" | null>(null);
   const [discoveredDevices, setDiscoveredDevices] = useState<MqttDevice[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
@@ -77,19 +80,39 @@ export const MultiProtocolMonitorConfigModal = ({
   const keySubTopicRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
-      setTimeout(() => {
-        // Reset semua state saat modal ditutup
-        setWidgetTitle("Multi-Protocol Monitor");
-        setDeviceType(null);
-        setDiscoveredDevices([]);
-        setSelectedDevice(null);
-        setAvailableKeys([]);
-        setKeyConfigs({});
-        setIsLoadingDevices(false);
-      }, 300);
+    if (isOpen && initialConfig) {
+      setIsEditMode(true);
+      setWidgetTitle(initialConfig.widgetTitle || "Multi-Protocol Monitor");
+      if (initialConfig.deviceTopic) {
+        // In edit mode, we can't easily re-select the device type,
+        // so we focus on loading the keys for the saved device.
+        const mockDevice = {
+          profile: {
+            topic: initialConfig.deviceTopic,
+            name: initialConfig.widgetTitle, // Fallback name
+            part_number: "", // Not critical for re-loading keys
+          },
+        };
+        setSelectedDevice(mockDevice);
+      }
+      if (initialConfig.monitoredKeys) {
+        const configs: Record<string, KeyConfig> = {};
+        initialConfig.monitoredKeys.forEach((item: KeyConfig) => {
+          configs[item.key] = item;
+        });
+        setKeyConfigs(configs);
+      }
+    } else if (isOpen) {
+      setIsEditMode(false);
+      setWidgetTitle("Multi-Protocol Monitor");
+      setDeviceType(null);
+      setDiscoveredDevices([]);
+      setSelectedDevice(null);
+      setAvailableKeys([]);
+      setKeyConfigs({});
+      setIsLoadingDevices(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialConfig]);
 
   const handleDeviceListResponse = useCallback(
     (topic: string, payloadString: string) => {
@@ -223,10 +246,14 @@ export const MultiProtocolMonitorConfigModal = ({
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-xl">
-            Configure Multi-Protocol Monitor
+            {isEditMode
+              ? "Edit Multi-Protocol Monitor"
+              : "Configure Multi-Protocol Monitor"}
           </DialogTitle>
           <DialogDescription>
-            Select a device, then choose which keys to monitor.
+            {isEditMode
+              ? "Update your multi-protocol monitor widget configuration."
+              : "Select a device, then choose which keys to monitor."}
           </DialogDescription>
         </DialogHeader>
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
@@ -372,7 +399,7 @@ export const MultiProtocolMonitorConfigModal = ({
             Cancel
           </Button>
           <Button type="submit" onClick={handleSave}>
-            Save Widget
+            {isEditMode ? "Update Widget" : "Save Widget"}
           </Button>
         </DialogFooter>
       </DialogContent>
