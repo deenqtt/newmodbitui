@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import _ from "lodash";
 
+
 import { mainWidgets, widgets, getWidgetCount } from "@/lib/widget-data";
 import { showToast } from "@/lib/toast-utils";
 
@@ -290,41 +291,19 @@ export default function DashboardEditorPage({
       let minH = 2;
 
       switch (configuringWidget.name) {
-        case "Dashboard Shortcut":
-          defaultWidth = 2;
-          defaultHeight = 6;
-          minW = 2;
-          minH = 5;
-          break;
         case "Access Controller Status":
-          defaultWidth = 3;
-          defaultHeight = 5;
+          defaultWidth = 4;
+          defaultHeight = 6;
           minW = 3;
           minH = 5;
           break;
         case "Single Value Card":
           defaultWidth = 2;
-          defaultHeight = 4;
-          minW = 2;
-          minH = 4;
-          break;
-        case "Breaker Status":
-          defaultWidth = 2;
-          defaultHeight = 4;
-          minW = 2;
-          minH = 4;
-          break;
-        case "Multi-Protocol Monitor":
-          defaultWidth = 3;
-          defaultHeight = 7;
-          minW = 3;
-          minH = 7;
+          defaultHeight = 2;
           break;
         case "Icon Status Card":
-          defaultWidth = 2;
-          defaultHeight = 4;
-          minW = 2;
-          minH = 4;
+          defaultWidth = 3;
+          defaultHeight = 2;
           break;
         case "Grouped Icon Status":
           defaultWidth = 4;
@@ -333,10 +312,8 @@ export default function DashboardEditorPage({
           minH = 4;
           break;
         case "Basic Trend Chart":
-          defaultWidth = 2;
-          defaultHeight = 4;
-          minW = 2;
-          minH = 4;
+          defaultWidth = 3;
+          defaultHeight = 3;
           break;
         // Chart besar bisa punya minimal lebih besar
         case "Power Generate Chart":
@@ -388,13 +365,6 @@ export default function DashboardEditorPage({
           defaultHeight = 3;
           minW = 1;
           minH = 1;
-
-          break;
-        case "Alarm Summary":
-          defaultWidth = 3;
-          defaultHeight = 4;
-          minW = 3;
-          minH = 4;
 
           break;
       }
@@ -1149,6 +1119,20 @@ export default function DashboardEditorPage({
           />
         )}
 
+      {isConfigModalOpen && configuringWidget?.name === "Connection" && (
+        <ConnectionWidgetConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingWidget(null);
+            setIsEditMode(false);
+          }}
+          onSave={handleSaveWidgetConfig}
+          initialConfig={
+            isEditMode && editingWidget ? editingWidget.config : undefined
+          }
+        />
+      )}
 
       <header className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">

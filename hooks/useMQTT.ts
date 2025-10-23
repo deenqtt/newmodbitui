@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import mqtt, { MqttClient } from "mqtt";
-import { getAppConfig } from "@/lib/config";
+import { getMQTTConfig } from "@/lib/mqtt-config";
 
 interface AlarmData {
   nodeName: string;
@@ -86,8 +86,8 @@ export const useMQTTAlarms = (locations: Array<{ id: string; name: string; topic
           .filter(loc => loc.topic) // Only locations with topics
           .map(loc => `${loc.topic}/Alarm`);
 
-        // Get MQTT broker URL from app config (same as lib/mqttClient.ts)
-        const { mqttBrokerUrl } = getAppConfig();
+        // Get MQTT broker URL from config
+        const mqttBrokerUrl = getMQTTConfig();
 
         client = mqtt.connect(mqttBrokerUrl, {
           clientId: `alarm-monitor-${Math.random().toString(16).substring(2, 8)}`,

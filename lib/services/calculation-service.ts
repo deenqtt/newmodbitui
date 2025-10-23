@@ -28,6 +28,10 @@ class CalculationService {
   private lastValues: Map<string, { value: number; timestamp: Date }> =
     new Map();
 
+  // ✅ NEW: Reload mechanism
+  private reloadRequested: boolean = false;
+  private isInitialized: boolean = false;
+
   constructor() {
     this.prisma = new PrismaClient();
   }
@@ -43,6 +47,83 @@ class CalculationService {
       () => this.refreshConfigurations(),
       15 * 1000
     );
+
+    // ✅ Start auto-reload polling
+    this.startAutoReloadPolling();
+
+    this.isInitialized = true;
+    console.log("🎉 Calculation Service ready!");
+    console.log("💡 Real-time calculation on payload received");
+    console.log("💡 Config refresh: every 15 seconds");
+    console.log("💡 Auto-reload polling: every 5s");
+    console.log(
+      `💡 Active configs: ${this.configs.length} (Bill: ${
+        this.configs.filter((c) => c.type === "Bill").length
+      }, PUE: ${
+        this.configs.filter((c) => c.type === "PUE").length
+      }, PowerAnalyzer: ${
+        this.configs.filter((c) => c.type === "PowerAnalyzer").length
+      })\n`
+    );
+
+    // Log config details
+    this.configs.forEach((config) => {
+      console.log(
+        `📋 [${config.type}] ${(config as any).customName || "Unnamed"}`
+      );
+      console.log(`   Publish Topic: ${config.publishTopic}`);
+      console.log(
+        `   Source Devices: ${config.sourceDevices
+          .map((s) => `${s.uniqId}:${s.key}`)
+          .join(", ")}`
+      );
+    });
+    console.log();
+  }
+
+  /**
+   * ✅ Request reload (called by API)
+   */
+  public requestReload() {
+    console.log("[Calculation Service] 🔄 Reload requested");
+    this.reloadRequested = true;
+  }
+
+  /**
+   * ✅ Start auto-reload polling
+   */
+  private startAutoReloadPolling(intervalMs: number = 5000) {
+    setInterval(async () => {
+      if (this.reloadRequested) {
+        console.log(
+          "\n🔄 [CALC SERVICE AUTO-CHECK] Reload flag detected, reloading..."
+        );
+        this.reloadRequested = false;
+        await this.refreshConfigurations();
+        console.log("✅ Calculation service reloaded successfully\n");
+      }
+    }, intervalMs);
+
+    console.log(
+      `🔄 Calculation service auto-reload polling started (check every ${intervalMs / 1000}s)`
+    );
+  }
+
+  /**
+   * ✅ Get status
+   */
+  public getStatus() {
+    return {
+      initialized: this.isInitialized,
+      activeConfigs: this.configs.length,
+      configBreakdown: {
+        bill: this.configs.filter((c) => c.type === "Bill").length,
+        pue: this.configs.filter((c) => c.type === "PUE").length,
+        powerAnalyzer: this.configs.filter((c) => c.type === "PowerAnalyzer").length,
+      },
+      cachedValues: this.lastValues.size,
+      mqttConnected: this.mqttClient?.connected || false,
+    };
   }
 
   private async refreshConfigurations() {
@@ -160,7 +241,16 @@ class CalculationService {
     this.configs = allConfigs;
 
     if (this.mqttClient?.connected && topicsToSubscribe.size > 0) {
-      this.mqttClient.subscribe(Array.from(topicsToSubscribe));
+      const topics = Array.from(topicsToSubscribe);
+      console.log(
+        `[CALC SERVICE] 📡 Subscribing to ${topics.length} topic(s):`
+      );
+      topics.forEach((t) => console.log(`   - ${t}`));
+      this.mqttClient.subscribe(topics);
+    } else if (!this.mqttClient?.connected) {
+      console.log(
+        `[CALC SERVICE] ⚠️  Cannot subscribe: MQTT not connected yet`
+      );
     }
   }
 
@@ -199,7 +289,10 @@ class CalculationService {
       const device = await this.prisma.deviceExternal.findUnique({
         where: { topic },
       });
-      if (!device) return;
+      if (!device) {
+        console.log(`[CALC SERVICE] ⚠️  Device not found for topic: ${topic}`);
+        return;
+      }
       const valueObject = JSON.parse(parsedPayload.value);
       for (const key in valueObject) {
         const value = parseFloat(valueObject[key]);
@@ -208,14 +301,26 @@ class CalculationService {
             value,
             timestamp: new Date(),
           });
+          console.log(
+            `[CALC SERVICE] 📥 Cached: ${device.uniqId}:${key} = ${value}`
+          );
         }
       }
       this.configs.forEach((config) => {
         if (config.sourceDevices.some((s) => s.uniqId === device.uniqId)) {
+          console.log(
+            `[CALC SERVICE] 🔄 Triggering calculation for: ${config.type} - ${
+              (config as any).customName
+            }`
+          );
           this.triggerCalculation(config);
         }
       });
-    } catch (error) {}
+    } catch (error) {
+      console.error(`[CALC SERVICE] ❌ Error handling message:`, error);
+      console.error(`[CALC SERVICE] Topic: ${topic}`);
+      console.error(`[CALC SERVICE] Payload: ${payloadStr}`);
+    }
   }
   // TAMBAH function helper ini di class
   private getMQTTHost(): string {
@@ -233,33 +338,61 @@ class CalculationService {
     return "localhost";
   }
   private triggerCalculation(config: AnyConfig) {
-    if (
-      config.sourceDevices.every((s) =>
-        this.lastValues.has(`${s.uniqId}:${s.key}`)
-      )
-    ) {
-      switch (config.type) {
-        case "Bill":
-          this.calculateAndPublishBill(config as any);
-          break;
-        case "PUE":
-          this.calculateAndPublishPue(config as any);
-          break;
-        case "PowerAnalyzer":
-          this.calculateAndPublishPowerAnalyzer(config as any);
-          break;
-      }
+    // Check if all required values are cached
+    const allValuesReady = config.sourceDevices.every((s) =>
+      this.lastValues.has(`${s.uniqId}:${s.key}`)
+    );
+
+    if (!allValuesReady) {
+      const missingValues = config.sourceDevices.filter(
+        (s) => !this.lastValues.has(`${s.uniqId}:${s.key}`)
+      );
+      console.log(
+        `[CALC SERVICE] ⏳ Waiting for values: ${(config as any).customName}`
+      );
+      console.log(
+        `[CALC SERVICE]    Missing: ${missingValues
+          .map((s) => `${s.uniqId}:${s.key}`)
+          .join(", ")}`
+      );
+      return;
+    }
+
+    console.log(
+      `[CALC SERVICE] ✅ All values ready for: ${(config as any).customName}`
+    );
+
+    switch (config.type) {
+      case "Bill":
+        this.calculateAndPublishBill(config as any);
+        break;
+      case "PUE":
+        this.calculateAndPublishPue(config as any);
+        break;
+      case "PowerAnalyzer":
+        this.calculateAndPublishPowerAnalyzer(config as any);
+        break;
     }
   }
 
   private publish(topic: string, deviceName: string, valuePayload: object) {
-    if (!this.mqttClient) return;
+    if (!this.mqttClient) {
+      console.error(
+        `[CALC SERVICE] ❌ Cannot publish: MQTT client not connected`
+      );
+      return;
+    }
     const finalPayload = {
       device_name: deviceName,
       value: JSON.stringify(valuePayload),
       Timestamp: new Date().toISOString(),
     };
     this.mqttClient.publish(topic, JSON.stringify(finalPayload));
+    console.log(`[CALC SERVICE] 📤 Published to: ${topic}`);
+    console.log(`[CALC SERVICE]    Device: ${deviceName}`);
+    console.log(
+      `[CALC SERVICE]    Payload: ${JSON.stringify(valuePayload, null, 2)}`
+    );
   }
 
   private calculateAndPublishBill(
@@ -382,10 +515,21 @@ class CalculationService {
 
 const calculationServiceInstance = new CalculationService();
 let isCalcServiceStarted = false;
+
+/**
+ * Get singleton instance and auto-start
+ */
 export const getCalculationService = () => {
   if (!isCalcServiceStarted) {
     calculationServiceInstance.start();
     isCalcServiceStarted = true;
   }
   return calculationServiceInstance;
+};
+
+/**
+ * ✅ Get instance (for API access) - may return null if not initialized yet
+ */
+export const getCalculationServiceInstance = () => {
+  return isCalcServiceStarted ? calculationServiceInstance : null;
 };

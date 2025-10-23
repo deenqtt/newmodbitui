@@ -66,6 +66,8 @@ import {
   Search,
   Eye,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 // --- Enhanced Multiselect Component ---
@@ -214,7 +216,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
 export function PueTab() {
-  const { subscribe, unsubscribe } = useMqtt();
+  const { subscribe, unsubscribe, isReady } = useMqtt();
 
   const [devicesForSelection, setDevicesForSelection] = useState<
     DeviceForSelection[]
@@ -436,6 +438,7 @@ export function PueTab() {
             keyLower.includes("current") ||
             keyLower.includes("voltage") ||
             keyLower.includes("energy") ||
+            keyLower.includes("ph") ||
             keyLower.includes("consumption")
           );
         }
@@ -445,7 +448,7 @@ export function PueTab() {
     [modalPayloadData]
   );
 
-  // Modal MQTT subscription management
+  // Modal MQTT subscription management - Subscribe only
   useEffect(() => {
     if (!isAddModalOpen && !isEditModalOpen) return;
 
@@ -482,27 +485,6 @@ export function PueTab() {
       }
     });
 
-    // Update filtered keys when payload data changes
-    setPduListForm((currentList) =>
-      currentList.map((pdu) => {
-        if (!pdu.topicUniqId) return pdu;
-        const device = devicesForSelection.find(
-          (d) => d.uniqId === pdu.topicUniqId
-        );
-        const newFilteredKeys = getFilteredKeys(device);
-        return { ...pdu, filteredKeys: newFilteredKeys };
-      })
-    );
-
-    setMainPowerForm((currentMainPower) => {
-      if (!currentMainPower.topicUniqId) return currentMainPower;
-      const device = devicesForSelection.find(
-        (d) => d.uniqId === currentMainPower.topicUniqId
-      );
-      const newFilteredKeys = getFilteredKeys(device);
-      return { ...currentMainPower, filteredKeys: newFilteredKeys };
-    });
-
     return () => {
       // Cleanup subscriptions when modal closes
       if (!isAddModalOpen && !isEditModalOpen) {
@@ -522,6 +504,50 @@ export function PueTab() {
     subscribe,
     unsubscribe,
     handleMqttMessage,
+  ]);
+
+  // Separate effect for updating filtered keys based on modalPayloadData
+  useEffect(() => {
+    if (!isAddModalOpen && !isEditModalOpen) return;
+
+    // Update filtered keys when payload data changes
+    setPduListForm((currentList) =>
+      currentList.map((pdu) => {
+        if (!pdu.topicUniqId) return pdu;
+        const device = devicesForSelection.find(
+          (d) => d.uniqId === pdu.topicUniqId
+        );
+        const newFilteredKeys = getFilteredKeys(device);
+        // Only update if keys actually changed
+        if (
+          JSON.stringify(pdu.filteredKeys) === JSON.stringify(newFilteredKeys)
+        ) {
+          return pdu;
+        }
+        return { ...pdu, filteredKeys: newFilteredKeys };
+      })
+    );
+
+    setMainPowerForm((currentMainPower) => {
+      if (!currentMainPower.topicUniqId) return currentMainPower;
+      const device = devicesForSelection.find(
+        (d) => d.uniqId === currentMainPower.topicUniqId
+      );
+      const newFilteredKeys = getFilteredKeys(device);
+      // Only update if keys actually changed
+      if (
+        JSON.stringify(currentMainPower.filteredKeys) ===
+        JSON.stringify(newFilteredKeys)
+      ) {
+        return currentMainPower;
+      }
+      return { ...currentMainPower, filteredKeys: newFilteredKeys };
+    });
+  }, [
+    modalPayloadData,
+    isAddModalOpen,
+    isEditModalOpen,
+    devicesForSelection,
     getFilteredKeys,
   ]);
 
@@ -742,6 +768,17 @@ export function PueTab() {
       });
       setIsAddModalOpen(false);
       await initializeData();
+
+      // ✅ Trigger calculation service reload
+      try {
+        await fetch(`${API_BASE_URL}/api/cron/calculation-reload`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        console.log("✅ Calculation service reload triggered");
+      } catch (reloadError) {
+        console.error("Failed to trigger calculation reload:", reloadError);
+      }
     } catch (error: any) {
       Toast.fire({ icon: "error", title: `Failed to save: ${error.message}` });
     } finally {
@@ -792,6 +829,17 @@ export function PueTab() {
       });
       setIsEditModalOpen(false);
       await initializeData();
+
+      // ✅ Trigger calculation service reload
+      try {
+        await fetch(`${API_BASE_URL}/api/cron/calculation-reload`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        console.log("✅ Calculation service reload triggered");
+      } catch (reloadError) {
+        console.error("Failed to trigger calculation reload:", reloadError);
+      }
     } catch (error: any) {
       Toast.fire({
         icon: "error",
@@ -822,6 +870,17 @@ export function PueTab() {
       setIsDeleteAlertOpen(false);
       setConfigToDelete(null);
       await initializeData();
+
+      // ✅ Trigger calculation service reload
+      try {
+        await fetch(`${API_BASE_URL}/api/cron/calculation-reload`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        console.log("✅ Calculation service reload triggered");
+      } catch (reloadError) {
+        console.error("Failed to trigger calculation reload:", reloadError);
+      }
     } catch (error: any) {
       Toast.fire({
         icon: "error",
@@ -959,45 +1018,123 @@ export function PueTab() {
 
   return (
     <div className="space-y-6">
+      {/* Header Section with Gradient */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg">
+            <BarChart3 className="h-8 w-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              PUE Configuration
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Power Usage Effectiveness Monitoring
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => initializeData(true)}
+            disabled={refreshing || isLoadingInitialData}
+            className="gap-2"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            onClick={openAddDataModal}
+            disabled={isSubmitting || isLoadingInitialData || isDeletingConfig}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white gap-2 shadow-md"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Add Configuration
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-xl transition-shadow duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-emerald-100 text-sm font-medium mb-2">
+                  Active Configurations
+                </p>
+                <p className="text-4xl font-bold">{pueConfigs.length}</p>
+              </div>
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Database className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:shadow-xl transition-shadow duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium mb-2">
+                  Average PUE
+                </p>
+                <p className="text-4xl font-bold">
+                  {pueConfigs.length > 0
+                    ? (
+                        pueConfigs.reduce(
+                          (sum, c) => sum + (parseFloat(c.pue || "0") || 0),
+                          0
+                        ) / pueConfigs.length
+                      ).toFixed(2)
+                    : "N/A"}
+                </p>
+              </div>
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Activity className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white hover:shadow-xl transition-shadow duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium mb-2">
+                  Total Racks Monitored
+                </p>
+                <p className="text-4xl font-bold">
+                  {pueConfigs.reduce(
+                    (sum, c) => sum + (c.pduList?.length || 0),
+                    0
+                  )}
+                </p>
+              </div>
+              <div className="p-3 bg-white/20 rounded-xl">
+                <Zap className="h-6 w-6" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Main PUE Configuration Card */}
-      <Card className="border-0 shadow-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50">
+      <Card className="border-0 shadow-lg">
+        <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-xl flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                PUE (Power Usage Effectiveness)
+                <BarChart3 className="h-5 w-5 text-emerald-600" />
+                PUE Configurations
               </CardTitle>
               <CardDescription>
-                Configure and monitor Power Usage Effectiveness of your data
-                center
+                Monitor and manage data center power efficiency
               </CardDescription>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => initializeData(true)}
-                disabled={refreshing || isLoadingInitialData}
-                className="whitespace-nowrap"
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={openAddDataModal}
-                disabled={
-                  isSubmitting || isLoadingInitialData || isDeletingConfig
-                }
-                className="bg-primary hover:bg-primary/90 whitespace-nowrap"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add PUE Config
-              </Button>
             </div>
           </div>
 
@@ -1006,11 +1143,14 @@ export function PueTab() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search PUE configurations..."
+                placeholder="Search configurations..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 disabled={isLoadingInitialData}
-                className="pl-10 bg-background"
+                className="pl-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-emerald-500"
               />
             </div>
           </div>
@@ -1019,113 +1159,152 @@ export function PueTab() {
         <CardContent className="p-0">
           <div className="overflow-hidden">
             {isLoadingInitialData ? (
-              <div className="flex flex-col items-center justify-center h-48">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground mt-2">
+              <div className="flex flex-col items-center justify-center h-64">
+                <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mb-4" />
+                <p className="text-muted-foreground text-lg font-medium">
                   Loading PUE configurations...
                 </p>
               </div>
             ) : paginatedData.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="flex flex-col items-center gap-3">
-                  <BarChart3 className="h-12 w-12 text-muted-foreground/50" />
-                  <div className="space-y-1">
-                    <p className="text-muted-foreground font-medium">
+              <div className="text-center py-20">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 rounded-full">
+                    <BarChart3 className="h-16 w-16 text-emerald-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                       {searchQuery
                         ? "No configurations found"
-                        : "No PUE configurations"}
+                        : "No PUE Configurations Yet"}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground max-w-md">
                       {searchQuery
-                        ? "Try adjusting your search terms"
-                        : "Add your first PUE configuration to monitor efficiency"}
+                        ? "Try adjusting your search terms or clear the search"
+                        : "Start monitoring your data center power efficiency by adding your first PUE configuration"}
                     </p>
                   </div>
                   {!searchQuery && (
-                    <Button onClick={openAddDataModal} className="mt-2">
+                    <Button
+                      onClick={openAddDataModal}
+                      className="mt-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md"
+                    >
                       <PlusCircle className="h-4 w-4 mr-2" />
-                      Add PUE Config
+                      Add Your First Configuration
                     </Button>
                   )}
                 </div>
               </div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        #
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        Configuration
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        PDU/Racks
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        PUE Value
-                      </TableHead>
-                      <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedData.map((item, index) => (
-                      <TableRow
-                        key={item.id}
-                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
-                      >
-                        <TableCell className="py-4">
-                          {index + 1 + (currentPage - 1) * itemsPerPage}
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-b-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          #
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Configuration
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          Main Power
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          IT Power (Racks)
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                          PUE Value
+                        </TableHead>
+                        <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedData.map((item, index) => {
+                        const pueValue = parseFloat(item.pue || "0");
+                        const totalItPower = item.pduList?.reduce(
+                          (sum, pdu) => sum + (pdu.value || 0),
+                          0
+                        );
 
-                        <TableCell className="py-4">
-                          <div className="space-y-1">
-                            <p className="font-medium text-slate-900 dark:text-slate-100">
-                              {item.customName}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                <Database className="h-3 w-3 mr-1" />
-                                Main:{" "}
-                                {item.mainPower.value?.toFixed(2) || "N/A"}W
-                              </Badge>
-                            </div>
-                          </div>
-                        </TableCell>
+                        return (
+                          <TableRow
+                            key={item.id}
+                            className="hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200 border-b border-slate-100 dark:border-slate-800"
+                          >
+                            <TableCell className="py-4 font-medium text-slate-600 dark:text-slate-400">
+                              {index + 1 + (currentPage - 1) * itemsPerPage}
+                            </TableCell>
 
-                        <TableCell className="py-4">
-                          <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-blue-500" />
-                            <span className="font-medium">
-                              {item.pduList?.length || 0}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              racks
-                            </span>
-                          </div>
-                        </TableCell>
+                            <TableCell className="py-4">
+                              <div className="space-y-2">
+                                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                  {item.customName}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                                    Live monitoring
+                                  </span>
+                                </div>
+                              </div>
+                            </TableCell>
 
-                        <TableCell className="py-4">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                item.pue === "N/A"
-                                  ? "secondary"
-                                  : parseFloat(item.pue || "0") > 2
-                                  ? "destructive"
-                                  : parseFloat(item.pue || "0") > 1.5
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="text-sm"
-                            >
-                              {item.pue}
-                            </Badge>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950 dark:to-orange-950 rounded-lg">
+                                  <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                  <p className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                                    {item.mainPower.value?.toFixed(2) || "0.00"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Watts
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg">
+                                  <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                  <p className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                                    {totalItPower?.toFixed(2) || "0.00"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {item.pduList?.length || 0} racks
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      item.pue === "N/A"
+                                        ? "secondary"
+                                        : pueValue > 2
+                                        ? "destructive"
+                                        : pueValue > 1.5
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                    className={`text-base font-bold px-3 py-1 ${
+                                      item.pue !== "N/A" && pueValue <= 1.5
+                                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                                        : ""
+                                    }`}
+                                  >
+                                    {item.pue}
+                                  </Badge>
+                                </div>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1135,26 +1314,20 @@ export function PueTab() {
                                     isLoadingInitialData ||
                                     isDeletingConfig
                                   }
+                                  className="h-7 text-xs"
                                 >
                                   <Eye className="h-3 w-3 mr-1" />
-                                  Details
+                                  View
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                View detailed PUE breakdown
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
+                              </div>
+                            </TableCell>
 
-                        <TableCell className="text-right py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                            <TableCell className="text-right py-4">
+                              <div className="flex items-center justify-end gap-1">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                  className="h-8 w-8 hover:bg-emerald-100 dark:hover:bg-emerald-900/20"
                                   onClick={() => editItem(item)}
                                   disabled={
                                     isSubmitting ||
@@ -1162,16 +1335,9 @@ export function PueTab() {
                                     isDeletingConfig
                                   }
                                 >
-                                  <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                  <Edit className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Edit configuration
-                              </TooltipContent>
-                            </Tooltip>
 
-                            <Tooltip>
-                              <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -1190,47 +1356,92 @@ export function PueTab() {
                                     <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
                                   )}
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Delete configuration
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCurrentPage((p) => Math.max(1, p - 1))
-                        }
-                        disabled={currentPage === 1 || isLoadingInitialData}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCurrentPage((p) => Math.min(totalPages, p + 1))
-                        }
-                        disabled={
-                          currentPage === totalPages || isLoadingInitialData
-                        }
-                      >
-                        Next
-                      </Button>
+                  <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground font-medium">
+                        Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                        {Math.min(
+                          currentPage * itemsPerPage,
+                          filteredConfigs.length
+                        )}{" "}
+                        of {filteredConfigs.length} configurations
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCurrentPage((p) => Math.max(1, p - 1))
+                          }
+                          disabled={currentPage === 1 || isLoadingInitialData}
+                          className="gap-1"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          {Array.from(
+                            { length: Math.min(5, totalPages) },
+                            (_, i) => {
+                              let pageNum;
+                              if (totalPages <= 5) {
+                                pageNum = i + 1;
+                              } else if (currentPage <= 3) {
+                                pageNum = i + 1;
+                              } else if (currentPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i;
+                              } else {
+                                pageNum = currentPage - 2 + i;
+                              }
+
+                              return (
+                                <Button
+                                  key={pageNum}
+                                  variant={
+                                    currentPage === pageNum
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  className={`w-8 h-8 p-0 ${
+                                    currentPage === pageNum
+                                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white"
+                                      : ""
+                                  }`}
+                                >
+                                  {pageNum}
+                                </Button>
+                              );
+                            }
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCurrentPage((p) => Math.min(totalPages, p + 1))
+                          }
+                          disabled={
+                            currentPage === totalPages || isLoadingInitialData
+                          }
+                          className="gap-1"
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}

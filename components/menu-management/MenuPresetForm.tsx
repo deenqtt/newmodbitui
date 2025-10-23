@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { IconPicker } from './IconPicker';
 import { Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface MenuGroupData {
@@ -279,16 +280,12 @@ export function MenuPresetForm({
                 disabled={saving}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="icon">Icon</Label>
-              <Input
-                id="icon"
-                placeholder="Menu"
-                value={formData.icon}
-                onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
-                disabled={saving}
-              />
-            </div>
+            <IconPicker
+              value={formData.icon}
+              onChange={(iconName) => setFormData(prev => ({ ...prev, icon: iconName }))}
+              disabled={saving}
+              placeholder="Select preset icon"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -312,7 +309,7 @@ export function MenuPresetForm({
             Select the menu groups and items that will be visible when this preset is active.
           </p>
         </CardHeader>
-        <CardContent>...
+        <CardContent>
           <ScrollArea className="h-[500px] w-full">
             <div className="space-y-2">
               {menuData.map((group) => {

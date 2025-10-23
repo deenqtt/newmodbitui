@@ -104,7 +104,7 @@ async function seedMenu() {
 
       // 4. Security & Access
       { name: 'security', label: 'Security', icon: 'Shield', order: 7, isActive: true },
-      { name: 'security_access', label: 'Access', icon: 'ShieldCheck', order: 8, isActive: true },
+      { name: 'security_access', label: 'VPN', icon: 'ShieldCheck', order: 8, isActive: true },
 
       // 5. Specialized Technologies
       { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 9, isActive: true },
@@ -154,6 +154,7 @@ async function seedMenu() {
       // ========== 3. MONITORING & CONTROL ==========
       // Monitoring Group - Active monitoring features
       { name: 'info-system-info', label: 'System Information', path: '/info', icon: 'Info', order: 0, groupName: 'monitoring', isActive: true, isDeveloper: false },
+      { name: 'mqtt-monitoring', label: 'MQTT Monitoring', path: '/mqtt-monitoring', icon: 'Radio', order: 1, groupName: 'monitoring', isActive: true, isDeveloper: false },
 
       // Control Group - Control interfaces
       { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isActive: true, isDeveloper: false },
@@ -174,10 +175,9 @@ async function seedMenu() {
       { name: 'security-surveillance-cctv', label: 'CCTV Surveillance', path: '/security-access/surveillance-cctv', icon: 'Camera', order: 1, groupName: 'security', isActive: true, isDeveloper: false },
 
       // Security Access Group - VPN & Remote Access
-      { name: 'vpn-openvpn', label: 'OpenVPN', path: '/vpn/openvpn', icon: 'Lock', order: 0, groupName: 'security_access', isActive: true, isDeveloper: false },
-      { name: 'vpn-wireguard', label: 'WireGuard', path: '/vpn/wireguard', icon: 'Shield', order: 1, groupName: 'security_access', isActive: true, isDeveloper: false },
-      { name: 'vpn-ikev2', label: 'IKEv2 VPN', path: '/vpn/ikev2', icon: 'Key', order: 2, groupName: 'security_access', isActive: true, isDeveloper: false },
-
+      { name: 'vpn-openvpn', label: 'OpenVPN', path: '/vpn', icon: 'Lock', order: 0, groupName: 'security_access', isActive: true, isDeveloper: false },
+      { name: 'vpn-wireguard', label: 'Config VPN', path: '/vpn/config', icon: 'Shield', order: 1, groupName: 'security_access', isActive: true, isDeveloper: false },
+      
       // ========== 5. SPECIALIZED TECHNOLOGIES ==========
       // LoRaWAN Group
       { name: 'lorawan-gateways', label: 'LoRaWAN Gateways', path: '/lo-ra-wan/gateways', icon: 'Router', order: 0, groupName: 'lorawan', isActive: true, isDeveloper: false },

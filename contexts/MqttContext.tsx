@@ -10,6 +10,7 @@ import {
   useCallback,
 } from "react";
 import Paho from "paho-mqtt";
+import { getEnvMQTTBrokerUrl } from "@/lib/mqtt-config";
 
 // Tipe untuk callback listener
 type MqttListener = (topic: string, payload: string) => void;
@@ -104,28 +105,23 @@ export function MqttProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (clientRef.current) return;
 
-    const getMqttHost = () => {
-      // Production: SELALU gunakan window.location.hostname, abaikan ENV variables
-      if (process.env.NODE_ENV === "production") {
-        if (typeof window !== "undefined" && window.location) {
-          return window.location.hostname;
-        }
-        // Fallback untuk SSR
-        return "localhost";
-      }
+    const mqttBrokerUrl = getEnvMQTTBrokerUrl();
 
-      // Development: gunakan env variable jika tersedia
-      if (process.env.NEXT_PUBLIC_MQTT_HOST) {
-        return process.env.NEXT_PUBLIC_MQTT_HOST;
-      }
+    // Parse the MQTT broker URL
+    let mqttHost = "localhost";
+    let mqttPort = 9000;
+    let useSSL = false;
 
-      // Fallback untuk development
-      return "localhost";
-    };
+    try {
+      const url = new URL(mqttBrokerUrl);
+      mqttHost = url.hostname;
+      mqttPort = parseInt(url.port) || (url.protocol === 'wss:' ? 443 : 80);
+      useSSL = url.protocol === 'wss:';
+    } catch (error) {
+      console.error('Error parsing MQTT broker URL in MqttContext:', error);
+    }
 
-    const mqttHost = getMqttHost();
-    const mqttPort = parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000");
-    const clientId = `web-client-${Math.random().toString(16).substr(2, 8)}`;
+    const clientId = `web-client-${Math.random().toString(36).substring(2, 15)}${Date.now()}`;
 
     const mqttClient = new Paho.Client(mqttHost, mqttPort, clientId);
     clientRef.current = mqttClient;
@@ -158,7 +154,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
         setConnectionStatus("Failed to Connect");
         setIsReady(false); // Set isReady ke false jika koneksi gagal
       },
-      useSSL: false,
+      useSSL: useSSL,
       reconnect: true,
       cleanSession: true,
     });

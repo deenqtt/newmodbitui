@@ -118,19 +118,40 @@ export async function PUT(
       }
     }
 
+    // Build update data object, filtering out undefined/null values
+    const updateData: any = {};
+
+    if (menuGroupId !== undefined && menuGroupId !== null && menuGroupId !== "") {
+      updateData.menuGroupId = menuGroupId;
+    }
+    if (name !== undefined && name !== null && name !== "") {
+      updateData.name = name;
+    }
+    if (label !== undefined && label !== null) {
+      updateData.label = label;
+    }
+    if (path !== undefined && path !== null) {
+      updateData.path = path;
+    }
+    if (icon !== undefined && icon !== null) {
+      updateData.icon = icon;
+    }
+    if (component !== undefined && component !== null) {
+      updateData.component = component;
+    }
+    if (order !== undefined && order !== null) {
+      updateData.order = order;
+    }
+    if (isActive !== undefined && isActive !== null) {
+      updateData.isActive = isActive;
+    }
+    if (isDeveloper !== undefined && isDeveloper !== null) {
+      updateData.isDeveloper = isDeveloper;
+    }
+
     const menuItem = await prisma.menuItem.update({
       where: { id },
-      data: {
-        ...(menuGroupId && { menuGroupId }),
-        ...(name && { name }),
-        ...(label !== undefined && { label }),
-        ...(path !== undefined && { path }),
-        ...(icon !== undefined && { icon }),
-        ...(component !== undefined && { component }),
-        ...(order !== undefined && { order }),
-        ...(isActive !== undefined && { isActive }),
-        ...(isDeveloper !== undefined && { isDeveloper }),
-      },
+      data: updateData,
       include: {
         menuGroup: true,
         permissions: {

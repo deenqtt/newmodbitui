@@ -1,6 +1,6 @@
 // lib/mqttClient.ts
 import mqtt, { MqttClient } from "mqtt";
-import { getAppConfig } from "@/lib/config"
+import { getMQTTConfig } from "@/lib/mqtt-config"
 
 let client: MqttClient | null = null;
 let isConnecting: boolean = false;
@@ -32,7 +32,7 @@ function throttledLog(message: string, type: "log" | "error" = "log") {
 
 // Function to get MQTT config (simplified - only use environment config)
 function getMQTTConfigUrl(): string {
-  return getAppConfig().mqttBrokerUrl;
+  return getMQTTConfig();
 }
 
 // Now the function needs to be synchronous since getMQTTConfigUrl is no longer async
@@ -216,8 +216,8 @@ export function connectMQTT(): MqttClient {
     return client;
   }
 
-  // Create temporary client with fallback URL for immediate return
-  const { mqttBrokerUrl } = getAppConfig();
+  // Create temporary client with URL for immediate return
+  const mqttBrokerUrl = getMQTTConfig();
   return mqtt.connect(mqttBrokerUrl, {
     clean: true,
     connectTimeout: 5000,

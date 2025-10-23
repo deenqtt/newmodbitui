@@ -5,25 +5,190 @@ import Paho from "paho-mqtt";
 
 const prisma = new PrismaClient();
 
+// ✅ GLOBAL MQTT CLIENT (Truly Persistent)
+let globalMqttClient: Paho.Client | null = null;
+let latestPayloadsCache: Record<string, any> = {};
+let subscribedTopics = new Set<string>();
+let isConnecting = false;
+let isConnected = false;
+let connectionPromise: Promise<void> | null = null;
+
+function getMQTTHost(): string {
+  if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+    return process.env.NEXT_PUBLIC_MQTT_HOST;
+  }
+  return "localhost";
+}
+
+/**
+ * ✅ Initialize persistent MQTT connection (called once and kept alive)
+ */
+async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
+  // ✅ If already connected, just subscribe to new topics if needed
+  if (isConnected && globalMqttClient) {
+    const missingTopics = requiredTopics.filter(
+      (t) => !subscribedTopics.has(t)
+    );
+
+    if (missingTopics.length > 0) {
+      console.log(
+        `[MQTT] 📡 Subscribing to ${missingTopics.length} new topic(s)...`
+      );
+      missingTopics.forEach((topic) => {
+        try {
+          globalMqttClient!.subscribe(topic);
+          subscribedTopics.add(topic);
+          console.log(`[MQTT] ✅ Subscribed: ${topic}`);
+        } catch (error) {
+          console.error(`[MQTT] ❌ Failed to subscribe to ${topic}:`, error);
+        }
+      });
+    } else {
+      console.log(
+        `[MQTT] ♻️  Reusing existing connection (${subscribedTopics.size} topics)`
+      );
+    }
+
+    return; // ✅ Connection already active, return immediately
+  }
+
+  // ✅ If currently connecting, wait for existing connection attempt
+  if (isConnecting && connectionPromise) {
+    console.log("[MQTT] ⏳ Connection in progress, waiting...");
+    await connectionPromise;
+    return;
+  }
+
+  // ✅ Start new connection
+  isConnecting = true;
+
+  connectionPromise = new Promise<void>(async (resolve, reject) => {
+    console.log("[MQTT] 🔌 Initializing persistent MQTT connection...");
+
+    try {
+      globalMqttClient = new Paho.Client(
+        getMQTTHost(),
+        parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"),
+        `cron-logger-persistent-${Date.now()}`
+      );
+
+      // ✅ Message handler - updates cache automatically
+      globalMqttClient.onMessageArrived = (message) => {
+        try {
+          const payload = JSON.parse(message.payloadString);
+          latestPayloadsCache[message.destinationName] = payload;
+
+          const cacheSize = Object.keys(latestPayloadsCache).length;
+          console.log(
+            `[MQTT] 📥 Cached payload: ${message.destinationName} (${cacheSize} total)`
+          );
+        } catch (e) {
+          console.error(
+            `[MQTT] ❌ Failed to parse payload from ${message.destinationName}`
+          );
+        }
+      };
+
+      // ✅ Connection lost handler - auto-reconnect
+      globalMqttClient.onConnectionLost = (responseObject) => {
+        isConnected = false;
+        isConnecting = false;
+        connectionPromise = null;
+
+        console.error(
+          "[MQTT] ⚠️  Connection lost:",
+          responseObject.errorMessage
+        );
+        console.log(
+          "[MQTT] 🔄 Connection will be re-established on next request"
+        );
+
+        globalMqttClient = null;
+        subscribedTopics.clear();
+      };
+
+      // ✅ Connect to MQTT broker
+      globalMqttClient.connect({
+        onSuccess: () => {
+          isConnected = true;
+          isConnecting = false;
+
+          console.log("[MQTT] ✅ Connected to MQTT broker (PERSISTENT)");
+
+          // Subscribe to all required topics
+          let subscribeErrors = 0;
+          requiredTopics.forEach((topic) => {
+            try {
+              globalMqttClient!.subscribe(topic);
+              subscribedTopics.add(topic);
+              console.log(`[MQTT] 📡 Subscribed: ${topic}`);
+            } catch (error) {
+              subscribeErrors++;
+              console.error(
+                `[MQTT] ❌ Failed to subscribe to ${topic}:`,
+                error
+              );
+            }
+          });
+
+          console.log(
+            `[MQTT] 🎉 Ready! Subscribed to ${
+              requiredTopics.length - subscribeErrors
+            }/${requiredTopics.length} topic(s)`
+          );
+
+          // ✅ Wait briefly for initial payload (only on first connect)
+          setTimeout(() => {
+            const cacheSize = Object.keys(latestPayloadsCache).length;
+            console.log(`[MQTT] 💾 Cache ready with ${cacheSize} payload(s)`);
+            resolve();
+          }, 1500); // Reduced to 1.5 seconds
+        },
+        onFailure: (err) => {
+          isConnecting = false;
+          isConnected = false;
+          connectionPromise = null;
+
+          console.error("[MQTT] ❌ Failed to connect:", err.errorMessage);
+          reject(new Error(err.errorMessage));
+        },
+        useSSL: false,
+        keepAliveInterval: 60, // Keep connection alive
+        cleanSession: false, // Preserve subscriptions
+        reconnect: false, // We handle reconnect manually
+      });
+    } catch (error) {
+      isConnecting = false;
+      isConnected = false;
+      connectionPromise = null;
+      reject(error);
+    }
+  });
+
+  await connectionPromise;
+}
+
+/**
+ * ✅ Main GET handler
+ */
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+
   // Get parameters from query
   const searchParams = request.nextUrl.searchParams;
   const intervalParam = searchParams.get("interval");
-  const configIdParam = searchParams.get("configId"); // 🆕 NEW
+  const configIdParam = searchParams.get("configId");
 
   const interval = intervalParam ? parseInt(intervalParam) : null;
 
-  // 🆕 Build where clause based on parameters
+  // Build where clause
   let whereClause: any = {};
 
   if (configIdParam) {
-    // Single config mode
     whereClause = { id: configIdParam };
   } else if (interval) {
-    // Interval mode
     whereClause = { loggingIntervalMinutes: interval };
   }
-  // else: fetch all configs
 
   // Fetch configs from database
   const configs = await prisma.loggingConfiguration.findMany({
@@ -43,9 +208,9 @@ export async function GET(request: NextRequest) {
   }
 
   console.log(
-    `[CRON] Processing ${configs.length} config(s)${
+    `\n[CRON] 🚀 Processing ${configs.length} config(s)${
       configIdParam
-        ? ` (single config)`
+        ? ` (${configs[0].customName})`
         : interval
         ? ` for ${interval}min interval`
         : ""
@@ -54,90 +219,36 @@ export async function GET(request: NextRequest) {
 
   // Get unique topics
   const topics = [...new Set(configs.map((c) => c.device.topic))];
-  const latestPayloads: Record<string, any> = {};
 
-  function getMQTTHost(): string {
-    if (process.env.NEXT_PUBLIC_MQTT_HOST) {
-      return process.env.NEXT_PUBLIC_MQTT_HOST;
-    }
-    return "localhost";
-  }
-
-  // MQTT Client setup
-  const client = new Paho.Client(
-    getMQTTHost(),
-    parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"),
-    `cron-logger-${Date.now()}`
-  );
-
-  client.onMessageArrived = (message) => {
-    try {
-      const payload = JSON.parse(message.payloadString);
-      latestPayloads[message.destinationName] = payload;
-      console.log(
-        `[CRON] 📥 Received payload from: ${message.destinationName}`
-      );
-    } catch (e) {
-      console.error(
-        `[CRON] ❌ Failed to parse payload from ${message.destinationName}:`,
-        message.payloadString
-      );
-    }
-  };
-
-  // Connect to MQTT and subscribe
+  // ✅ Ensure MQTT connection (persistent)
   try {
-    await new Promise<void>((resolve, reject) => {
-      client.connect({
-        onSuccess: () => {
-          console.log("[CRON] ✅ Connected to MQTT broker");
-          topics.forEach((topic) => {
-            client.subscribe(topic);
-            console.log(`[CRON] 📡 Subscribed to: ${topic}`);
-          });
-
-          console.log("[CRON] ⏳ Waiting 15 seconds for payloads...");
-
-          setTimeout(() => {
-            console.log(
-              `[CRON] 📊 Received ${
-                Object.keys(latestPayloads).length
-              } payload(s)`
-            );
-            client.disconnect();
-            resolve();
-          }, 15000); // 15 seconds
-        },
-        onFailure: (err) => {
-          console.error(
-            "[CRON] ❌ Failed to connect to MQTT:",
-            err.errorMessage
-          );
-          reject(new Error(err.errorMessage));
-        },
-        useSSL: false,
-      });
-    });
+    await ensureMqttConnection(topics);
   } catch (error: any) {
+    console.error(`[MQTT] ❌ Connection error:`, error.message);
     return NextResponse.json(
       { message: `Failed to connect to MQTT: ${error.message}`, logged: 0 },
       { status: 500 }
     );
   }
 
-  // File: app/api/cron/log-data/route.ts
-  // ... (code sebelumnya sama)
+  // ✅ Small delay to ensure we have fresh data (only if cache is empty)
+  const hasAllPayloads = topics.every((topic) => latestPayloadsCache[topic]);
 
-  // Process payloads and create log entries
+  if (!hasAllPayloads) {
+    console.log("[MQTT] ⏳ Waiting briefly for fresh payloads...");
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Just 500ms!
+  }
+
+  // ✅ Get payloads from cache (INSTANT!)
   const logEntries = [];
 
   for (const config of configs) {
     const topic = config.device.topic;
-    const payload = latestPayloads[topic];
+    const payload = latestPayloadsCache[topic];
 
     if (!payload) {
       console.warn(
-        `[CRON] ⚠️  No payload for topic ${topic} (Config: ${config.customName})`
+        `[CRON] ⚠️  No cached payload for topic ${topic} (Config: ${config.customName})`
       );
       continue;
     }
@@ -180,7 +291,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 🔥 FIX: Verify configs still exist before saving
+  // Save to database with retry
+  let savedCount = 0;
+
   if (logEntries.length > 0) {
     try {
       // Re-fetch configs to verify they still exist
@@ -207,9 +320,8 @@ export async function GET(request: NextRequest) {
 
       if (validLogEntries.length > 0) {
         await prisma.loggedData.createMany({ data: validLogEntries });
-        console.log(
-          `[CRON] 💾 Saved ${validLogEntries.length} log entry(ies) to database`
-        );
+        savedCount = validLogEntries.length;
+        console.log(`[CRON] 💾 Saved ${savedCount} log entry(ies) to database`);
       } else {
         console.log(
           "[CRON] ⚠️  No valid log entries to save (all configs deleted)"
@@ -226,13 +338,16 @@ export async function GET(request: NextRequest) {
     console.log("[CRON] ⚠️  No log entries to save");
   }
 
+  const duration = Date.now() - startTime;
+  console.log(`[CRON] ⚡ Completed in ${duration}ms (${savedCount} logged)\n`);
+
   return NextResponse.json({
     message: "Cron job finished",
     interval: interval || "single",
     configs: configs.length,
-    logged: logEntries.filter((entry) => {
-      // Only count entries that were actually saved
-      return true; // This will be updated by the validation above
-    }).length,
+    logged: savedCount,
+    durationMs: duration,
+    mqttConnected: isConnected,
+    cacheSize: Object.keys(latestPayloadsCache).length,
   });
 }

@@ -1,6 +1,12 @@
 // File: lib/services/ec25-listener.ts
 import mqtt from "mqtt";
 
+// Import centralized MQTT configuration
+import { getMQTTFullConfig } from "@/lib/mqtt-config";
+
+// Configuration
+const EC25_MQTT_CONFIG = getMQTTFullConfig();
+
 interface ModemInfo {
   manufacturer?: string;
   model?: string;
@@ -127,17 +133,21 @@ class EC25ListenerService {
 
   private connect() {
     try {
-      const brokerUrl =
-        process.env.NEXT_PUBLIC_MQTT_BROKER_URL ||
-        process.env.MQTT_BROKER_URL ||
-        "ws://192.168.0.139:9000";
-
-      this.client = mqtt.connect(brokerUrl, {
+      // Setup connection options with authentication if available
+      const connectionOptions: mqtt.IClientOptions = {
         clientId: `ec25-web-client-${Date.now()}`,
         clean: true,
         connectTimeout: 4000,
         reconnectPeriod: this.reconnectInterval,
-      });
+      };
+
+      // Add authentication if available
+      if (EC25_MQTT_CONFIG.username) {
+        connectionOptions.username = EC25_MQTT_CONFIG.username;
+        connectionOptions.password = EC25_MQTT_CONFIG.password;
+      }
+
+      this.client = mqtt.connect(EC25_MQTT_CONFIG.brokerUrl, connectionOptions);
 
       this.client.on("connect", () => {
         this.isConnected = true;

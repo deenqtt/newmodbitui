@@ -63,6 +63,10 @@ export function MenuGroupManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<MenuGroup | null>(null);
+
   // Search functionality
   const { searchQuery, setSearchQuery, filteredData: filteredMenuGroups } = useSearchFilter(menuGroups, ['name', 'label', 'icon']);
 
@@ -182,7 +186,7 @@ export function MenuGroupManagement() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (group: MenuGroup) => {
+  const handleDelete = (group: MenuGroup) => {
     if (group._count.menuItems > 0) {
       toast({
         title: "Cannot Delete",
@@ -192,12 +196,15 @@ export function MenuGroupManagement() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete menu group "${group.label}"?`)) {
-      return;
-    }
+    setGroupToDelete(group);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!groupToDelete) return;
 
     try {
-      const response = await fetch(`/api/menu-groups/${group.id}`, {
+      const response = await fetch(`/api/menu-groups/${groupToDelete.id}`, {
         method: "DELETE",
         credentials: 'include',
       });
@@ -223,6 +230,9 @@ export function MenuGroupManagement() {
         description: "Failed to delete menu group",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setGroupToDelete(null);
     }
   };
 
@@ -432,6 +442,31 @@ export function MenuGroupManagement() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the menu group "{groupToDelete?.label}"?
+                This action cannot be undone and will permanently remove this menu group.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Menu Group
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

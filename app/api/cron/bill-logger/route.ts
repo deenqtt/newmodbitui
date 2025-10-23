@@ -1,127 +1,263 @@
 // File: app/api/cron/bill-logger/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Paho from "paho-mqtt";
-export const dynamic = "force-dynamic"; // ✅ Tambahkan baris ini
 
-// --- Fungsi Helper ---
+export const dynamic = "force-dynamic";
 
-// Fungsi untuk menghubungkan, subscribe, dan mengambil data dari MQTT
-const getLatestMqttData = (topics: string[]): Promise<Record<string, any>> => {
-  return new Promise((resolve, reject) => {
-    const latestPayloads: Record<string, any> = {};
+// ✅ GLOBAL MQTT CLIENT (Persistent seperti log-data)
+let globalBillMqttClient: Paho.Client | null = null;
+let billPayloadsCache: Record<string, any> = {};
+let subscribedBillTopics = new Set<string>();
+let isBillConnecting = false;
+let isBillConnected = false;
+let billConnectionPromise: Promise<void> | null = null;
 
-    function getMQTTHost(): string {
-      // Development: gunakan env variable
-      if (process.env.NEXT_PUBLIC_MQTT_HOST) {
-        return process.env.NEXT_PUBLIC_MQTT_HOST;
-      }
+function getMQTTHost(): string {
+  if (process.env.NEXT_PUBLIC_MQTT_HOST) {
+    return process.env.NEXT_PUBLIC_MQTT_HOST;
+  }
+  return "localhost";
+}
 
-      // Server-side fallback ke localhost
-      return "localhost";
-    }
-
-    // Ganti bagian client initialization:
-    const client = new Paho.Client(
-      getMQTTHost(), // UBAH INI
-      parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"), // UBAH INI
-      `cron-logger-${Date.now()}`
+/**
+ * ✅ Ensure persistent MQTT connection for billing
+ */
+async function ensureBillMqttConnection(
+  requiredTopics: string[]
+): Promise<void> {
+  // Already connected, just subscribe to new topics
+  if (isBillConnected && globalBillMqttClient) {
+    const missingTopics = requiredTopics.filter(
+      (t) => !subscribedBillTopics.has(t)
     );
 
-    client.onMessageArrived = (message) => {
-      try {
-        const payload = JSON.parse(message.payloadString);
-        latestPayloads[message.destinationName] = payload;
-      } catch (e) {
-        console.error(
-          `[CRON-BILL] Gagal parse payload dari ${message.destinationName}`
-        );
-      }
-    };
-
-    client.connect({
-      onSuccess: () => {
-        topics.forEach((topic) => client.subscribe(topic));
-        // Tunggu 5 detik untuk data masuk, lalu selesaikan
-        setTimeout(() => {
-          client.disconnect();
-          resolve(latestPayloads);
-        }, 5000);
-      },
-      onFailure: (err) => {
-        reject(new Error(err.errorMessage));
-      },
-      useSSL: false,
-    });
-  });
-};
-
-// Fungsi untuk mempublikasikan hasil ke MQTT
-const publishResults = (publishTasks: { topic: string; payload: string }[]) => {
-  if (publishTasks.length === 0) return;
-
-  const client = new Paho.Client(
-    process.env.NEXT_PUBLIC_MQTT_HOST!,
-    parseInt(process.env.NEXT_PUBLIC_MQTT_PORT!),
-    `cron-bill-publisher-${Date.now()}`
-  );
-
-  client.connect({
-    onSuccess: () => {
-      publishTasks.forEach((task) => {
-        const message = new Paho.Message(task.payload);
-        message.destinationName = task.topic;
-        client.send(message);
-      });
-      client.disconnect();
-    },
-    onFailure: (err) => {
-      console.error(
-        "[CRON-BILL] Gagal terhubung ke MQTT untuk publish:",
-        err.errorMessage
+    if (missingTopics.length > 0) {
+      console.log(
+        `[BILL-MQTT] 📡 Subscribing to ${missingTopics.length} new topic(s)...`
       );
-    },
+      missingTopics.forEach((topic) => {
+        try {
+          globalBillMqttClient!.subscribe(topic);
+          subscribedBillTopics.add(topic);
+          console.log(`[BILL-MQTT] ✅ Subscribed: ${topic}`);
+        } catch (error) {
+          console.error(
+            `[BILL-MQTT] ❌ Failed to subscribe to ${topic}:`,
+            error
+          );
+        }
+      });
+    } else {
+      console.log(
+        `[BILL-MQTT] ♻️  Reusing connection (${subscribedBillTopics.size} topics)`
+      );
+    }
+    return;
+  }
+
+  // Wait for existing connection attempt
+  if (isBillConnecting && billConnectionPromise) {
+    console.log("[BILL-MQTT] ⏳ Connection in progress, waiting...");
+    await billConnectionPromise;
+    return;
+  }
+
+  // Start new connection
+  isBillConnecting = true;
+
+  billConnectionPromise = new Promise<void>(async (resolve, reject) => {
+    console.log("[BILL-MQTT] 🔌 Initializing persistent MQTT connection...");
+
+    try {
+      globalBillMqttClient = new Paho.Client(
+        getMQTTHost(),
+        parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"),
+        `bill-cron-persistent-${Date.now()}`
+      );
+
+      // Message handler
+      globalBillMqttClient.onMessageArrived = (message) => {
+        try {
+          const payload = JSON.parse(message.payloadString);
+          billPayloadsCache[message.destinationName] = payload;
+          console.log(`[BILL-MQTT] 📥 Cached: ${message.destinationName}`);
+        } catch (e) {
+          console.error(
+            `[BILL-MQTT] ❌ Parse error: ${message.destinationName}`
+          );
+        }
+      };
+
+      // Connection lost handler
+      globalBillMqttClient.onConnectionLost = (responseObject) => {
+        isBillConnected = false;
+        isBillConnecting = false;
+        billConnectionPromise = null;
+        console.error(
+          "[BILL-MQTT] ⚠️  Connection lost:",
+          responseObject.errorMessage
+        );
+        globalBillMqttClient = null;
+        subscribedBillTopics.clear();
+      };
+
+      // Connect
+      globalBillMqttClient.connect({
+        onSuccess: () => {
+          isBillConnected = true;
+          isBillConnecting = false;
+          console.log("[BILL-MQTT] ✅ Connected (PERSISTENT)");
+
+          // Subscribe to all required topics
+          requiredTopics.forEach((topic) => {
+            try {
+              globalBillMqttClient!.subscribe(topic);
+              subscribedBillTopics.add(topic);
+              console.log(`[BILL-MQTT] 📡 Subscribed: ${topic}`);
+            } catch (error) {
+              console.error(`[BILL-MQTT] ❌ Subscribe error: ${topic}`, error);
+            }
+          });
+
+          // Wait for initial payloads
+          setTimeout(() => {
+            console.log(
+              `[BILL-MQTT] 💾 Cache ready (${
+                Object.keys(billPayloadsCache).length
+              } payloads)`
+            );
+            resolve();
+          }, 1500);
+        },
+        onFailure: (err) => {
+          isBillConnecting = false;
+          isBillConnected = false;
+          billConnectionPromise = null;
+          console.error("[BILL-MQTT] ❌ Connection failed:", err.errorMessage);
+          reject(new Error(err.errorMessage));
+        },
+        useSSL: false,
+        keepAliveInterval: 60,
+        cleanSession: false,
+        reconnect: false,
+      });
+    } catch (error) {
+      isBillConnecting = false;
+      isBillConnected = false;
+      billConnectionPromise = null;
+      reject(error);
+    }
   });
-};
+
+  await billConnectionPromise;
+}
 
 // --- Endpoint Utama ---
+// NOTE: MQTT publishing removed from here
+// Publishing is now handled by Bill Publisher Service (every 7 seconds with RETAIN flag)
 
-export async function GET() {
-  console.log("\n[CRON-BILL] Memulai cron job Bill Calculation...");
+export async function GET(request: NextRequest) {
+  const startTime = Date.now();
 
-  // 1. Ambil semua konfigurasi tagihan dari database
+  // Get configId parameter (optional)
+  const searchParams = request.nextUrl.searchParams;
+  const configIdParam = searchParams.get("configId");
+
+  console.log(
+    `\n[CRON-BILL] 🚀 Starting bill calculation${
+      configIdParam ? ` for config ${configIdParam}` : ""
+    }...`
+  );
+
+  // Build where clause
+  let whereClause: any = {};
+  if (configIdParam) {
+    whereClause = { id: configIdParam };
+  }
+
+  // 1. Fetch bill configurations
   const configs = await prisma.billConfiguration.findMany({
+    where: Object.keys(whereClause).length > 0 ? whereClause : undefined,
     include: { sourceDevice: true, publishTargetDevice: true },
   });
 
   if (configs.length === 0) {
-    return NextResponse.json({ message: "No bill configurations found." });
+    return NextResponse.json({
+      message: configIdParam
+        ? `Bill config ${configIdParam} not found`
+        : "No bill configurations found.",
+      logged: 0,
+      published: 0,
+    });
   }
 
-  // 2. Kumpulkan semua topic sumber yang perlu didengarkan
+  console.log(`[CRON-BILL] 📊 Processing ${configs.length} config(s)...`);
+
+  // 2. Get unique source topics
   const sourceTopics = [...new Set(configs.map((c) => c.sourceDevice.topic))];
-  const latestPayloads = await getLatestMqttData(sourceTopics);
+
+  // 3. Ensure MQTT connection
+  try {
+    await ensureBillMqttConnection(sourceTopics);
+  } catch (error: any) {
+    console.error(`[BILL-MQTT] ❌ Connection error:`, error.message);
+    return NextResponse.json(
+      {
+        message: `Failed to connect to MQTT: ${error.message}`,
+        logged: 0,
+        published: 0,
+      },
+      { status: 500 }
+    );
+  }
+
+  // 4. Wait briefly if cache is empty
+  const hasAllPayloads = sourceTopics.every(
+    (topic) => billPayloadsCache[topic]
+  );
+  if (!hasAllPayloads) {
+    console.log("[BILL-MQTT] ⏳ Waiting for fresh payloads...");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 
   const logsToCreate = [];
-  const publishTasks = [];
 
-  // 3. Proses setiap konfigurasi
+  // 5. Process each config
   for (const config of configs) {
-    const sourcePayload = latestPayloads[config.sourceDevice.topic];
-    if (!sourcePayload || typeof sourcePayload.value !== "string") continue;
+    const sourcePayload = billPayloadsCache[config.sourceDevice.topic];
+
+    if (!sourcePayload) {
+      console.warn(
+        `[CRON-BILL] ⚠️  No cached payload for ${config.sourceDevice.topic}`
+      );
+      continue;
+    }
+
+    if (typeof sourcePayload.value !== "string") {
+      console.warn(
+        `[CRON-BILL] ⚠️  Invalid payload structure for ${config.customName}`
+      );
+      continue;
+    }
 
     try {
       const innerPayload = JSON.parse(sourcePayload.value);
       const rawValue = parseFloat(innerPayload[config.sourceDeviceKey]);
 
-      if (isNaN(rawValue)) continue;
+      if (isNaN(rawValue)) {
+        console.warn(
+          `[CRON-BILL] ⚠️  Invalid value for key "${config.sourceDeviceKey}" in ${config.customName}`
+        );
+        continue;
+      }
 
-      // 4. Lakukan perhitungan biaya
-      const energyKwh = (rawValue * 1) / 1000; // Asumsi per 1 jam
+      // 6. Calculate costs
+      const energyKwh = (rawValue * 1) / 1000; // Per 1 jam
       const rupiahCost = energyKwh * config.rupiahRatePerKwh;
       const dollarCost = energyKwh * config.dollarRatePerKwh;
 
-      // 5. Siapkan data untuk disimpan ke log
+      // 7. Prepare log entry (only for database logging)
       logsToCreate.push({
         configId: config.id,
         rawValue,
@@ -129,42 +265,64 @@ export async function GET() {
         dollarCost,
       });
 
-      // 6. Siapkan data untuk dipublikasikan ke MQTT
-      const publishPayload = {
-        Timestamp: new Date().toISOString(),
-        device_name: config.customName,
-        address: config.publishTargetDevice.address,
-        value: {
-          power_watt: rawValue,
-          cost_idr_per_hour: rupiahCost,
-          cost_usd_per_hour: dollarCost,
-        },
-      };
-      publishTasks.push({
-        topic: config.publishTargetDevice.topic,
-        payload: JSON.stringify(publishPayload),
-      });
+      console.log(
+        `[CRON-BILL] ✅ ${
+          config.customName
+        }: ${rawValue}W → Rp${rupiahCost.toFixed(2)}/h (logged to DB)`
+      );
     } catch (error) {
       console.error(
-        `[CRON-BILL] Gagal memproses config ${config.customName}:`,
+        `[CRON-BILL] ❌ Processing error for ${config.customName}:`,
         error
       );
     }
   }
 
-  // 7. Simpan semua log ke database dalam satu operasi
+  // 9. Save to database
+  let savedCount = 0;
   if (logsToCreate.length > 0) {
-    await prisma.billLog.createMany({
-      data: logsToCreate,
-    });
+    try {
+      // Verify configs still exist (handle deletion race condition)
+      const configIds = logsToCreate.map((entry) => entry.configId);
+      const existingConfigs = await prisma.billConfiguration.findMany({
+        where: { id: { in: configIds } },
+        select: { id: true },
+      });
+
+      const existingConfigIds = new Set(existingConfigs.map((c) => c.id));
+      const validLogEntries = logsToCreate.filter((entry) =>
+        existingConfigIds.has(entry.configId)
+      );
+
+      if (validLogEntries.length > 0) {
+        await prisma.billLog.createMany({ data: validLogEntries });
+        savedCount = validLogEntries.length;
+        console.log(`[CRON-BILL] 💾 Saved ${savedCount} bill log(s)`);
+      }
+    } catch (error) {
+      console.error("[CRON-BILL] ❌ Database save error:", error);
+      return NextResponse.json(
+        { message: "Error saving bill logs", logged: 0 },
+        { status: 500 }
+      );
+    }
   }
 
-  // 8. Publikasikan semua hasil ke MQTT
-  publishResults(publishTasks);
+  const duration = Date.now() - startTime;
+  console.log(
+    `[CRON-BILL] ⚡ Completed in ${duration}ms (${savedCount} logged to database)`
+  );
+  console.log(
+    `[CRON-BILL] ℹ️  MQTT publishing handled by Bill Publisher Service (every 7s with RETAIN)\n`
+  );
 
   return NextResponse.json({
-    message: "Bill calculation cron job finished.",
-    logged: logsToCreate.length,
-    published: publishTasks.length,
+    message: "Bill calculation finished",
+    configs: configs.length,
+    logged: savedCount,
+    durationMs: duration,
+    mqttConnected: isBillConnected,
+    cacheSize: Object.keys(billPayloadsCache).length,
+    note: "MQTT publishing handled by Bill Publisher Service (7s interval with RETAIN flag)",
   });
 }

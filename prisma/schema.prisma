@@ -1,7 +1,6 @@
-// prisma/schema.prisma - SQLite version
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"] // untuk RPi
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -125,17 +124,14 @@ model Maintenance {
   endTask     DateTime
   assignTo    String
   targetType  MaintenanceTarget
-  targetId    String // Fleksibel untuk Device ID atau Rack ID
+  targetId    String
   status      String            @default("Scheduled")
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   isActive    Boolean           @default(true)
 
-  // Relations
   assignedTo User @relation("AssignedToUser", fields: [assignTo], references: [id])
-
-  // Optional device relation - hanya untuk targetType = Device
-  deviceTargetId String? // Foreign key terpisah
+  deviceTargetId String?
   deviceTarget   DeviceExternal? @relation(fields: [deviceTargetId], references: [id])
 }
 
@@ -145,9 +141,9 @@ model DeviceExternal {
   name                        String
   topic                       String                      @unique
   address                     String?
-  rackId                      String? // Optional rack assignment
-  positionU                   Int?                        @default(0) // Position in rack (U units)
-  sizeU                       Int?                        @default(1) // Size in rack (U units)
+  rackId                      String?
+  positionU                   Int?                        @default(0)
+  sizeU                       Int?                        @default(1)
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime                    @updatedAt
   lastPayload                 Json?
@@ -429,7 +425,7 @@ model DeviceData {
 
 model LoraGateway {
   id          String         @id @default(cuid())
-  gatewayId   String         @unique // Gateway ID dari topic MQTT
+  gatewayId   String         @unique
   name        String
   description String?
   lastSeen    DateTime?
@@ -443,8 +439,6 @@ model GatewayStats {
   id        String   @id @default(cuid())
   gatewayId String
   timestamp DateTime
-
-  // Upstream Statistics
   rfPacketsReceived     Int   @default(0)
   rfPacketsOk           Int   @default(0)
   rfPacketsBad          Int   @default(0)
@@ -457,8 +451,6 @@ model GatewayStats {
   crcOkRatio            Float @default(0)
   crcFailRatio          Float @default(0)
   noCrcRatio            Float @default(0)
-
-  // Downstream Statistics
   pullDataSent                Int   @default(0)
   pullAckReceived             Int   @default(0)
   downstreamDatagramsReceived Int   @default(0)
@@ -467,16 +459,11 @@ model GatewayStats {
   txOk                        Int   @default(0)
   txErrors                    Int   @default(0)
   downstreamAckRatio          Float @default(0)
-
-  // SX1302 Status
   counterInst String @default("0")
   counterPps  String @default("0")
-
-  // Beacon Status
   beaconQueued   Int @default(0)
   beaconSent     Int @default(0)
   beaconRejected Int @default(0)
-
   createdAt DateTime    @default(now())
   gateway   LoraGateway @relation(fields: [gatewayId], references: [id])
 }
@@ -489,11 +476,10 @@ model ThermalData {
   minTemp   Float?
   maxTemp   Float?
   avgTemp   Float?
-  // rawData   String?  // REMOVED - tidak perlu disimpan
-  frameCount Int?     // Optional: untuk tracking frame number
-  
+  frameCount Int?
+
   device    DeviceExternal @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  
+
   @@index([deviceId, timestamp])
 }
 
@@ -534,14 +520,11 @@ model Tenant {
   email       String    @unique
   phone       String?
   address     String?
-  status      String    @default("active") // active, inactive, suspended
+  status      String    @default("active")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   isActive    Boolean   @default(true)
   notes       String?
-
-  // Relations - when implementing multi-tenancy
-  // users       User[]    // Uncomment when adding tenant isolation
   locations   NodeTenantLocation[]
 
   @@map("Tenant")
@@ -555,17 +538,13 @@ model NodeTenantLocation {
   url         String?
   topic       String?
   description String?
-  status      Boolean   @default(false) // Auto update to true when MQTT payload received
-  nodeType    String    @default("node") // "server" or "node"
-  tenantId    String?   // Optional foreign key for locations assigned to tenants
+  status      Boolean   @default(false)
+  nodeType    String    @default("node")
+  tenantId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  isActive    Boolean   @default(true) // General active/inactive for soft deletes
-
-  // MQTT payload tracking
+  isActive    Boolean   @default(true)
   mqttPayloads NodeLocationMqttPayload[]
-
-  // Relations
   tenant      Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@map("NodeTenantLocation")
@@ -574,12 +553,11 @@ model NodeTenantLocation {
 model NodeLocationMqttPayload {
   id           String            @id @default(cuid())
   locationId   String
-  topic        String            // MQTT topic
-  payload      Json              // MQTT payload data
-  receivedAt   DateTime          @default(now()) // When MQTT message received
-  messageId    String?           // MQTT message ID if available
+  topic        String
+  payload      Json
+  receivedAt   DateTime          @default(now())
+  messageId    String?
 
-  // Relations
   location     NodeTenantLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([locationId, receivedAt])
@@ -613,10 +591,8 @@ model Layout2DDataPoint {
   id            String   @id @default(cuid())
   layoutId      String
   deviceUniqId  String
-  // Legacy single-key format (for backward compatibility)
   selectedKey   String?
-  // New multi-key format
-  selectedKeys  String? // JSON string containing array of KeyConfig
+  selectedKeys  String?
   units         String?
   multiply      Float?   @default(1)
   customName    String
@@ -627,14 +603,13 @@ model Layout2DDataPoint {
   iconName      String?
   iconColor     String?  @default("#666666")
   showIcon      Boolean? @default(false)
-  displayLayout String?  @default("vertical") // "vertical", "horizontal", "grid"
+  displayLayout String?  @default("vertical")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
   device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
 
-  // Update unique constraint to allow multiple keys per device
   @@unique([layoutId, deviceUniqId, customName])
 }
 
@@ -646,33 +621,23 @@ model Layout2DFlowIndicator {
   customName     String
   positionX      Float
   positionY      Float
-  arrowDirection String @default("right") // "right", "left", "up", "down"
-
-  // Logic conditions
-  logicOperator String // ">", "<", ">=", "<=", "==", "!="
-  compareValue  String // Value to compare (supports number, string, boolean)
-  valueType     String @default("number") // "number", "string", "boolean"
-
-  // Visual states based on condition result
-  // When condition is TRUE
-  trueColor     String  @default("#22c55e") // green
+  arrowDirection String @default("right")
+  logicOperator String
+  compareValue  String
+  valueType     String @default("number")
+  trueColor     String  @default("#22c55e")
   trueAnimation Boolean @default(true)
-
-  // When condition is FALSE
-  falseColor     String  @default("#ef4444") // red
+  falseColor     String  @default("#ef4444")
   falseAnimation Boolean @default(false)
-
-  // Warning state (optional for range conditions)
-  warningColor     String  @default("#f59e0b") // orange
+  warningColor     String  @default("#f59e0b")
   warningAnimation Boolean @default(true)
   warningEnabled   Boolean @default(false)
-  warningOperator  String? // Secondary condition for warning
+  warningOperator  String?
   warningValue     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   layout Layout2D       @relation(fields: [layoutId], references: [id], onDelete: Cascade)
   device DeviceExternal @relation(fields: [deviceUniqId], references: [uniqId])
 
@@ -686,12 +651,10 @@ model MenuPreset {
   description String?
   icon        String?          @default("Menu")
   isActive    Boolean          @default(false)
-  isSystem    Boolean          @default(false) // Built-in presets
-  createdBy   String           // User ID who created
+  isSystem    Boolean          @default(false)
+  createdBy   String
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-
-  // Relations to selected menu structure
   selectedGroups MenuPresetGroup[]
   selectedItems  MenuPresetItem[]
 
@@ -701,7 +664,7 @@ model MenuPreset {
 model MenuPresetGroup {
   id       String     @id @default(cuid())
   presetId String
-  groupId  String     // Reference to MenuGroup.id
+  groupId  String
 
   preset   MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
@@ -712,7 +675,7 @@ model MenuPresetGroup {
 model MenuPresetItem {
   id       String     @id @default(cuid())
   presetId String
-  itemId   String     // Reference to MenuItem.id
+  itemId   String
 
   preset   MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 

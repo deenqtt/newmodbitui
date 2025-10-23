@@ -49,6 +49,10 @@ export function RoleManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+
   // Search functionality
   const { searchQuery, setSearchQuery, filteredData: filteredRoles } = useSearchFilter(roles, ['name', 'description']);
 
@@ -149,7 +153,7 @@ export function RoleManagement() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (role: Role) => {
+  const handleDelete = (role: Role) => {
     if (role._count.users > 0) {
       toast({
         title: "Cannot Delete",
@@ -159,12 +163,15 @@ export function RoleManagement() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete role "${role.name}"?`)) {
-      return;
-    }
+    setRoleToDelete(role);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!roleToDelete) return;
 
     try {
-      const response = await fetch(`/api/roles/${role.id}`, {
+      const response = await fetch(`/api/roles/${roleToDelete.id}`, {
         method: "DELETE",
         credentials: 'include',
       });
@@ -190,6 +197,9 @@ export function RoleManagement() {
         description: "Failed to delete role",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setRoleToDelete(null);
     }
   };
 
@@ -300,6 +310,31 @@ export function RoleManagement() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the role "{roleToDelete?.name}"?
+                This action cannot be undone and will permanently remove this role.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Role
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

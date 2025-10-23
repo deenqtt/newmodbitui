@@ -2,37 +2,11 @@
 import { PrismaClient } from "@prisma/client";
 import mqtt from "mqtt";
 
-// Dynamic host resolution function
-function getMQTTHost(): string {
-  // Development: gunakan env variable
-  if (process.env.NEXT_PUBLIC_MQTT_HOST) {
-    return process.env.NEXT_PUBLIC_MQTT_HOST;
-  }
-
-  // Production: gunakan window.location.hostname jika tersedia (browser only)
-  if (typeof window !== "undefined" && window.location) {
-    return window.location.hostname;
-  }
-
-  // Fallback ke localhost
-  return "localhost";
-}
-
-function getMQTTPort(): string {
-  // Port dari env variable atau default
-  return process.env.NEXT_PUBLIC_MQTT_PORT || "9000";
-}
-
-function getMQTTBrokerURL(): string {
-  const host = getMQTTHost();
-  const port = getMQTTPort();
-  const brokerUrl = `ws://${host}:${port}`;
-
-  return brokerUrl;
-}
+// Import MQTT config from unified configuration
+import { getMQTTFullConfig, MQTTConfig } from "@/lib/mqtt-config";
 
 // Configuration
-const MQTT_BROKER_URL = getMQTTBrokerURL();
+const MQTT_CONFIG: MQTTConfig = getMQTTFullConfig();
 const AUTO_DISCOVERY = process.env.THERMAL_AUTO_DISCOVERY !== "false"; // Default true
 
 // Global variables
@@ -84,11 +58,21 @@ export function getThermalListenerService() {
     return;
   }
 
-  mqttClient = mqtt.connect(MQTT_BROKER_URL, {
+  // Setup connection options with authentication if available
+  const connectionOptions: mqtt.IClientOptions = {
+    clientId: `thermal_listener_${Date.now()}`,
+    clean: true,
     reconnectPeriod: 5000,
     connectTimeout: 10000,
-    clientId: `thermal_listener_${Date.now()}`,
-  });
+  };
+
+  // Add authentication if available
+  if (MQTT_CONFIG.username) {
+    connectionOptions.username = MQTT_CONFIG.username;
+    connectionOptions.password = MQTT_CONFIG.password;
+  }
+
+  mqttClient = mqtt.connect(MQTT_CONFIG.brokerUrl, connectionOptions);
 
   mqttClient.on("connect", async () => {
     // Step 1: Subscribe to all registered thermal devices
@@ -121,19 +105,19 @@ export function getThermalListenerService() {
   });
 
   mqttClient.on("error", (err) => {
-    console.error(`MQTT thermal listener error (${MQTT_BROKER_URL}):`, err);
+    console.error(`MQTT thermal listener error (${MQTT_CONFIG.brokerUrl}):`, err);
   });
 
   mqttClient.on("close", () => {
-    console.log(`MQTT thermal listener disconnected from: ${MQTT_BROKER_URL}`);
+    console.log(`MQTT thermal listener disconnected from: ${MQTT_CONFIG.brokerUrl}`);
   });
 
   mqttClient.on("reconnect", () => {
-    console.log(`MQTT thermal listener reconnecting to: ${MQTT_BROKER_URL}...`);
+    console.log(`MQTT thermal listener reconnecting to: ${MQTT_CONFIG.brokerUrl}...`);
   });
 
   mqttClient.on("offline", () => {
-    console.log(`MQTT thermal listener offline from: ${MQTT_BROKER_URL}`);
+    console.log(`MQTT thermal listener offline from: ${MQTT_CONFIG.brokerUrl}`);
   });
 }
 
@@ -421,7 +405,8 @@ export function getThermalDataCache() {
 export function getThermalListenerStatus() {
   return {
     connected: mqttClient?.connected || false,
-    brokerUrl: MQTT_BROKER_URL,
+    brokerUrl: MQTT_CONFIG.brokerUrl,
+    username: MQTT_CONFIG.username || null,
     subscribedTopics: Array.from(subscribedTopics),
     cachedDevices: thermalDataCache.size,
     autoDiscovery: AUTO_DISCOVERY,

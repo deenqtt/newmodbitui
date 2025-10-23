@@ -74,6 +74,10 @@ export function MenuItemManagement() {
   // Group filter
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
 
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
+
   // Filter by group first
   const filteredByGroup = useMemo(() => {
     if (selectedGroupId === "all") return menuItems;
@@ -136,7 +140,7 @@ export function MenuItemManagement() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -162,13 +166,26 @@ export function MenuItemManagement() {
       const url = isEditing ? `/api/menu-items/${editingItem.id}` : "/api/menu-items";
       const method = isEditing ? "PUT" : "POST";
 
+      // For updates, only send changed fields to avoid Prisma errors
+      const payload = isEditing ? {
+        menuGroupId: formData.menuGroupId,
+        name: formData.name,
+        label: formData.label,
+        path: formData.path,
+        icon: formData.icon || null,
+        component: formData.component || null,
+        order: formData.order,
+        isActive: formData.isActive,
+        isDeveloper: formData.isDeveloper,
+      } : formData;
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -226,12 +243,15 @@ export function MenuItemManagement() {
   };
 
   const handleDelete = async (item: MenuItem) => {
-    if (!confirm(`Are you sure you want to delete menu item "${item.label}"?`)) {
-      return;
-    }
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
 
     try {
-      const response = await fetch(`/api/menu-items/${item.id}`, {
+      const response = await fetch(`/api/menu-items/${itemToDelete.id}`, {
         method: "DELETE",
         credentials: 'include',
       });
@@ -257,26 +277,24 @@ export function MenuItemManagement() {
         description: "Failed to delete menu item",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
     }
   };
 
   const handleToggleActive = async (item: MenuItem) => {
     try {
+      const newActiveState = !item.isActive;
+
       const response = await fetch(`/api/menu-items/${item.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify({
-          menuGroupId: item.menuGroupId,
-          name: item.name,
-          label: item.label,
-          path: item.path,
-          icon: item.icon,
-          component: item.component,
-          order: item.order,
-          isActive: !item.isActive,
-          isDeveloper: item.isDeveloper,
+          isActive: newActiveState,
         }),
       });
 
@@ -285,7 +303,7 @@ export function MenuItemManagement() {
       if (result.success) {
         toast({
           title: "Success",
-          description: `Menu item ${result.data.isActive ? "activated" : "deactivated"}`,
+          description: `Menu item ${newActiveState ? "activated" : "deactivated"}`,
         });
         fetchMenuItems();
       } else {
@@ -306,9 +324,6 @@ export function MenuItemManagement() {
 
   const handleToggleActiveDirect = async (itemId: string, checked: boolean) => {
     try {
-      const item = menuItems.find(i => i.id === itemId);
-      if (!item) return;
-
       const response = await fetch(`/api/menu-items/${itemId}`, {
         method: "PUT",
         headers: {
@@ -316,32 +331,32 @@ export function MenuItemManagement() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          menuGroupId: item.menuGroupId,
-          name: item.name,
-          label: item.label,
-          path: item.path,
-          icon: item.icon,
-          component: item.component,
-          order: item.order,
           isActive: checked,
-          isDeveloper: item.isDeveloper,
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        // Update local state optimistically
+        setMenuItems(prev =>
+          prev.map(item =>
+            item.id === itemId ? { ...item, isActive: checked } : item
+          )
+        );
+
         toast({
           title: "Success",
           description: `Menu item ${checked ? "activated" : "deactivated"}`,
         });
-        fetchMenuItems();
       } else {
         toast({
           title: "Error",
           description: result.error,
           variant: "destructive",
         });
+        // Refresh data if there's an error
+        fetchMenuItems();
       }
     } catch (error) {
       toast({
@@ -349,6 +364,8 @@ export function MenuItemManagement() {
         description: "Failed to update menu item status",
         variant: "destructive",
       });
+      // Refresh data if there's an error
+      fetchMenuItems();
     }
   };
 
@@ -489,6 +506,31 @@ export function MenuItemManagement() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the menu item "{itemToDelete?.label}"?
+                This action cannot be undone and will permanently remove this menu item.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Menu Item
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

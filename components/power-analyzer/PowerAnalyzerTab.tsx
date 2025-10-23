@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { showToast } from "@/lib/toast-utils";
+import Swal from "sweetalert2";
 import { useSortableTable } from "@/hooks/use-sort-table";
 import {
   Plus,
@@ -19,7 +20,8 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Eye
 } from "lucide-react";
 
 // Shadcn/UI & Custom Components
@@ -371,7 +373,7 @@ export function PowerAnalyzerTab() {
       !mainPower.key ||
       pduList.some((p) => !p.uniqId || p.keys.length === 0)
     ) {
-      showToast.error("Harap isi semua field yang wajib diisi.");
+      showToast.error("Please fill in all required fields.");
       return;
     }
     setIsSubmitting(true);
@@ -384,14 +386,22 @@ export function PowerAnalyzerTab() {
 
       await promise;
 
-      showToast.success(`Data berhasil ${editingId ? "diperbarui" : "disimpan"}.`);
+      showToast.success(`Configuration ${editingId ? "updated" : "saved"} successfully!`);
 
       fetchAllData();
       setIsModalOpen(false);
+
+      // ✅ Trigger calculation service reload
+      try {
+        await axios.post("/api/cron/calculation-reload");
+        console.log("✅ Calculation service reload triggered");
+      } catch (reloadError) {
+        console.error("Failed to trigger calculation reload:", reloadError);
+      }
     } catch (error: any) {
       showToast.error(
         error.response?.data?.message ||
-        "Terjadi kesalahan saat menyimpan data."
+        "An error occurred while saving data."
       );
     } finally {
       setIsSubmitting(false);
@@ -399,17 +409,45 @@ export function PowerAnalyzerTab() {
   };
 
   const handleDelete = async (id: string) => {
-    const confirmation = confirm("Apakah Anda yakin? Anda tidak akan bisa mengembalikan data ini!"); // Simple confirm for now
-    if (confirmation) {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
       setIsSubmitting(true);
       try {
         await axios.delete(`/api/power-analyzer/${id}`);
-        showToast.success("Data berhasil dihapus.");
+
+        Swal.fire({
+          title: "Deleted!",
+          text: "Configuration has been deleted successfully.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
         fetchAllData();
+
+        // ✅ Trigger calculation service reload
+        try {
+          await axios.post("/api/cron/calculation-reload");
+          console.log("✅ Calculation service reload triggered");
+        } catch (reloadError) {
+          console.error("Failed to trigger calculation reload:", reloadError);
+        }
       } catch (error: any) {
-        showToast.error(
-          error.response?.data?.message || "Gagal menghapus data."
-        );
+        Swal.fire({
+          title: "Error!",
+          text: error.response?.data?.message || "Failed to delete configuration.",
+          icon: "error",
+        });
       } finally {
         setIsSubmitting(false);
       }
@@ -438,54 +476,49 @@ export function PowerAnalyzerTab() {
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center">
-                  <Calculator className="h-6 w-6 text-primary" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-muted-foreground">Total Configurations</p>
-                    <p className="text-2xl font-bold">{configs.length}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-xl transition-shadow duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-emerald-100 text-sm font-medium mb-2">
+                      Active Configurations
+                    </p>
+                    <p className="text-4xl font-bold">{configs.length}</p>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <Calculator className="h-6 w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center">
-                  <HardDrive className="h-6 w-6 text-emerald-600" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-muted-foreground">Active Racks</p>
-                    <p className="text-2xl font-bold">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:shadow-xl transition-shadow duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium mb-2">
+                      Total Racks Monitored
+                    </p>
+                    <p className="text-4xl font-bold">
                       {configs.reduce((sum, config) => sum + config.pduList.length, 0)}
                     </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center">
-                  <Zap className="h-6 w-6 text-blue-600" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-muted-foreground">Live Data</p>
-                    <p className="text-2xl font-bold text-emerald-600">
-                      {Object.keys(liveData).length}
-                    </p>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <HardDrive className="h-6 w-6" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center">
-                  <Gauge className="h-6 w-6 text-amber-600" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-muted-foreground">Avg PUE</p>
-                    <p className="text-2xl font-bold">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white hover:shadow-xl transition-shadow duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium mb-2">
+                      Avg IT Load
+                    </p>
+                    <p className="text-4xl font-bold">
                       {configs.length > 0
                         ? (
                           configs.reduce((sum, config) => {
@@ -496,6 +529,9 @@ export function PowerAnalyzerTab() {
                         : 'N/A'
                       }
                     </p>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <Gauge className="h-6 w-6" />
                   </div>
                 </div>
               </CardContent>
@@ -539,114 +575,160 @@ export function PowerAnalyzerTab() {
           </div>
 
           {/* Table */}
-          <Card>
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-purple-600" />
+                Power Analyzer Configurations
+              </CardTitle>
+            </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">#</TableHead>
-                    <TableHead className="w-[250px]">
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('customName')}
-                        className="h-auto p-0 font-semibold hover:bg-transparent"
-                      >
-                        Custom Name
-                        {sortKey === 'customName' ? (
-                          sortDirection === 'asc' ? (
-                            <ArrowUp className="ml-2 h-4 w-4" />
-                          ) : sortDirection === 'desc' ? (
-                            <ArrowDown className="ml-2 h-4 w-4" />
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">#</TableHead>
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('customName')}
+                          className="h-auto p-0 font-semibold hover:bg-transparent text-slate-700 dark:text-slate-300"
+                        >
+                          Configuration Name
+                          {sortKey === 'customName' ? (
+                            sortDirection === 'asc' ? (
+                              <ArrowUp className="ml-2 h-4 w-4" />
+                            ) : sortDirection === 'desc' ? (
+                              <ArrowDown className="ml-2 h-4 w-4" />
+                            ) : (
+                              <ArrowUpDown className="ml-2 h-4 w-4" />
+                            )
                           ) : (
                             <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableHead>
-                    <TableHead>Total PDU/Rack</TableHead>
-                    <TableHead>PUE (IT / Main)</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                [...Array(5)].map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-8"></div></TableCell>
-                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-24"></div></TableCell>
-                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-16"></div></TableCell>
-                    <TableCell><div className="h-4 bg-muted rounded animate-pulse w-20"></div></TableCell>
-                    <TableCell className="text-right"><div className="h-4 bg-muted rounded animate-pulse w-8 ml-auto"></div></TableCell>
-                  </TableRow>
-                ))
-              ) : paginatedConfigs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <div className="flex flex-col items-center">
-                      <Calculator className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium text-foreground mb-2">No Power Analyzer Configurations Found</h3>
-                      <p className="text-muted-foreground">
-                        {searchTerm
-                          ? "No configurations match your search"
-                          : "Get started by adding your first power analyzer configuration"}
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedConfigs.map((config, index) => (
-                  <TableRow key={config.id} className="hover:bg-muted/50">
-                    <TableCell>
-                      {index + 1 + (currentPage - 1) * itemsPerPage}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {config.customName}
-                    </TableCell>
-                    <TableCell>{config.pduList?.length || 0}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span>{calculateTotalPUE(config)}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleShowDetails(config)}
-                        >
-                          Detail
+                          )}
                         </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleOpenModal(config)}
-                          >
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(config.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Total Racks</TableHead>
+                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">IT Load %</TableHead>
+                      <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      [...Array(5)].map((_, i) => (
+                        <TableRow key={i} className="border-b border-slate-100 dark:border-slate-800">
+                          <TableCell><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-8"></div></TableCell>
+                          <TableCell><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-48"></div></TableCell>
+                          <TableCell><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-16"></div></TableCell>
+                          <TableCell><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-20"></div></TableCell>
+                          <TableCell className="text-right"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-8 ml-auto"></div></TableCell>
+                        </TableRow>
+                      ))
+                    ) : paginatedConfigs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-64 text-center">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950 dark:to-indigo-950 rounded-full">
+                              <Gauge className="h-16 w-16 text-purple-600" />
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                                {searchTerm
+                                  ? "No configurations found"
+                                  : "No Power Analyzer Configurations Yet"}
+                              </p>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                {searchTerm
+                                  ? "Try adjusting your search terms or clear the search"
+                                  : "Start monitoring your IT power load by adding your first Power Analyzer configuration"}
+                              </p>
+                            </div>
+                            {!searchTerm && (
+                              <Button
+                                onClick={() => handleOpenModal()}
+                                className="mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Your First Configuration
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedConfigs.map((config, index) => (
+                        <TableRow
+                          key={config.id}
+                          className="hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-all duration-200 border-b border-slate-100 dark:border-slate-800"
+                        >
+                          <TableCell className="py-4 font-medium text-slate-600 dark:text-slate-400">
+                            {index + 1 + (currentPage - 1) * itemsPerPage}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                {config.customName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                <span className="w-2 h-2 bg-purple-500 rounded-full inline-block mr-1 animate-pulse" />
+                                Live monitoring
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg">
+                                <HardDrive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {config.pduList?.length || 0} racks
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                                {calculateTotalPUE(config)}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleShowDetails(config)}
+                                className="h-7 text-xs"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right py-4">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-purple-100 dark:hover:bg-purple-900/20"
+                                onClick={() => handleOpenModal(config)}
+                              >
+                                <Edit className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                onClick={() => handleDelete(config.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -784,149 +866,259 @@ export function PowerAnalyzerTab() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingId ? "Edit" : "Tambah"} Data Power Analyzer
+            <DialogTitle className="text-xl">
+              {editingId ? "Edit" : "Add"} Power Analyzer Configuration
             </DialogTitle>
             <DialogDescription>
-              Isi detail untuk membuat atau memperbarui konfigurasi.
+              Configure power monitoring devices to calculate IT load percentage
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="customName" className="text-right">
-                Nama Kustom
+
+          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="customName" className="text-sm font-medium">
+                Configuration Name *
               </Label>
               <Input
                 id="customName"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
-                className="col-span-3"
+                placeholder="e.g., Data Center IT Load Monitor"
+                className="h-10"
+                required
+                disabled={isSubmitting}
               />
             </div>
-            <hr />
-            <h4 className="font-semibold text-center text-sm text-muted-foreground">
-              PDU (Racks) / IT Power
-            </h4>
-            {pduList.map((pdu, index) => (
-              <div
-                key={index}
-                className="relative rounded-lg border p-4 grid gap-4"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Pilih Topik (Rack)</Label>
-                    <Select
-                      value={pdu.uniqId ?? undefined}
-                      onValueChange={(value) =>
-                        handlePduDeviceChange(index, value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih topik..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deviceOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+            {/* PDU/Racks Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  IT Power (PDU/Racks)
+                </h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addPdu}
+                  disabled={isSubmitting}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Rack
+                </Button>
+              </div>
+
+              {pduList.map((pdu, index) => (
+                <Card
+                  key={index}
+                  className="relative border border-slate-200 dark:border-slate-700"
+                >
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">
+                          Select Device (Rack) *
+                        </Label>
+                        <Select
+                          value={pdu.uniqId ?? undefined}
+                          onValueChange={(value) =>
+                            handlePduDeviceChange(index, value)
+                          }
+                          required={pduList.length === 1}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Choose a device..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {deviceOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                <div className="flex flex-col items-start">
+                                  <span className="font-medium">{opt.label}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {devices.find((d) => d.uniqId === opt.value)?.topic}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">
+                          Select Power Keys *
+                        </Label>
+                        <MultiSelect
+                          options={getKeyOptions(pdu.uniqId)}
+                          isMulti
+                          value={getKeyOptions(pdu.uniqId).filter((option) =>
+                            pdu.keys.includes(option.value)
+                          )}
+                          onChange={(opts: any) =>
+                            handlePduKeysChange(
+                              index,
+                              opts.map((o: any) => o.value)
+                            )
+                          }
+                          isDisabled={!pdu.uniqId || isSubmitting}
+                          placeholder="Choose power keys..."
+                        />
+                        {pdu.uniqId && getKeyOptions(pdu.uniqId).length === 0 && (
+                          <p className="text-xs text-amber-600">
+                            Waiting for power data from device...
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {pduList.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        onClick={() => removePdu(index)}
+                        disabled={isSubmitting}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Main Power Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <HardDrive className="h-5 w-5" />
+                Total Facility Power
+              </h3>
+
+              <Card className="border border-slate-200 dark:border-slate-700">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        Select Device *
+                      </Label>
+                      <Select
+                        value={mainPower.uniqId ?? undefined}
+                        onValueChange={handleMainPowerDeviceChange}
+                        required
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Choose main power device..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deviceOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">{opt.label}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {devices.find((d) => d.uniqId === opt.value)?.topic}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        Select Power Key *
+                      </Label>
+                      <Select
+                        value={mainPower.key ?? undefined}
+                        onValueChange={(value) =>
+                          setMainPower({ ...mainPower, key: value })
+                        }
+                        required
+                        disabled={isSubmitting || !mainPower.uniqId}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Choose power key..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getKeyOptions(mainPower.uniqId).map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              <code className="font-mono">{opt.label}</code>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {mainPower.uniqId &&
+                        getKeyOptions(mainPower.uniqId).length === 0 && (
+                          <p className="text-xs text-amber-600">
+                            Waiting for power data from device...
+                          </p>
+                        )}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Pilih Keys</Label>
-                    <MultiSelect
-                      options={getKeyOptions(pdu.uniqId)}
-                      isMulti
-                      value={getKeyOptions(pdu.uniqId).filter((option) =>
-                        pdu.keys.includes(option.value)
-                      )}
-                      onChange={(opts: any) =>
-                        handlePduKeysChange(
-                          index,
-                          opts.map((o: any) => o.value)
-                        )
-                      }
-                      isDisabled={!pdu.uniqId}
-                      placeholder="Pilih keys..."
-                    />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Preview Section */}
+            {mainPower.uniqId &&
+              mainPower.key &&
+              pduList.some((p) => p.uniqId && p.keys.length > 0) && (
+                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+                  <h4 className="text-sm font-medium mb-2">
+                    Configuration Preview
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Total Facility Power:
+                      </span>
+                      <span>
+                        {devices.find((d) => d.uniqId === mainPower.uniqId)?.name}
+                        {" → "}
+                        {mainPower.key}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        IT Power Sources:
+                      </span>
+                      <span>
+                        {pduList.filter((p) => p.uniqId && p.keys.length > 0).length}{" "}
+                        racks
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Total Keys Monitored:
+                      </span>
+                      <span>
+                        {pduList.reduce((sum, p) => sum + p.keys.length, 0)}{" "}
+                        power keys
+                      </span>
+                    </div>
                   </div>
                 </div>
-                {pduList.length > 1 && (
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-3 -right-3 h-6 w-6 rounded-full"
-                    onClick={() => removePdu(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button variant="outline" onClick={addPdu}>
-              <Plus className="mr-2 h-4 w-4" /> Tambah Rack/PDU
-            </Button>
-            <hr />
-            <h4 className="font-semibold text-center text-sm text-muted-foreground">
-              Main Power
-            </h4>
-            <div className="grid grid-cols-2 gap-4 rounded-lg border p-4">
-              <div className="space-y-2">
-                <Label>Pilih Topik</Label>
-                <Select
-                  value={mainPower.uniqId ?? undefined}
-                  onValueChange={handleMainPowerDeviceChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih topik..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deviceOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Pilih Key</Label>
-                <Select
-                  value={mainPower.key ?? undefined}
-                  onValueChange={(value) =>
-                    setMainPower({ ...mainPower, key: value })
-                  }
-                >
-                  <SelectTrigger disabled={!mainPower.uniqId}>
-                    <SelectValue placeholder="Pilih key..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getKeyOptions(mainPower.uniqId).map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
+              )}
+          </form>
+
+          <DialogFooter className="gap-2 pt-4">
             <Button
+              type="button"
               variant="outline"
               onClick={() => setIsModalOpen(false)}
               disabled={isSubmitting}
             >
-              Batal
+              Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {editingId ? "Simpan Perubahan" : "Simpan"}
+            <Button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingId ? "Save Changes" : "Save Configuration"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -936,25 +1128,25 @@ export function PowerAnalyzerTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Detail PUE untuk {selectedConfig?.customName}
+              IT Load Details for {selectedConfig?.customName}
             </DialogTitle>
             <DialogDescription>
-              Rincian perhitungan PUE untuk setiap rack yang dikonfigurasi.
+              Breakdown of IT load calculation for each configured rack.
             </DialogDescription>
           </DialogHeader>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>#</TableHead>
-                <TableHead>Nama Rack</TableHead>
-                <TableHead>PUE</TableHead>
+                <TableHead>Rack Name</TableHead>
+                <TableHead>IT Load %</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!selectedConfig || selectedConfig.pduList.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="h-24 text-center">
-                    Tidak ada data PDU/Rack.
+                    No PDU/Rack data available.
                   </TableCell>
                 </TableRow>
               ) : (
