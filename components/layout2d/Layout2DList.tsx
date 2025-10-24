@@ -337,8 +337,8 @@ export default function Layout2DList({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col h-full">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">Process Flow Layouts</h2>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
@@ -400,7 +400,8 @@ export default function Layout2DList({
       </div>
 
       {/* Table View */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="border rounded-lg overflow-hidden flex-1">
         <table className="w-full">
           <thead className="bg-muted/50">
             <tr>
@@ -498,6 +499,7 @@ export default function Layout2DList({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Edit Dialog */}

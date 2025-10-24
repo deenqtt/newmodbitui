@@ -2,9 +2,9 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Pre-configured alarm configurations dengan predictable IDs
+// Pre-configured alarm configurations menggunakan device external yang baru
 const ALARM_CONFIGS_DATA = [
-  // pH Sensor Alarms
+  // pH Sensor Alarms - PH Sensor 1
   {
     id: "ph-sensor-1-critical-high",
     customName: "PH Critical High [PH Sensor 1]",
@@ -38,17 +38,8 @@ const ALARM_CONFIGS_DATA = [
     maxValue: 10.5,
     maxOnly: true
   },
-  {
-    id: "ph-sensor-1-minor-low",
-    customName: "PH Minor Low [PH Sensor 1]",
-    alarmType: "MINOR",
-    keyType: "THRESHOLD",
-    key: "ph",
-    deviceUniqId: "limbah-ph1",
-    minValue: 4.5,
-    maxValue: null,
-    maxOnly: false
-  },
+
+  // pH Sensor Alarms - PH Sensor 2
   {
     id: "ph-sensor-2-critical-high",
     customName: "PH Critical High [PH Sensor 2]",
@@ -71,19 +62,32 @@ const ALARM_CONFIGS_DATA = [
     maxValue: null,
     maxOnly: false
   },
+
+  // pH Sensor Alarms - PH Sensor 3
   {
-    id: "ph-sensor-3-warning-high",
-    customName: "PH Warning High [PH Sensor 3]",
-    alarmType: "MINOR",
+    id: "ph-sensor-3-critical-high",
+    customName: "PH Critical High [PH Sensor 3]",
+    alarmType: "CRITICAL",
     keyType: "THRESHOLD",
     key: "ph",
     deviceUniqId: "limbah-ph3",
     minValue: null,
-    maxValue: 9.5,
+    maxValue: 12.0,
     maxOnly: true
   },
+  {
+    id: "ph-sensor-3-minor-low",
+    customName: "PH Minor Low [PH Sensor 3]",
+    alarmType: "MINOR",
+    keyType: "THRESHOLD",
+    key: "ph",
+    deviceUniqId: "limbah-ph3",
+    minValue: 4.0,
+    maxValue: null,
+    maxOnly: false
+  },
 
-  // Temperature Alarms
+  // Temperature Alarms - PH Sensor 1
   {
     id: "temp-sensor-1-critical-high",
     customName: "Temperature Critical High [PH Sensor 1]",
@@ -106,6 +110,8 @@ const ALARM_CONFIGS_DATA = [
     maxValue: 50.0,
     maxOnly: true
   },
+
+  // Temperature Alarms - PH Sensor 2
   {
     id: "temp-sensor-2-critical-low",
     customName: "Temperature Critical Low [PH Sensor 2]",
@@ -129,7 +135,20 @@ const ALARM_CONFIGS_DATA = [
     maxOnly: true
   },
 
-  // Flow Rate Alarms
+  // Temperature Alarms - PH Sensor 3
+  {
+    id: "temp-sensor-3-major-high",
+    customName: "Temperature Major High [PH Sensor 3]",
+    alarmType: "MAJOR",
+    keyType: "THRESHOLD",
+    key: "temp",
+    deviceUniqId: "limbah-ph3",
+    minValue: null,
+    maxValue: 55.0,
+    maxOnly: true
+  },
+
+  // Flow Rate Alarms - Water Flow 1
   {
     id: "flow-rate-1-critical-low",
     customName: "Flow Rate Critical Low [Water Flow Meter 1]",
@@ -137,9 +156,9 @@ const ALARM_CONFIGS_DATA = [
     keyType: "THRESHOLD",
     key: "flow_rate",
     deviceUniqId: "limbah-flow1",
-    minValue: 0.0,
-    maxValue: 1.0,
-    maxOnly: false
+    minValue: null,
+    maxValue: 0.5,
+    maxOnly: true
   },
   {
     id: "flow-rate-1-major-high",
@@ -152,6 +171,8 @@ const ALARM_CONFIGS_DATA = [
     maxValue: 25.0,
     maxOnly: true
   },
+
+  // Flow Rate Alarms - Water Flow 2
   {
     id: "flow-rate-2-critical-no-flow",
     customName: "Flow Rate Critical No Flow [Water Flow Meter 2]",
@@ -174,14 +195,25 @@ const ALARM_CONFIGS_DATA = [
     maxValue: null,
     maxOnly: false
   },
+  {
+    id: "flow-rate-2-minor-high",
+    customName: "Flow Rate Minor High [Water Flow Meter 2]",
+    alarmType: "MINOR",
+    keyType: "THRESHOLD",
+    key: "flow_rate",
+    deviceUniqId: "limbah-flow2",
+    minValue: null,
+    maxValue: 18.0,
+    maxOnly: true
+  },
 
-  // Air Quality Alarms
+  // Air Quality Alarms - SPS30 Sensor 1
   {
     id: "air-quality-1-pm25-critical",
     customName: "PM2.5 Critical High [Air Quality 1]",
     alarmType: "CRITICAL",
     keyType: "THRESHOLD",
-    key: "pm25",
+    key: "pm2_5",
     deviceUniqId: "limbah-airquality1-sps30",
     minValue: null,
     maxValue: 100.0,
@@ -192,39 +224,39 @@ const ALARM_CONFIGS_DATA = [
     customName: "PM10 Major High [Air Quality 1]",
     alarmType: "MAJOR",
     keyType: "THRESHOLD",
-    key: "pm10",
+    key: "pm10_0",
     deviceUniqId: "limbah-airquality1-sps30",
     minValue: null,
     maxValue: 150.0,
     maxOnly: true
   },
+
+  // Air Quality Alarms - SPS30 Sensor 2
   {
-    id: "air-quality-2-humidity-low",
-    customName: "Humidity Critical Low [Air Quality 2]",
+    id: "air-quality-2-pm25-major",
+    customName: "PM2.5 Major High [Air Quality 2]",
+    alarmType: "MAJOR",
+    keyType: "THRESHOLD",
+    key: "pm2_5",
+    deviceUniqId: "limbah-airquality2-sps30",
+    minValue: null,
+    maxValue: 75.0,
+    maxOnly: true
+  },
+  {
+    id: "air-quality-2-pm10-critical",
+    customName: "PM10 Critical High [Air Quality 2]",
     alarmType: "CRITICAL",
     keyType: "THRESHOLD",
-    key: "humidity",
-    deviceUniqId: "limbah-airquality2-sht4x",
-    minValue: 20.0,
-    maxValue: null,
-    maxOnly: false
-  },
-
-  // Vibration Alarms (using bit values simulation)
-  {
-    id: "vibration-1-fault-bit",
-    customName: "Vibration Sensor Fault [Vibration 1]",
-    alarmType: "MAJOR",
-    keyType: "BIT_VALUE",
-    key: "status_bits",
-    deviceUniqId: "limbah-airquality1-lis3dhtr",
+    key: "pm10_0",
+    deviceUniqId: "limbah-airquality2-sps30",
     minValue: null,
-    maxValue: null,
-    maxOnly: false
+    maxValue: 200.0,
+    maxOnly: true
   }
 ];
 
-// Dummy alarm logs data
+// Dummy alarm logs data menggunakan alarm config yang baru
 const ALARM_LOGS_DATA = [
   {
     id: "ph-sensor-1-high-001",
@@ -251,7 +283,7 @@ const ALARM_LOGS_DATA = [
     alarmConfigId: "flow-rate-1-critical-low"
   },
   {
-    id: "ph-sensor-2Major-high-002",
+    id: "ph-sensor-2-high-002",
     status: "CLEARED",
     triggeringValue: "11.8",
     timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
@@ -272,7 +304,7 @@ const ALARM_LOGS_DATA = [
     triggeringValue: "25.3",
     timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
     clearedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
-    alarmConfigId: "temp-sensor-1-critical-low"
+    alarmConfigId: "temp-sensor-2-critical-low"
   },
   {
     id: "air-quality-1-pm25-001",
@@ -283,12 +315,28 @@ const ALARM_LOGS_DATA = [
     alarmConfigId: "air-quality-1-pm25-critical"
   },
   {
-    id: "vibration-1-fault-001",
+    id: "ph-sensor-3-low-001",
     status: "CLEARED",
-    triggeringValue: "1",
-    timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-    clearedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), // 6 days ago
-    alarmConfigId: "vibration-1-fault-bit"
+    triggeringValue: "3.8",
+    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+    clearedAt: new Date(Date.now() - 18 * 60 * 60 * 1000), // 18 hours ago
+    alarmConfigId: "ph-sensor-3-minor-low"
+  },
+  {
+    id: "flow-rate-2-high-001",
+    status: "ACTIVE",
+    triggeringValue: "19.2",
+    timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+    clearedAt: null,
+    alarmConfigId: "flow-rate-2-minor-high"
+  },
+  {
+    id: "air-quality-2-pm25-001",
+    status: "CLEARED",
+    triggeringValue: "65.4",
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+    clearedAt: new Date(Date.now() - 1.5 * 60 * 60 * 1000), // 1.5 hours ago
+    alarmConfigId: "air-quality-2-pm25-major"
   }
 ];
 

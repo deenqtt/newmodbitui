@@ -2,8 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import MqttStatus from "@/components/mqtt-status";
 import {
   Card,
   CardHeader,
@@ -31,7 +30,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { connectMQTT, getMQTTClient } from "@/lib/mqttClient";
 import type { MqttClient } from "mqtt";
-import MqttStatus from "@/components/mqtt-status";
 import { toast } from "sonner";
 
 interface VPNConnection {
@@ -238,23 +236,11 @@ export default function VPNDashboardPage() {
   };
 
   return (
-    <SidebarInset>
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
-        <div className="flex items-center gap-3">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="h-6" />
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <BarChart3 className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold">VPN Dashboard</h1>
-              <p className="text-xs text-muted-foreground">
-                Real-time monitoring
-              </p>
-            </div>
-          </div>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">VPN Dashboard</h1>
+          <p className="text-muted-foreground">Real-time VPN connection monitoring</p>
         </div>
         <div className="flex items-center gap-3">
           <MqttStatus />
@@ -268,296 +254,294 @@ export default function VPNDashboardPage() {
             Refresh
           </Button>
         </div>
-      </header>
+      </div>
 
-      <div className="p-6 space-y-6">
-        {/* Stats Overview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-l-4 border-l-primary">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Active Connections
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {activeConnections}
-                    <span className="text-lg text-muted-foreground font-normal">
-                      /{totalConnections}
-                    </span>
-                  </p>
-                </div>
-                <div className="p-3 rounded-full bg-primary/10">
-                  <Activity className="h-6 w-6 text-primary" />
-                </div>
+      {/* Stats Overview */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Active Connections
+                </p>
+                <p className="text-3xl font-bold">
+                  {activeConnections}
+                  <span className="text-lg text-muted-foreground font-normal">
+                    /{totalConnections}
+                  </span>
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 rounded-full bg-primary/10">
+                <Activity className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Downloaded
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {formatBytes(totalBytesReceived)}
-                  </p>
-                </div>
-                <div className="p-3 rounded-full bg-green-500/10">
-                  <ArrowDown className="h-6 w-6 text-green-500" />
-                </div>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Downloaded
+                </p>
+                <p className="text-3xl font-bold">
+                  {formatBytes(totalBytesReceived)}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 rounded-full bg-green-500/10">
+                <ArrowDown className="h-6 w-6 text-green-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Uploaded
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {formatBytes(totalBytesSent)}
-                  </p>
-                </div>
-                <div className="p-3 rounded-full bg-blue-500/10">
-                  <ArrowUp className="h-6 w-6 text-blue-500" />
-                </div>
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Uploaded
+                </p>
+                <p className="text-3xl font-bold">
+                  {formatBytes(totalBytesSent)}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 rounded-full bg-blue-500/10">
+                <ArrowUp className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total Traffic
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {formatBytes(totalBytesSent + totalBytesReceived)}
-                  </p>
-                </div>
-                <div className="p-3 rounded-full bg-orange-500/10">
-                  <TrendingUp className="h-6 w-6 text-orange-500" />
-                </div>
+        <Card className="border-l-4 border-l-orange-500">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Traffic
+                </p>
+                <p className="text-3xl font-bold">
+                  {formatBytes(totalBytesSent + totalBytesReceived)}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+              <div className="p-3 rounded-full bg-orange-500/10">
+                <TrendingUp className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* VPN Connections */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">VPN Connections</h2>
+            <p className="text-sm text-muted-foreground">
+              Manage and monitor your VPN tunnels
+            </p>
+          </div>
         </div>
 
-        {/* VPN Connections */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">VPN Connections</h2>
-              <p className="text-sm text-muted-foreground">
-                Manage and monitor your VPN tunnels
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+              <p className="text-base font-medium">Loading VPN status...</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please wait
               </p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        ) : vpnConnections.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="p-4 rounded-full bg-muted mb-4">
+                <Network className="w-12 h-12 text-muted-foreground" />
+              </div>
+              <p className="text-lg font-medium">No VPN Configured</p>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">
+                Get started by configuring your first VPN connection
+              </p>
+              <Button onClick={() => (window.location.href = "/vpn/config")}>
+                Configure VPN
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {vpnConnections.map((vpn) => {
+              const Icon = getVPNIcon(vpn.type);
+              const isConnected = vpn.status === "connected";
+              const isConnecting = vpn.status === "connecting";
 
-          {isLoading ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-base font-medium">Loading VPN status...</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Please wait
-                </p>
-              </CardContent>
-            </Card>
-          ) : vpnConnections.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="p-4 rounded-full bg-muted mb-4">
-                  <Network className="w-12 h-12 text-muted-foreground" />
-                </div>
-                <p className="text-lg font-medium">No VPN Configured</p>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Get started by configuring your first VPN connection
-                </p>
-                <Button onClick={() => (window.location.href = "/vpn/config")}>
-                  Configure VPN
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {vpnConnections.map((vpn) => {
-                const Icon = getVPNIcon(vpn.type);
-                const isConnected = vpn.status === "connected";
-                const isConnecting = vpn.status === "connecting";
+              return (
+                <Card
+                  key={vpn.id}
+                  className="group hover:shadow-lg transition-all duration-300"
+                >
+                  <div
+                    className={`h-2 rounded-t-lg bg-gradient-to-r ${getVPNColor(
+                      vpn.type
+                    )}`}
+                  />
 
-                return (
-                  <Card
-                    key={vpn.id}
-                    className="group hover:shadow-lg transition-all duration-300"
-                  >
-                    <div
-                      className={`h-2 rounded-t-lg bg-gradient-to-r ${getVPNColor(
-                        vpn.type
-                      )}`}
-                    />
-
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`p-3 rounded-xl bg-gradient-to-br ${getVPNColor(
-                              vpn.type
-                            )} border`}
-                          >
-                            <Icon className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">
-                              {vpn.name}
-                            </CardTitle>
-                            <CardDescription className="capitalize">
-                              {vpn.type} Protocol
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge
-                          variant={isConnected ? "default" : "secondary"}
-                          className={`${
-                            isConnected ? "bg-green-500 hover:bg-green-600" : ""
-                          }`}
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-3 rounded-xl bg-gradient-to-br ${getVPNColor(
+                            vpn.type
+                          )} border`}
                         >
-                          {isConnected
-                            ? "Connected"
-                            : isConnecting
-                            ? "Connecting"
-                            : "Disconnected"}
-                        </Badge>
+                          <Icon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">
+                            {vpn.name}
+                          </CardTitle>
+                          <CardDescription className="capitalize">
+                            {vpn.type} Protocol
+                          </CardDescription>
+                        </div>
                       </div>
-                    </CardHeader>
+                      <Badge
+                        variant={isConnected ? "default" : "secondary"}
+                        className={`${
+                          isConnected ? "bg-green-500 hover:bg-green-600" : ""
+                        }`}
+                      >
+                        {isConnected
+                          ? "Connected"
+                          : isConnecting
+                          ? "Connecting"
+                          : "Disconnected"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
 
-                    <CardContent className="space-y-4">
-                      {isConnected ? (
-                        <div className="space-y-3">
-                          {/* Connection Info */}
-                          <div className="grid grid-cols-2 gap-3">
+                  <CardContent className="space-y-4">
+                    {isConnected ? (
+                      <div className="space-y-3">
+                        {/* Connection Info */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Network className="w-3 h-3" />
+                              <span>VPN IP</span>
+                            </div>
+                            <p className="text-sm font-mono font-medium">
+                              {vpn.vpn_ip || "N/A"}
+                            </p>
+                          </div>
+
+                          {vpn.interface && (
                             <div className="p-3 rounded-lg bg-muted/50 space-y-1">
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Network className="w-3 h-3" />
-                                <span>VPN IP</span>
+                                <Server className="w-3 h-3" />
+                                <span>Interface</span>
                               </div>
                               <p className="text-sm font-mono font-medium">
-                                {vpn.vpn_ip || "N/A"}
+                                {vpn.interface}
                               </p>
                             </div>
+                          )}
+                        </div>
 
-                            {vpn.interface && (
-                              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Server className="w-3 h-3" />
-                                  <span>Interface</span>
-                                </div>
-                                <p className="text-sm font-mono font-medium">
-                                  {vpn.interface}
+                        {/* Traffic Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                            <div className="flex items-center gap-2 text-xs font-medium text-green-700 dark:text-green-400 mb-1">
+                              <ArrowDown className="w-3 h-3" />
+                              Download
+                            </div>
+                            <p className="text-sm font-bold">
+                              {formatBytes(vpn.bytes_received || 0)}
+                            </p>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <div className="flex items-center gap-2 text-xs font-medium text-blue-700 dark:text-blue-400 mb-1">
+                              <ArrowUp className="w-3 h-3" />
+                              Upload
+                            </div>
+                            <p className="text-sm font-bold">
+                              {formatBytes(vpn.bytes_sent || 0)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Server Info */}
+                        {vpn.remote_host && (
+                          <div className="p-3 rounded-lg border bg-card">
+                            <div className="flex items-start gap-2">
+                              <Server className="w-4 h-4 text-muted-foreground mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-muted-foreground mb-0.5">
+                                  Server
+                                </p>
+                                <p className="text-sm font-mono truncate">
+                                  {vpn.remote_host}
                                 </p>
                               </div>
-                            )}
-                          </div>
-
-                          {/* Traffic Stats */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                              <div className="flex items-center gap-2 text-xs font-medium text-green-700 dark:text-green-400 mb-1">
-                                <ArrowDown className="w-3 h-3" />
-                                Download
-                              </div>
-                              <p className="text-sm font-bold">
-                                {formatBytes(vpn.bytes_received || 0)}
-                              </p>
-                            </div>
-
-                            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                              <div className="flex items-center gap-2 text-xs font-medium text-blue-700 dark:text-blue-400 mb-1">
-                                <ArrowUp className="w-3 h-3" />
-                                Upload
-                              </div>
-                              <p className="text-sm font-bold">
-                                {formatBytes(vpn.bytes_sent || 0)}
-                              </p>
                             </div>
                           </div>
-
-                          {/* Server Info */}
-                          {vpn.remote_host && (
-                            <div className="p-3 rounded-lg border bg-card">
-                              <div className="flex items-start gap-2">
-                                <Server className="w-4 h-4 text-muted-foreground mt-0.5" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs text-muted-foreground mb-0.5">
-                                    Server
-                                  </p>
-                                  <p className="text-sm font-mono truncate">
-                                    {vpn.remote_host}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="py-8 text-center">
-                          <div className="p-3 rounded-full bg-muted inline-flex mb-3">
-                            <Network className="w-6 h-6 text-muted-foreground" />
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Not connected
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          onClick={() =>
-                            handleToggleConnection(vpn.id, vpn.status)
-                          }
-                          variant={isConnected ? "destructive" : "default"}
-                          className="flex-1"
-                          disabled={isConnecting}
-                        >
-                          {isConnecting ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Connecting
-                            </>
-                          ) : isConnected ? (
-                            <>
-                              <Square className="w-4 h-4 mr-2" />
-                              Disconnect
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4 mr-2" />
-                              Connect
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => (window.location.href = "/vpn/config")}
-                        >
-                          Configure
-                        </Button>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    ) : (
+                      <div className="py-8 text-center">
+                        <div className="p-3 rounded-full bg-muted inline-flex mb-3">
+                          <Network className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Not connected
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        onClick={() =>
+                          handleToggleConnection(vpn.id, vpn.status)
+                        }
+                        variant={isConnected ? "destructive" : "default"}
+                        className="flex-1"
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Connecting
+                          </>
+                        ) : isConnected ? (
+                          <>
+                            <Square className="w-4 h-4 mr-2" />
+                            Disconnect
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 mr-2" />
+                            Connect
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => (window.location.href = "/vpn/config")}
+                      >
+                        Configure
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </SidebarInset>
+    </div>
   );
 }

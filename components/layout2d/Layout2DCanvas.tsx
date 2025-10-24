@@ -1265,7 +1265,7 @@ export default function Layout2DCanvas({
                 <div className="absolute -right-16 top-1/2 transform -translate-y-1/2 flex flex-col gap-1">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     className="h-8 w-8 p-0 bg-white shadow-md hover:bg-gray-50"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1381,7 +1381,7 @@ export default function Layout2DCanvas({
                 <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex gap-1">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     className="h-8 w-8 p-0 bg-white hover:bg-gray-100"
                     onClick={(e) => {
                       e.stopPropagation();

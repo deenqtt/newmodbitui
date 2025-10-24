@@ -1,6 +1,8 @@
 // File: app/api/backup/route.ts
+// File: app/api/backup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { backupService } from '@/lib/services/backup-service';
+import { requireAdmin } from '@/lib/auth';
 import {
   DatabaseBackupConfig,
   FilesystemBackupConfig,
@@ -11,8 +13,10 @@ import {
 // =======================================================
 // GET /api/backup - Get backup statistics and list backups
 // =======================================================
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Admin-only access for backup statistics
+    await requireAdmin(request);
     await backupService.initialize();
 
     // Get backup statistics
@@ -40,6 +44,9 @@ export async function GET() {
 // =======================================================
 export async function POST(request: NextRequest) {
   try {
+    // Admin-only access for creating backups
+    await requireAdmin(request);
+
     await backupService.initialize();
 
     const body = await request.json();
@@ -126,6 +133,9 @@ export async function POST(request: NextRequest) {
 // =======================================================
 export async function PUT(request: NextRequest) {
   try {
+    // Admin-only access for backup cleanup
+    await requireAdmin(request);
+
     await backupService.initialize();
 
     const body = await request.json();

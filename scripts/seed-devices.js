@@ -2,62 +2,49 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Data devices untuk seeding
+// Data devices untuk seeding dari TASK.md
 const DEVICES_DATA = [
   {
     name: "SENSOR PH 1",
-    address: "1", // String format sesuai schema
-    topic: "limbah/ph1"
+    address: "1",
+    topic: "limbah/ph1",
+    uniqId: "limbah-ph1"
   },
   {
     name: "SENSOR PH 2",
-    address: "2", // String format sesuai schema
-    topic: "limbah/ph2"
+    address: "2",
+    topic: "limbah/ph2",
+    uniqId: "limbah-ph2"
   },
   {
     name: "SENSOR PH 3",
-    address: "5", // String format sesuai schema
-    topic: "limbah/ph3"
+    address: "5",
+    topic: "limbah/ph3",
+    uniqId: "limbah-ph3"
   },
   {
     name: "WATER FLOW 1",
-    address: "3", // String format sesuai schema
-    topic: "limbah/flow1"
+    address: "3",
+    topic: "limbah/flow1",
+    uniqId: "limbah-flow1"
   },
   {
     name: "WATER FLOW 2",
-    address: "4", // String format sesuai schema
-    topic: "limbah/flow2"
+    address: "4",
+    topic: "limbah/flow2",
+    uniqId: "limbah-flow2"
   },
   {
     name: "AIR QUALITY 1",
     address: null,
-    topic: "limbah/airquality1/sps30"
-  },
-  {
-    name: "TEMP HUM 1",
-    address: null,
-    topic: "limbah/airquality1/sht4x"
-  },
-  {
-    name: "VIBRATION 1",
-    address: null,
-    topic: "limbah/airquality1/lis3dhtr"
+    topic: "limbah/airquality1/sps30",
+    uniqId: "limbah-airquality1-sps30"
   },
   {
     name: "AIR QUALITY 2",
     address: null,
-    topic: "limbah/airquality2/sps30"
-  },
-  {
-    name: "TEMP HUM 2",
-    address: null,
-    topic: "limbah/airquality2/sht4x"
-  },
-  {
-    name: "VIBRATION 2",
-    address: null,
-    topic: "limbah/airquality2/lis3dhtr"
+    topic: "limbah/airquality2/sps30",
+    uniqId: "limbah-airquality2-sps30"
   }
 ];
 
@@ -76,63 +63,63 @@ async function seedDevices() {
   try {
     // Gunakan transaksi untuk memastikan semua atau tidak sama sekali
     await prisma.$transaction(async (tx) => {
-  for (const deviceData of DEVICES_DATA) {
-    try {
-      console.log(`🔍 Processing: ${deviceData.name}`);
+      for (const deviceData of DEVICES_DATA) {
+        try {
+          console.log(`🔍 Processing: ${deviceData.name}`);
 
-      // Create predictable uniqId based on topic (remove slashes and create consistent ID)
-      const predictableUniqId = deviceData.topic.replace(/\//g, '-');
+          // Use explicit uniqId from DEVICES_DATA (from TASK.md)
+          const explicitUniqId = deviceData.uniqId;
 
-      // Cek apakah device sudah ada berdasarkan topic atau uniqId
-      const existingByTopic = await tx.deviceExternal.findUnique({
-        where: { topic: deviceData.topic }
-      });
+          // Cek apakah device sudah ada berdasarkan topic atau uniqId
+          const existingByTopic = await tx.deviceExternal.findUnique({
+            where: { topic: deviceData.topic }
+          });
 
-      const existingByUniqId = await tx.deviceExternal.findUnique({
-        where: { uniqId: predictableUniqId }
-      });
+          const existingByUniqId = await tx.deviceExternal.findUnique({
+            where: { uniqId: explicitUniqId }
+          });
 
-      if (existingByTopic) {
-        // Update device yang sudah ada - juga update uniqId untuk konsistensi
-        await tx.deviceExternal.update({
-          where: { topic: deviceData.topic },
-          data: {
-            name: deviceData.name,
-            uniqId: predictableUniqId, // Set predictable uniqId
-            address: deviceData.address,
-            updatedAt: new Date()
+          if (existingByTopic) {
+            // Update device yang sudah ada - juga update uniqId untuk konsistensi
+            await tx.deviceExternal.update({
+              where: { topic: deviceData.topic },
+              data: {
+                name: deviceData.name,
+                uniqId: explicitUniqId, // Use explicit uniqId dari TASK.md
+                address: deviceData.address,
+                updatedAt: new Date()
+              }
+            });
+            updatedCount++;
+            console.log(`   📝 Updated: ${deviceData.name} (ID: ${explicitUniqId})`);
+
+          } else if (existingByUniqId) {
+            // Update by uniqId if topic doesn't exist but uniqId does
+            await tx.deviceExternal.update({
+              where: { uniqId: explicitUniqId },
+              data: {
+                name: deviceData.name,
+                topic: deviceData.topic,
+                address: deviceData.address,
+                updatedAt: new Date()
+              }
+            });
+            updatedCount++;
+            console.log(`   📝 Updated by ID: ${deviceData.name} (ID: ${explicitUniqId})`);
+
+          } else {
+            // Buat device baru dengan explicit uniqId
+            await tx.deviceExternal.create({
+              data: {
+                name: deviceData.name,
+                topic: deviceData.topic,
+                uniqId: explicitUniqId, // Use explicit uniqId dari TASK.md
+                address: deviceData.address
+              }
+            });
+            createdCount++;
+            console.log(`   ➕ Created: ${deviceData.name} (ID: ${explicitUniqId})`);
           }
-        });
-        updatedCount++;
-        console.log(`   📝 Updated: ${deviceData.name} (ID: ${predictableUniqId})`);
-
-      } else if (existingByUniqId) {
-        // Update by uniqId if topic doesn't exist but uniqId does
-        await tx.deviceExternal.update({
-          where: { uniqId: predictableUniqId },
-          data: {
-            name: deviceData.name,
-            topic: deviceData.topic,
-            address: deviceData.address,
-            updatedAt: new Date()
-          }
-        });
-        updatedCount++;
-        console.log(`   📝 Updated by ID: ${deviceData.name} (ID: ${predictableUniqId})`);
-
-      } else {
-        // Buat device baru dengan predictable uniqId
-        await tx.deviceExternal.create({
-          data: {
-            name: deviceData.name,
-            topic: deviceData.topic,
-            uniqId: predictableUniqId, // Use predictable uniqId instead of auto-generated
-            address: deviceData.address
-          }
-        });
-        createdCount++;
-        console.log(`   ➕ Created: ${deviceData.name} (ID: ${predictableUniqId})`);
-      }
 
         } catch (deviceError) {
           console.error(`   ❌ Error processing ${deviceData.name}:`, deviceError.message);
@@ -147,11 +134,10 @@ async function seedDevices() {
     console.log(`   📝 Updated: ${updatedCount} devices`);
     console.log(`   ❌ Skipped: ${skippedCount} devices`);
 
-    console.log('\n🔗 Predictable Device IDs:');
-    console.log('   💡 Device IDs are now topic-based and consistent:');
+    console.log('\n🔗 Device IDs from TASK.md:');
+    console.log('   💡 Device IDs match the logging configurations exactly:');
     DEVICES_DATA.forEach(device => {
-      const id = device.topic.replace(/\//g, '-');
-      console.log(`   • ${device.name}: ${id}`);
+      console.log(`   • ${device.name}: ${device.uniqId}`);
     });
 
     if (errors.length > 0) {
@@ -164,9 +150,7 @@ async function seedDevices() {
     console.log('\n🎯 Device categories seeded:');
     console.log('   🔬 PH Sensors: 3 devices (PH 1, 2, 3)');
     console.log('   💧 Water Flow: 2 devices (Flow 1, 2)');
-    console.log('   🌪️  Air Quality: 2 devices (LPS S30 sensors)');
-    console.log('   🌡️  Temperature: 2 devices (SHT4X sensors)');
-    console.log('   📳 Vibration: 2 devices (LIS3DHTR sensors)');
+    console.log('   🌪️  Air Quality: 2 devices (SPS30 sensors)');
 
   } catch (error) {
     console.error('❌ Device seeding failed:', error);

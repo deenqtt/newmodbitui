@@ -47,7 +47,7 @@ async function seedMenuPresets() {
           "security",
           "security_access",
           "lorawan",
-          "administration",
+          "management",
           "maintenance"
         ],
         selectedItemNames: [
@@ -127,7 +127,7 @@ async function seedMenuPresets() {
         name: "Water Waste",
         description: "",
         icon: "Menu",
-        isActive: false,
+        isActive: true,
         isSystem: false,
         selectedGroupNames: [
           "dashboard",
@@ -135,7 +135,7 @@ async function seedMenuPresets() {
           "network",
           "analytics",
           "security_access",
-          "administration",
+          "management",
           "maintenance"
         ],
         selectedItemNames: [

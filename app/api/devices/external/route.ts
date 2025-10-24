@@ -2,13 +2,19 @@
 
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getAuthFromCookie } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
 /**
  * FUNGSI GET: Mengambil semua data device
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const devices = await prisma.deviceExternal.findMany({
       orderBy: {
@@ -31,6 +37,14 @@ export async function GET() {
 
 // Ganti seluruh fungsi POST yang lama dengan ini
 export async function POST(request: Request) {
+  // Check if user has permission to create external devices
+  const { requirePermission } = await import('@/lib/auth');
+  try {
+    await requirePermission(request, 'devices', 'create');
+  } catch (error) {
+    return NextResponse.json({ message: "Forbidden - Insufficient permissions" }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
 

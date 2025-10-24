@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PrismaClient } from "@prisma/client";
+import { getAuthFromCookie } from "@/lib/auth";
 
 interface DeviceInternalRecord {
   id: string;
@@ -29,6 +30,11 @@ interface DeviceExternalRecord {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Fetch all device types for the DataPointConfigModal
     // Since we don't have DeviceInternal in schema, we'll use existing tables that might represent internal devices

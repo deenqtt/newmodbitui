@@ -8,15 +8,13 @@ import {
   PlusCircle,
   Edit,
   Save,
-  X,
-  Plus,
-  Settings,
   Navigation,
+  Settings,
+  Plus,
 } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DataPointConfigModal from "@/components/layout2d/DataPointConfigModal";
 import FlowIndicatorConfigModal from "@/components/layout2d/FlowIndicatorConfigModal";
@@ -28,14 +26,6 @@ const Layout2DCanvas = dynamic(
   {
     ssr: false,
     loading: () => <Skeleton className="w-full h-[600px]" />,
-  }
-);
-
-const Layout2DList = dynamic(
-  () => import("@/components/layout2d/Layout2DList"),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="w-full h-96" />,
   }
 );
 
@@ -56,7 +46,7 @@ export default function Layout2DPage() {
   const [selectedLayout, setSelectedLayout] = useState<Layout2D | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("canvas");
+
   const [isManageMode, setIsManageMode] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [configModalPosition, setConfigModalPosition] = useState<{
@@ -131,7 +121,6 @@ export default function Layout2DPage() {
 
   const handleLayoutSelect = (layout: Layout2D) => {
     setSelectedLayout(layout);
-    setActiveTab("canvas");
     setIsManageMode(false); // Reset manage mode when switching layouts
   };
 
@@ -336,17 +325,6 @@ export default function Layout2DPage() {
                 <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-gradient-to-r from-green-500 to-blue-500 rounded-full opacity-60 animate-pulse delay-1000"></div>
               </div>
 
-              {/* Title */}
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-400 bg-clip-text text-transparent mb-4">
-                Welcome to Process Flow Designer
-              </h2>
-
-              {/* Description */}
-              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                Create interactive process flow layouts to visualize real-time data from your IoT devices.
-                Build stunning dashboards with drag-and-drop data points and custom backgrounds.
-              </p>
-
               {/* Features Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 p-4 rounded-xl border">
@@ -375,205 +353,185 @@ export default function Layout2DPage() {
               </div>
 
               {/* CTA Button */}
-              <div className="space-y-4">
-                <Layout2DList
-                  layouts={layouts}
-                  onLayoutsChange={handleLayoutsChange}
-                  onLayoutSelect={handleLayoutSelect}
-                  onSetActive={handleSetActiveLayout}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Get started by creating your first process flow layout above ↗
-                </p>
-              </div>
+              
             </div>
           </div>
         ) : (
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="flex flex-col flex-1"
-          >
-            <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-              <TabsTrigger value="canvas">Process Flow Canvas</TabsTrigger>
-              <TabsTrigger value="manage">Manage Layouts</TabsTrigger>
-            </TabsList>
+          <div className="flex flex-col flex-1 gap-6">
+          
 
-            <TabsContent
-              value="canvas"
-              className="flex flex-col flex-1 space-y-4"
-            >
-              {activeLayout && (
-                <Card className="flex flex-col flex-1">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl">
-                          {selectedLayout
-                            ? selectedLayout.name
-                            : activeLayout.name}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
+            {/* Canvas Section - Full Width */}
+            <div className="flex flex-col gap-4 flex-1">
+
+                {activeLayout && (
+                  <Card className="flex flex-col flex-1">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">
+                            {selectedLayout
+                              ? selectedLayout.name
+                              : activeLayout.name}
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {selectedLayout &&
+                            selectedLayout.id !== activeLayout.id
+                              ? "Preview Mode"
+                              : "Active Process Flow"}
+                            {isManageMode && " - Manage Mode"}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {isManageMode && (
+                            <div className="flex gap-1 bg-muted rounded-lg p-1">
+                              <Button
+                                onClick={() => setCreationMode('datapoint')}
+                                variant={creationMode === 'datapoint' ? "default" : "ghost"}
+                                size="sm"
+                                className="h-8 px-3"
+                              >
+                                <PlusCircle className="w-4 h-4 mr-1" />
+                                Data Point
+                              </Button>
+                              <Button
+                                onClick={() => setCreationMode('flowindicator')}
+                                variant={creationMode === 'flowindicator' ? "default" : "ghost"}
+                                size="sm"
+                                className="h-8 px-3"
+                              >
+                                <Navigation className="w-4 h-4 mr-1" />
+                                Flow Arrow
+                              </Button>
+                            </div>
+                          )}
+                          <Button
+                            onClick={() => setIsManageMode(!isManageMode)}
+                            variant={isManageMode ? "default" : "outline"}
+                            size="sm"
+                          >
+                            {isManageMode ? (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Done
+                              </>
+                            ) : (
+                              <>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Manage
+                              </>
+                            )}
+                          </Button>
                           {selectedLayout &&
-                          selectedLayout.id !== activeLayout.id
-                            ? "Preview Mode"
-                            : "Active Process Flow"}
-                          {isManageMode && " - Manage Mode"}
+                            selectedLayout.id !== activeLayout.id && (
+                              <Button
+                                onClick={() => setSelectedLayout(activeLayout)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                Back to Active Layout
+                              </Button>
+                            )}
+                <Link href="/layout2d/list">
+                  <Button className="bg-primary hover:bg-primary/90">
+                    Manage Layouts
+                  </Button>
+                </Link>
+                        </div>
+                        
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex p-0">
+                      <Layout2DCanvas
+                        layoutId={selectedLayout?.id || activeLayout.id}
+                        backgroundImage={
+                          selectedLayout?.image || activeLayout.image
+                        }
+                        className="w-full flex-1"
+                        isManageMode={isManageMode}
+                        onAddDataPoint={handleAddDataPoint}
+                        onEditDataPoint={handleEditDataPoint}
+                        onDeleteDataPoint={handleDeleteDataPoint}
+                        onAddFlowIndicator={handleAddFlowIndicator}
+                        onEditFlowIndicator={handleEditFlowIndicator}
+                        onDeleteFlowIndicator={handleDeleteFlowIndicator}
+                        refreshTrigger={selectedLayout?.updatedAt || activeLayout.updatedAt}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {!activeLayout && selectedLayout && (
+                  <Card className="flex flex-col flex-1">
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        {selectedLayout.name}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Preview Mode - This process flow is not currently active
+                      </p>
+                    </CardHeader>
+                    <CardContent className="flex-1 p-0">
+                      <Layout2DCanvas
+                        layoutId={selectedLayout.id}
+                        backgroundImage={selectedLayout.image}
+                        className="w-full h-full"
+                        isManageMode={isManageMode}
+                        onAddDataPoint={handleAddDataPoint}
+                        onEditDataPoint={handleEditDataPoint}
+                        onDeleteDataPoint={handleDeleteDataPoint}
+                        onAddFlowIndicator={handleAddFlowIndicator}
+                        onEditFlowIndicator={handleEditFlowIndicator}
+                        onDeleteFlowIndicator={handleDeleteFlowIndicator}
+                        refreshTrigger={selectedLayout.updatedAt}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {!activeLayout && !selectedLayout && (
+                  <Card className="flex flex-col flex-1">
+                    <CardContent className="flex-1 flex items-center justify-center">
+                      <div className="text-center max-w-lg mx-auto px-6 py-12">
+                        {/* Icon with background */}
+                        <div className="relative mb-8">
+                          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900 dark:to-orange-800 rounded-2xl flex items-center justify-center border border-orange-200 dark:border-orange-700 mb-4">
+                            <LayoutGrid className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
+                        </div>
+
+                        {/* Title */}
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                          No Active Process Flow
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-muted-foreground mb-8 leading-relaxed">
+                          You have created process flows, but none are currently active.
+                          Select a layout from the management panel to start visualizing your data.
+                        </p>
+
+                        {/* Action Button */}
+                        <Button
+                          variant="outline"
+                          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                          size="lg"
+                          disabled
+                        >
+                          <Settings className="mr-2 h-4 w-4" />
+                          Select Layout from Panel →
+                        </Button>
+
+                        {/* Helper text */}
+                        <p className="text-sm text-muted-foreground mt-4">
+                          💡 Use the management panel to create and activate layouts
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        {isManageMode && (
-                          <div className="flex gap-1 bg-muted rounded-lg p-1">
-                            <Button
-                              onClick={() => setCreationMode('datapoint')}
-                              variant={creationMode === 'datapoint' ? "default" : "ghost"}
-                              size="sm"
-                              className="h-8 px-3"
-                            >
-                              <PlusCircle className="w-4 h-4 mr-1" />
-                              Data Point
-                            </Button>
-                            <Button
-                              onClick={() => setCreationMode('flowindicator')}
-                              variant={creationMode === 'flowindicator' ? "default" : "ghost"}
-                              size="sm"
-                              className="h-8 px-3"
-                            >
-                              <Navigation className="w-4 h-4 mr-1" />
-                              Flow Arrow
-                            </Button>
-                          </div>
-                        )}
-                        <Button
-                          onClick={() => setIsManageMode(!isManageMode)}
-                          variant={isManageMode ? "default" : "outline"}
-                          size="sm"
-                        >
-                          {isManageMode ? (
-                            <>
-                              <Save className="w-4 h-4 mr-2" />
-                              Done
-                            </>
-                          ) : (
-                            <>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Manage
-                            </>
-                          )}
-                        </Button>
-                        {selectedLayout &&
-                          selectedLayout.id !== activeLayout.id && (
-                            <Button
-                              onClick={() => setSelectedLayout(activeLayout)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Back to Active Layout
-                            </Button>
-                          )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex">
-                    <Layout2DCanvas
-                      layoutId={selectedLayout?.id || activeLayout.id}
-                      backgroundImage={
-                        selectedLayout?.image || activeLayout.image
-                      }
-                      className="w-full flex-1"
-                      isManageMode={isManageMode}
-                      onAddDataPoint={handleAddDataPoint}
-                      onEditDataPoint={handleEditDataPoint}
-                      onDeleteDataPoint={handleDeleteDataPoint}
-                      onAddFlowIndicator={handleAddFlowIndicator}
-                      onEditFlowIndicator={handleEditFlowIndicator}
-                      onDeleteFlowIndicator={handleDeleteFlowIndicator}
-                      refreshTrigger={selectedLayout?.updatedAt || activeLayout.updatedAt}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-
-              {!activeLayout && selectedLayout && (
-                <Card className="flex flex-col flex-1">
-                  <CardHeader>
-                    <CardTitle className="text-xl">
-                      {selectedLayout.name}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Preview Mode - This process flow is not currently active
-                    </p>
-                  </CardHeader>
-                  <CardContent className="flex-1 p-0">
-                    <Layout2DCanvas
-                      layoutId={selectedLayout.id}
-                      backgroundImage={selectedLayout.image}
-                      className="w-full h-full"
-                      isManageMode={isManageMode}
-                      onAddDataPoint={handleAddDataPoint}
-                      onEditDataPoint={handleEditDataPoint}
-                      onDeleteDataPoint={handleDeleteDataPoint}
-                      onAddFlowIndicator={handleAddFlowIndicator}
-                      onEditFlowIndicator={handleEditFlowIndicator}
-                      onDeleteFlowIndicator={handleDeleteFlowIndicator}
-                      refreshTrigger={selectedLayout.updatedAt}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-
-              {!activeLayout && !selectedLayout && (
-                <Card className="flex flex-col flex-1">
-                  <CardContent className="flex-1 flex items-center justify-center">
-                    <div className="text-center max-w-lg mx-auto px-6 py-12">
-                      {/* Icon with background */}
-                      <div className="relative mb-8">
-                        <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900 dark:to-orange-800 rounded-2xl flex items-center justify-center border border-orange-200 dark:border-orange-700 mb-4">
-                          <LayoutGrid className="h-10 w-10 text-orange-600 dark:text-orange-400" />
-                        </div>
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-pulse"></div>
-                      </div>
-
-                      {/* Title */}
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                        No Active Process Flow
-                      </h2>
-
-                      {/* Description */}
-                      <p className="text-muted-foreground mb-8 leading-relaxed">
-                        You have created process flows, but none are currently active.
-                        Select a layout from the management tab to start visualizing your data.
-                      </p>
-
-                      {/* Action Button */}
-                      <Button
-                        onClick={() => setActiveTab("manage")}
-                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                        size="lg"
-                      >
-                        <Settings className="mr-2 h-4 w-4" />
-                        Manage Layouts
-                      </Button>
-
-                      {/* Helper text */}
-                      <p className="text-sm text-muted-foreground mt-4">
-                        💡 Tip: You can set any layout as active from the management tab
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="manage">
-              <Layout2DList
-                layouts={layouts}
-                onLayoutsChange={handleLayoutsChange}
-                onLayoutSelect={handleLayoutSelect}
-                onSetActive={handleSetActiveLayout}
-              />
-            </TabsContent>
-          </Tabs>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
         )}
 
         {/* Data Point Config Modal */}

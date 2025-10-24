@@ -592,8 +592,48 @@ function AlarmManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Confirmation Dialog State
+  const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
+  const [confirmationDialogContent, setConfirmationDialogContent] = useState<{
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: "info" | "warning" | "destructive";
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    title: "",
+    description: "",
+    confirmText: "Confirm",
+    cancelText: "Cancel",
+    type: "info",
+    onConfirm: () => {},
+  });
+
+  const confirmationDialog = (config: {
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: "info" | "warning" | "destructive";
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) => {
+    setConfirmationDialogContent({
+      title: config.title,
+      description: config.description,
+      confirmText: config.confirmText || "Confirm",
+      cancelText: config.cancelText || "Cancel",
+      type: config.type || "info",
+      onConfirm: config.onConfirm,
+      onCancel: config.onCancel,
+    });
+    setConfirmationDialogOpen(true);
+  };
+
   // Apply sorting using useSortableTable hook
-  const { sorted: sortedAlarms, sortKey, sortDirection, handleSort } = useSortableTable(alarms);
+  const { sorted: sortedAlarms, sortField, sortDirection, handleSort } = useSortableTable(alarms);
 
   // Paginate sorted results
   const totalPages = Math.ceil(sortedAlarms.length / itemsPerPage);
@@ -603,7 +643,7 @@ function AlarmManagementPage() {
   // Reset to first page when page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [itemsPerPage, sortKey, sortDirection]);
+  }, [itemsPerPage, sortField, sortDirection]);
 
   const fetchAlarms = useCallback(async () => {
     setIsLoading(true);
@@ -634,7 +674,7 @@ function AlarmManagementPage() {
   };
 
   const handleDelete = (id: string) => {
-    showConfirmation({
+    confirmationDialog({
       type: "destructive",
       title: "Delete Alarm",
       description: "Are you sure you want to delete this alarm? This action cannot be undone.",
@@ -886,6 +926,18 @@ function AlarmManagementPage() {
           onOpenChange={setIsDialogOpen}
           onSave={fetchAlarms}
           initialData={selectedAlarm}
+        />
+
+        <ConfirmationDialog
+          open={confirmationDialogOpen}
+          onOpenChange={setConfirmationDialogOpen}
+          type={confirmationDialogContent.type || "info"}
+          title={confirmationDialogContent.title}
+          description={confirmationDialogContent.description}
+          confirmText={confirmationDialogContent.confirmText || "Confirm"}
+          cancelText={confirmationDialogContent.cancelText || "Cancel"}
+          onConfirm={confirmationDialogContent.onConfirm}
+          onCancel={confirmationDialogContent.onCancel || (() => setConfirmationDialogOpen(false))}
         />
       </div>
     </div>

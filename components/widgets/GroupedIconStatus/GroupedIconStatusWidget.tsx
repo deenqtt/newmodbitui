@@ -544,11 +544,11 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
               className="text-slate-600 dark:text-slate-400"
               style={{
                 width: Math.max(
-                  layoutConfig.dynamicSizes.titleFontSize * 0.95,
+                  layoutConfig.dynamicSizes.titleFontSize * 1,
                   13
                 ),
                 height: Math.max(
-                  layoutConfig.dynamicSizes.titleFontSize * 0.95,
+                  layoutConfig.dynamicSizes.titleFontSize * 1,
                   13
                 ),
               }}
@@ -573,7 +573,7 @@ export const GroupedIconStatusWidget = ({ config }: Props) => {
           <div
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50"
             style={{
-              fontSize: `${layoutConfig.dynamicSizes.titleFontSize * 0.75}px`,
+              fontSize: `${layoutConfig.dynamicSizes.titleFontSize * 1}px`,
             }}
           >
             <span className="font-medium text-slate-600 dark:text-slate-400">

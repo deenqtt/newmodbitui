@@ -1,6 +1,7 @@
 // File: app/api/devices/external/[id]/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Pastikan path ini benar
+import { prisma } from "@/lib/prisma";
+import { getAuthFromCookie } from "@/lib/auth";
 
 /**
  * FUNGSI GET: Mengambil 'topic' berdasarkan 'uniqId'.
@@ -11,6 +12,11 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const uniqId = params.id; // Anggap parameter URL adalah uniqId
 
   if (!uniqId) {
@@ -56,6 +62,14 @@ export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Check if user has permission to update devices
+  const { requirePermission } = await import('@/lib/auth');
+  try {
+    await requirePermission(request, 'devices', 'update');
+  } catch (error) {
+    return NextResponse.json({ message: "Forbidden - Insufficient permissions" }, { status: 403 });
+  }
+
   try {
     const { name, topic, address } = await request.json();
     const updatedDevice = await prisma.deviceExternal.update({
@@ -80,6 +94,14 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Check if user has permission to delete devices
+  const { requirePermission } = await import('@/lib/auth');
+  try {
+    await requirePermission(request, 'devices', 'delete');
+  } catch (error) {
+    return NextResponse.json({ message: "Forbidden - Insufficient permissions" }, { status: 403 });
+  }
+
   try {
     await prisma.deviceExternal.delete({
       where: { id: params.id }, // Di sini, parameter URL adalah 'id' database

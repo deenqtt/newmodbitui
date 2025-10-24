@@ -64,3 +64,102 @@ export async function getServerSession(request: NextRequest) {
   const auth = await getAuthFromCookie(request);
   return auth ? { userId: auth.userId, role: auth.role, email: auth.email } : null;
 }
+
+// ==============================
+// PERMISSION CHECKING HELPERS
+// ==============================
+
+/**
+ * Check if user has specific permission for resource and action
+ * Uses the RolePermission system instead of hardcoded role checks
+ */
+export async function checkUserPermission(
+  request: Request | NextRequest,
+  resource: string,
+  action: string
+): Promise<boolean> {
+  const auth = await getAuthFromCookie(request);
+  if (!auth || !auth.userId) {
+    return false;
+  }
+
+  // Admin users always have all permissions
+  if (auth.role === 'ADMIN') {
+    return true;
+  }
+
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { prisma } = await import('@/lib/prisma');
+
+    // Check if user has the required permission through their role
+    const userPermissions = await prisma.rolePermission.findFirst({
+      where: {
+        role: {
+          users: {
+            some: {
+              id: auth.userId
+            }
+          }
+        },
+        permission: {
+          resource: resource,
+          action: action
+        }
+      }
+    });
+
+    return !!userPermissions;
+  } catch (error) {
+    console.error('Permission check failed:', error);
+    return false;
+  }
+}
+
+// Helper to require authentication
+export async function requireAuth(request: Request | NextRequest) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    throw new Response(JSON.stringify({ message: "Unauthorized" }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  return auth;
+}
+
+// Helper to require specific permission
+export async function requirePermission(
+  request: Request | NextRequest,
+  resource: string,
+  action: string
+) {
+  const hasPermission = await checkUserPermission(request, resource, action);
+  if (!hasPermission) {
+    throw new Response(JSON.stringify({ message: "Forbidden - Insufficient permissions" }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Legacy helper for admin-only operations (should migrate to permission-based)
+export async function requireAdmin(request: Request | NextRequest) {
+  const auth = await getAuthFromCookie(request);
+  if (!auth) {
+    throw new Response(JSON.stringify({ message: "Unauthorized" }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // For now, check role directly - should be migrated to permission system
+  if (auth.role !== 'ADMIN') {
+    throw new Response(JSON.stringify({ message: "Forbidden - Admin access required" }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  return auth;
+}

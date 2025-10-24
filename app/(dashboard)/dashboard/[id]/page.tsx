@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import _ from "lodash";
 
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 
 import { mainWidgets, widgets, getWidgetCount } from "@/lib/widget-data";
 import { showToast } from "@/lib/toast-utils";

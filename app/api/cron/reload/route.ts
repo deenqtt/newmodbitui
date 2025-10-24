@@ -17,12 +17,16 @@ async function ensureSchedulerInitialized() {
 
     // Wait for initialization (max 3 seconds)
     let attempts = 0;
-    while (!scheduler.getStatus().initialized && attempts < 30) {
+    while (attempts < 30) {
+      const status = await scheduler.getStatus();
+      if (status.initialized) break;
+
       await new Promise((resolve) => setTimeout(resolve, 100));
       attempts++;
     }
 
-    if (!scheduler.getStatus().initialized) {
+    const finalStatus = await scheduler.getStatus();
+    if (!finalStatus.initialized) {
       throw new Error("Scheduler initialization timeout");
     }
   }
@@ -68,7 +72,7 @@ export async function POST() {
 export async function GET() {
   try {
     const scheduler = await ensureSchedulerInitialized();
-    const status = scheduler.getStatus();
+    const status = await scheduler.getStatus();
 
     return NextResponse.json({
       initialized: status.initialized,

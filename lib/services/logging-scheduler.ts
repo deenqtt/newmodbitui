@@ -1,16 +1,16 @@
 // File: lib/services/logging-scheduler.ts
 import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 let instance: LoggingSchedulerService | null = null;
 
 export class LoggingSchedulerService {
-  private activeTimers: Map<string, { timer: NodeJS.Timeout; config: any }>;
+  private activeTimers: Map<string, { timer: NodeJS.Timeout; intervalTimer: NodeJS.Timeout | null }>;
   private reloadRequested: boolean = false;
   private hostname: string;
   private port: number;
   private isInitialized: boolean = false;
+  private isShuttingDown: boolean = false;
 
   constructor(hostname: string = "localhost", port: number = 3000) {
     this.activeTimers = new Map();
@@ -22,6 +22,7 @@ export class LoggingSchedulerService {
 
   /**
    * Calculate next run time based on config creation time
+   * Returns aligned time to avoid drift
    */
   private calculateNextRunTime(config: any) {
     const now = new Date();
@@ -34,13 +35,37 @@ export class LoggingSchedulerService {
 
     const nextRun = new Date(now.getTime() + nextRunMs);
 
-    return { nextRun, delayMs: nextRunMs };
+    return { nextRun, delayMs: nextRunMs, intervalMs };
   }
 
   /**
-   * Log single config
+   * Fetch fresh config from database
    */
-  private async logSingleConfig(config: any) {
+  private async getFreshConfig(configId: string) {
+    try {
+      const config = await prisma.loggingConfiguration.findUnique({
+        where: { id: configId },
+        include: { device: true },
+      });
+      return config;
+    } catch (error) {
+      console.error(`❌ Failed to fetch config ${configId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Log single config with retry mechanism
+   */
+  private async logSingleConfig(configId: string, retryCount: number = 0) {
+    // Fetch fresh config from database
+    const config = await this.getFreshConfig(configId);
+
+    if (!config) {
+      console.error(`⚠️  Config ${configId} not found in database, skipping...`);
+      return { success: false, logged: 0 };
+    }
+
     const now = new Date().toLocaleString("id-ID", {
       year: "numeric",
       month: "2-digit",
@@ -76,25 +101,37 @@ export class LoggingSchedulerService {
       console.log(
         `✅ ${config.customName}: logged ${result.logged || 0} entry(ies)`
       );
+
+      return { success: true, logged: result.logged || 0 };
     } catch (error: any) {
       if (error.name === "AbortError") {
         console.error(`❌ Timeout logging ${config.customName} (>30s)`);
       } else {
         console.error(`❌ Failed to log ${config.customName}:`, error.message);
       }
+
+      // Retry logic (max 2 retries)
+      if (retryCount < 2) {
+        console.log(`🔄 Retrying... (attempt ${retryCount + 2}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+        return this.logSingleConfig(configId, retryCount + 1);
+      }
+
+      return { success: false, logged: 0 };
     }
   }
 
   /**
-   * Schedule single config logging (recursive setTimeout)
+   * Schedule single config logging with proper interval management
    */
   private scheduleConfigLogging(config: any) {
+    // Clear existing timers for this config to prevent duplicates
     if (this.activeTimers.has(config.id)) {
-      console.log(`⏭️  Config ${config.customName} already scheduled`);
-      return;
+      console.log(`⏭️  Config ${config.customName} already scheduled, clearing old timers...`);
+      this.clearConfigTimer(config.id);
     }
 
-    const { nextRun, delayMs } = this.calculateNextRunTime(config);
+    const { nextRun, delayMs, intervalMs } = this.calculateNextRunTime(config);
 
     console.log(`📅 Scheduling: ${config.customName}`);
     console.log(`   • Interval: ${config.loggingIntervalMinutes} minutes`);
@@ -104,43 +141,77 @@ export class LoggingSchedulerService {
       )}s)`
     );
 
-    const timer = setTimeout(async () => {
+    // Initial timer for first run
+    const initialTimer = setTimeout(async () => {
+      await this.executeAndReschedule(config.id);
+    }, delayMs);
+
+    // Store timer (intervalTimer will be set after first execution)
+    this.activeTimers.set(config.id, {
+      timer: initialTimer,
+      intervalTimer: null
+    });
+  }
+
+  /**
+   * Execute logging and reschedule next run
+   */
+  private async executeAndReschedule(configId: string) {
+    // Check if config is still active
+    if (!this.activeTimers.has(configId) || this.isShuttingDown) {
+      return;
+    }
+
+    // Fetch fresh config to get latest settings
+    const config = await this.getFreshConfig(configId);
+
+    if (!config) {
+      console.log(`⏭️  Config ${configId} no longer exists, removing timer...`);
+      this.clearConfigTimer(configId);
+      return;
+    }
+
+    // Execute logging
+    await this.logSingleConfig(configId);
+
+    // Check again if still active after logging
+    if (!this.activeTimers.has(configId) || this.isShuttingDown) {
+      return;
+    }
+
+    // Schedule next execution using setInterval for consistency
+    const intervalMs = config.loggingIntervalMinutes * 60 * 1000;
+
+    const intervalTimer = setInterval(async () => {
       // Check if still active
-      if (!this.activeTimers.has(config.id)) {
-        console.log(`⏭️  Skipping ${config.customName} (deleted)`);
+      if (!this.activeTimers.has(configId) || this.isShuttingDown) {
+        if (intervalTimer) clearInterval(intervalTimer);
         return;
       }
 
-      // Log data
-      await this.logSingleConfig(config);
+      // Execute logging
+      await this.logSingleConfig(configId);
+    }, intervalMs);
 
-      // Schedule next run (recursive)
-      const intervalMs = config.loggingIntervalMinutes * 60 * 1000;
-      const nextTimer = setTimeout(
-        async function runNext(this: LoggingSchedulerService) {
-          if (!this.activeTimers.has(config.id)) return;
+    // Update timer data
+    const timerData = this.activeTimers.get(configId);
+    if (timerData) {
+      timerData.intervalTimer = intervalTimer;
+    }
+  }
 
-          await this.logSingleConfig(config);
-
-          // Continue recursion
-          const timer = setTimeout(runNext.bind(this), intervalMs);
-          const timerData = this.activeTimers.get(config.id);
-          if (timerData) {
-            timerData.timer = timer;
-          }
-        }.bind(this),
-        intervalMs
-      );
-
-      // Update timer
-      const timerData = this.activeTimers.get(config.id);
-      if (timerData) {
-        timerData.timer = nextTimer;
+  /**
+   * Clear all timers for a specific config
+   */
+  private clearConfigTimer(configId: string) {
+    const timerData = this.activeTimers.get(configId);
+    if (timerData) {
+      clearTimeout(timerData.timer);
+      if (timerData.intervalTimer) {
+        clearInterval(timerData.intervalTimer);
       }
-    }, delayMs);
-
-    // Store timer
-    this.activeTimers.set(config.id, { timer, config });
+      this.activeTimers.delete(configId);
+    }
   }
 
   /**
@@ -175,7 +246,7 @@ export class LoggingSchedulerService {
   }
 
   /**
-   * Reload configurations (add new, remove deleted)
+   * Reload configurations (add new, remove deleted, update changed)
    */
   public async reloadConfigs() {
     try {
@@ -188,18 +259,23 @@ export class LoggingSchedulerService {
       const currentConfigIds = new Set(currentConfigs.map((c) => c.id));
 
       // Stop & remove deleted configs
-      for (const [configId, timerData] of this.activeTimers.entries()) {
+      for (const [configId] of this.activeTimers.entries()) {
         if (!currentConfigIds.has(configId)) {
-          clearTimeout(timerData.timer);
-          this.activeTimers.delete(configId);
-          console.log(`🛑 Stopped & removed: ${timerData.config.customName}`);
+          const config = await this.getFreshConfig(configId);
+          const configName = config?.customName || configId;
+          this.clearConfigTimer(configId);
+          console.log(`🛑 Stopped & removed: ${configName}`);
         }
       }
 
-      // Add new configs
+      // Add new configs OR reschedule existing ones (to apply changes)
       for (const config of currentConfigs) {
         if (!this.activeTimers.has(config.id)) {
           console.log(`🆕 New config detected: ${config.customName}`);
+          this.scheduleConfigLogging(config);
+        } else {
+          // Reschedule existing config to apply any changes (interval, multiply, etc)
+          console.log(`🔄 Updating config: ${config.customName}`);
           this.scheduleConfigLogging(config);
         }
       }
@@ -268,7 +344,12 @@ export class LoggingSchedulerService {
   public shutdown() {
     console.log("\n🛑 Shutting down Logging Scheduler...");
 
-    this.activeTimers.forEach(({ timer }) => clearTimeout(timer));
+    this.isShuttingDown = true;
+
+    // Clear all timers
+    this.activeTimers.forEach((timerData, configId) => {
+      this.clearConfigTimer(configId);
+    });
     this.activeTimers.clear();
 
     this.isInitialized = false;
@@ -279,15 +360,24 @@ export class LoggingSchedulerService {
   /**
    * Get status
    */
-  public getStatus() {
+  public async getStatus() {
+    const configs = [];
+
+    for (const [configId] of this.activeTimers.entries()) {
+      const config = await this.getFreshConfig(configId);
+      if (config) {
+        configs.push({
+          id: config.id,
+          name: config.customName,
+          interval: config.loggingIntervalMinutes,
+        });
+      }
+    }
+
     return {
       initialized: this.isInitialized,
       activeTimers: this.activeTimers.size,
-      configs: Array.from(this.activeTimers.values()).map(({ config }) => ({
-        id: config.id,
-        name: config.customName,
-        interval: config.loggingIntervalMinutes,
-      })),
+      configs,
     };
   }
 }

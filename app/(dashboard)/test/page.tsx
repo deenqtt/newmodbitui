@@ -1,9 +1,8 @@
 "use client";
 
+import Layout2DList from "@/components/layout2d/Layout2DList";
 export default function TestPage() {
   return (
-    <div className="p-4">
-      <h1>Mihuu mihuuu</h1>
-    </div>
+    <></>
   );
 }

@@ -9,6 +9,7 @@ const { seedLayout2D } = require('./seed-layout2d');
 const { seedLoggingConfigs } = require('./seed-logging-configs');
 const { seedMaintenance } = require('./seed-maintenance');
 const { seedAlarmConfigsAndLogs } = require('./seed-alarm-configs');
+const { seedLayout2DDataPoints } = require('./seed-layout2d-datapoints');
 
 const prisma = new PrismaClient();
 
@@ -20,6 +21,7 @@ const SEED_CONFIG = {
   ENABLE_DASHBOARD: process.env.SEED_DASHBOARD !== 'false', // Default: true
   ENABLE_DEVICES: process.env.SEED_DEVICES !== 'false', // Default: true
   ENABLE_LAYOUT2D: process.env.SEED_LAYOUT2D !== 'false', // Default: true
+  ENABLE_LAYOUT2D_DATAPOINTS: process.env.SEED_LAYOUT2D_DATAPOINTS !== 'false', // Default: true
   ENABLE_LOGGING_CONFIGS: process.env.SEED_LOGGING_CONFIGS !== 'false', // Default: true
   ENABLE_MAINTENANCE: process.env.SEED_MAINTENANCE !== 'false', // Default: true
   ENABLE_ALARM_CONFIGS: process.env.SEED_ALARM_CONFIGS !== 'false', // Default: true
@@ -117,6 +119,16 @@ async function seedInit() {
       console.log('📟 Starting Layout 2D seeding...');
       await seedLayout2D();
       console.log('✅ Layout 2D seeding completed');
+      return true;
+    });
+  }
+
+  // Seed Layout 2D Data Points (optional)
+  if (SEED_CONFIG.ENABLE_LAYOUT2D_DATAPOINTS) {
+    steps.push(async () => {
+      console.log('📍 Starting Layout 2D Data Points seeding...');
+      await seedLayout2DDataPoints();
+      console.log('✅ Layout 2D Data Points seeding completed');
       return true;
     });
   }

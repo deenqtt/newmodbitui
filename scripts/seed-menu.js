@@ -110,7 +110,7 @@ async function seedMenu() {
       { name: 'lorawan', label: 'LoRaWAN', icon: 'Radio', order: 9, isActive: true },
 
       // 6. Administration & Maintenance
-      { name: 'administration', label: 'Administration', icon: 'Settings', order: 10, isActive: true, isDeveloper: true },
+      { name: 'management', label: 'Management', icon: 'Settings', order: 10, isActive: true, isDeveloper: true },
       { name: 'maintenance', label: 'Maintenance', icon: 'Wrench', order: 11, isActive: true },
 
       // 7. Testing & Development
@@ -121,7 +121,13 @@ async function seedMenu() {
     for (const group of menuGroups) {
       const created = await prisma.menuGroup.upsert({
         where: { name: group.name },
-        update: {},
+        update: {
+          label: group.label,
+          icon: group.icon,
+          order: group.order,
+          isActive: group.isActive,
+          isDeveloper: group.isDeveloper,
+        },
         create: group,
       });
       createdMenuGroups[group.name] = created;
@@ -141,14 +147,13 @@ async function seedMenu() {
 
       // Devices Group
       { name: 'devices-external', label: 'External Devices', path: '/devices/devices-external', icon: 'Globe', order: 0, groupName: 'devices', isActive: true, isDeveloper: false },
-      { name: 'logging-configs', label: 'Device Log Configs', path: '/devices/devices-for-logging', icon: 'Database', order: 1, groupName: 'devices', isActive: true, isDeveloper: false },
-      { name: 'devices-internal', label: 'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 2, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'devices-internal', label:  'Internal Devices', path: '/devices/devices-internal', icon: 'Server', order: 1, groupName: 'devices', isActive: true, isDeveloper: false },
+      { name: 'logging-configs', label: 'Log Configs', path: '/devices/devices-for-logging', icon: 'Database', order: 2, groupName: 'devices', isActive: true, isDeveloper: false },
       { name: 'devices-access-controllers', label: 'Access Controllers', path: '/devices/access-controllers', icon: 'Shield', order: 3, groupName: 'devices', isActive: true, isDeveloper: false },
       { name: 'devices-zigbee', label: 'Zigbee Devices', path: '/devices/zigbee', icon: 'Zap', order: 4, groupName: 'devices', isActive: true, isDeveloper: false },
 
       // Network Group
       { name: 'network-mqtt-broker', label: 'MQTT Broker', path: '/network/mqtt-broker', icon: 'Radio', order: 0, groupName: 'network', isActive: true, isDeveloper: false },
-      { name: 'network-mqtt-configurations', label: 'MQTT Configurations', path: '/mqtt-configurations', icon: 'Settings', order: 1, groupName: 'network', isActive: true, isDeveloper: false },
       { name: 'network-communication-setup', label: 'Communication Setup', path: '/network/communication-setup', icon: 'Waves', order: 2, groupName: 'network', isActive: true, isDeveloper: false },
       { name: 'network-register-snmp', label: 'SNMP Registration', path: '/network/register-snmp', icon: 'Database', order: 3, groupName: 'network', isActive: true, isDeveloper: false },
 
@@ -161,9 +166,9 @@ async function seedMenu() {
       { name: 'control-manual', label: 'Manual Control', path: '/control/manual', icon: 'Settings', order: 0, groupName: 'control', isActive: true, isDeveloper: false },
       { name: 'control-schedule', label: 'Scheduled Control', path: '/control/schedule', icon: 'Calendar', order: 1, groupName: 'control', isActive: true, isDeveloper: false },
       { name: 'control-logic', label: 'Logic Control', path: '/control/logic', icon: 'GitBranch', order: 2, groupName: 'control', isActive: true, isDeveloper: false },
-      { name: 'control-unified', label: 'Unified Control', path: '/control/unified', icon: 'Sliders', order: 3, groupName: 'control', isActive: true, isDeveloper: false },
-      { name: 'control-value', label: 'Value Control', path: '/control/value', icon: 'Gauge', order: 4, groupName: 'control', isActive: true, isDeveloper: false },
-      { name: 'control-voice', label: 'Voice Control', path: '/control/voice', icon: 'Mic', order: 5, groupName: 'control', isActive: true, isDeveloper: false },
+      { name: 'control-value', label: 'Value Control', path: '/control/value', icon: 'Gauge', order: 3, groupName: 'control', isActive: true, isDeveloper: false },
+      { name: 'control-voice', label: 'Voice Control', path: '/control/voice', icon: 'Mic', order: 4, groupName: 'control', isActive: true, isDeveloper: false },
+      { name: 'control-unified', label: 'Unified Control', path: '/control/unified', icon: 'Sliders', order: 5, groupName: 'control', isActive: true, isDeveloper: false },
 
       // Analytics Group
       { name: 'alarms-alarm-management', label: 'Alarm Management', path: '/alarms/alarm-management', icon: 'AlertTriangle', order: 0, groupName: 'analytics', isActive: true, isDeveloper: false },
@@ -189,11 +194,11 @@ async function seedMenu() {
 
       // ========== 6. ADMINISTRATION & MAINTENANCE ==========
       // Administration Group - User & System Administration
-      { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'administration', isActive: true, isDeveloper: true },
-      { name: 'system-tenant-management', label: 'Tenant Management', path: '/tenants', icon: 'Building2', order: 1, groupName: 'administration', isActive: true, isDeveloper: true },
-      { name: 'system-node-locations', label: 'Node Locations', path: '/node-tenant-locations', icon: 'MapPin', order: 2, groupName: 'administration', isActive: true, isDeveloper: true },
-      { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 15, groupName: 'administration', isActive: true, isDeveloper: true },
-      { name: 'system-menu-presets', label: 'Menu Presets', path: '/system-config/menu-presets', icon: 'Settings2', order: 16, groupName: 'administration', isActive: true, isDeveloper: true },
+      { name: 'system-user-management', label: 'User Management', path: '/system-config/user-management', icon: 'Users', order: 0, groupName: 'management', isActive: true, isDeveloper: true },
+      { name: 'system-tenant-management', label: 'Tenant Management', path: '/tenants', icon: 'Building2', order: 1, groupName: 'management', isActive: true, isDeveloper: true },
+      { name: 'system-menu-management', label: 'Menu Management', path: '/manage-menu', icon: 'Menu', order: 2, groupName: 'management', isActive: true, isDeveloper: true },
+      { name: 'system-menu-presets', label: 'Menu Presets', path: '/system-config/menu-presets', icon: 'Settings2', order: 3, groupName: 'management', isActive: true, isDeveloper: true },
+      { name: 'system-node-locations', label: 'Node Locations', path: '/node-tenant-locations', icon: 'MapPin', order: 4, groupName: 'management', isActive: true, isDeveloper: true },
 
       // Maintenance Group - Operational Maintenance
       { name: 'maintenance-schedule-management', label: 'Maintenance Schedule', path: '/maintenance/schedule-management', icon: 'Wrench', order: 0, groupName: 'maintenance', isActive: true, isDeveloper: false },
@@ -212,7 +217,15 @@ async function seedMenu() {
     for (const item of menuItems) {
       const menuItem = await prisma.menuItem.upsert({
         where: { name: item.name },
-        update: {},
+        update: {
+          menuGroupId: createdMenuGroups[item.groupName].id,
+          label: item.label,
+          path: item.path,
+          icon: item.icon,
+          order: item.order,
+          isActive: item.isActive,
+          isDeveloper: item.isDeveloper,
+        },
         create: {
           menuGroupId: createdMenuGroups[item.groupName].id,
           name: item.name,

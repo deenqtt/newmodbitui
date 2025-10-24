@@ -69,6 +69,7 @@ import {
   ChevronRight,
   Loader2,
   UploadCloud,
+  Copy,
 } from "lucide-react";
 
 interface Device {
@@ -119,7 +120,7 @@ const DevicesExternalContent = () => {
   });
 
   // Apply sorting using useSortableTable hook
-  const { sorted: sortedDevices, sortKey, sortDirection, handleSort } = useSortableTable(filteredDevices);
+  const { sorted: sortedDevices, sortField, sortDirection, handleSort } = useSortableTable(filteredDevices);
 
   // Paginate sorted results
   const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
@@ -129,7 +130,7 @@ const DevicesExternalContent = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, sortKey, sortDirection]);
+  }, [searchTerm, sortField, sortDirection]);
 
   // Fetch devices and check database status
   const fetchData = async () => {
@@ -510,7 +511,7 @@ const DevicesExternalContent = () => {
                         className="h-auto p-0 font-semibold hover:bg-transparent"
                       >
                         Device Name
-                        {sortKey === 'name' ? (
+                        {sortField === 'name' ? (
                           sortDirection === 'asc' ? (
                             <ArrowUp className="ml-2 h-4 w-4" />
                           ) : sortDirection === 'desc' ? (
@@ -530,7 +531,7 @@ const DevicesExternalContent = () => {
                         className="h-auto p-0 font-semibold hover:bg-transparent"
                       >
                         Topic
-                        {sortKey === 'topic' ? (
+                        {sortField === 'topic' ? (
                           sortDirection === 'asc' ? (
                             <ArrowUp className="ml-2 h-4 w-4" />
                           ) : sortDirection === 'desc' ? (
@@ -580,9 +581,30 @@ const DevicesExternalContent = () => {
                         <TableRow key={device.id} className="hover:bg-muted/50">
                           <TableCell className="font-medium">{device.name}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {device.topic}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {device.topic}
+                              </Badge>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(device.topic);
+                                      toast({
+                                        title: "Copied",
+                                        description: "Topic copied to clipboard",
+                                      });
+                                    }}
+                                    className="h-6 w-6"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy topic</TooltipContent>
+                              </Tooltip>
+                            </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {device.address || '-'}
@@ -605,6 +627,25 @@ const DevicesExternalContent = () => {
                                   <code className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 rounded border max-w-[150px] truncate">
                                     {latestPayload}
                                   </code>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(latestPayload);
+                                          toast({
+                                            title: "Copied",
+                                            description: "Payload data copied to clipboard",
+                                          });
+                                        }}
+                                        className="h-6 w-6"
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Copy payload data</TooltipContent>
+                                  </Tooltip>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button

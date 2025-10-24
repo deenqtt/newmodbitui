@@ -786,8 +786,8 @@ function DevicesForLoggingContent() {
                           <div className="flex items-center justify-between">
                             <code className="font-mono">{k}</code>
                             {currentConfig.key === k && (
-                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            )}
+                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 ml-2" />
+                            )} 
                           </div>
                         </SelectItem>
                       ))

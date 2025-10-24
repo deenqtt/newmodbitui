@@ -87,6 +87,13 @@ else
     SEED_LAYOUT2D=true
 fi
 
+if [[ -n "${SEED_LAYOUT2D_DATAPOINTS}" ]]; then
+    SEED_LAYOUT2D_DATAPOINTS=$(echo "${SEED_LAYOUT2D_DATAPOINTS}" | tr '[:upper:]' '[:lower:]')
+    [[ "${SEED_LAYOUT2D_DATAPOINTS}" == "true" || "${SEED_LAYOUT2D_DATAPOINTS}" == "1" ]] && SEED_LAYOUT2D_DATAPOINTS=true || SEED_LAYOUT2D_DATAPOINTS=false
+else
+    SEED_LAYOUT2D_DATAPOINTS=true
+fi
+
 if [[ -n "${SEED_LOGGING_CONFIGS}" ]]; then
     SEED_LOGGING_CONFIGS=$(echo "${SEED_LOGGING_CONFIGS}" | tr '[:upper:]' '[:lower:]')
     [[ "${SEED_LOGGING_CONFIGS}" == "true" || "${SEED_LOGGING_CONFIGS}" == "1" ]] && SEED_LOGGING_CONFIGS=true || SEED_LOGGING_CONFIGS=false
@@ -336,6 +343,7 @@ run_database_seeding() {
     [ "$SEED_DASHBOARD" = false ] && seeder_envs="$seeder_envs SEED_DASHBOARD=false"
     [ "$SEED_DEVICES" = false ] && seeder_envs="$seeder_envs SEED_DEVICES=false"
     [ "$SEED_LAYOUT2D" = false ] && seeder_envs="$seeder_envs SEED_LAYOUT2D=false"
+    [ "$SEED_LAYOUT2D_DATAPOINTS" = false ] && seeder_envs="$seeder_envs SEED_LAYOUT2D_DATAPOINTS=false"
     [ "$SEED_LOGGING_CONFIGS" = false ] && seeder_envs="$seeder_envs SEED_LOGGING_CONFIGS=false"
     [ "$SEED_ALARM_CONFIGS" = false ] && seeder_envs="$seeder_envs SEED_ALARM_CONFIGS=false"
     [ "$SEED_MAINTENANCE" = false ] && seeder_envs="$seeder_envs SEED_MAINTENANCE=false"

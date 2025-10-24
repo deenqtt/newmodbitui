@@ -37083,4 +37083,13 @@
 > newmodbitui@0.1.0 start
 > next start
 
-2025-10-24T08:36:24: 2025-10-24T08:36:24: 2025-10-24T08:36:24: 
+2025-10-24T08:36:24: 2025-10-24T08:36:24: 2025-10-24T08:36:24: 2025-10-24T13:17:51: npm warn cli npm v11.6.1 does not support Node.js v18.19.1. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+2025-10-24T13:17:51: 
+> newmodbitui@0.1.0 start
+> next start
+
+2025-10-24T13:24:17: npm warn cli npm v11.6.1 does not support Node.js v18.19.1. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+2025-10-24T13:24:17: 
+> newmodbitui@0.1.0 start
+> next start
+

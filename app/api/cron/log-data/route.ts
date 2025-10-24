@@ -1,17 +1,17 @@
 // File: app/api/cron/log-data/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import Paho from "paho-mqtt";
 
-const prisma = new PrismaClient();
-
-// ✅ GLOBAL MQTT CLIENT (Truly Persistent)
+// ✅ GLOBAL MQTT CLIENT (Truly Persistent with Auto-Reconnect)
 let globalMqttClient: Paho.Client | null = null;
 let latestPayloadsCache: Record<string, any> = {};
 let subscribedTopics = new Set<string>();
 let isConnecting = false;
 let isConnected = false;
 let connectionPromise: Promise<void> | null = null;
+let reconnectTimer: NodeJS.Timeout | null = null;
+let reconnectAttempts = 0;
 
 function getMQTTHost(): string {
   if (process.env.NEXT_PUBLIC_MQTT_HOST) {
@@ -21,9 +21,38 @@ function getMQTTHost(): string {
 }
 
 /**
- * ✅ Initialize persistent MQTT connection (called once and kept alive)
+ * ✅ Auto-reconnect function
  */
-async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
+async function attemptReconnect(requiredTopics: string[]): Promise<void> {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+  }
+
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Max 30s
+  reconnectAttempts++;
+
+  console.log(
+    `[MQTT] 🔄 Attempting reconnect in ${delay / 1000}s (attempt ${reconnectAttempts})...`
+  );
+
+  reconnectTimer = setTimeout(async () => {
+    try {
+      await ensureMqttConnection(requiredTopics, true);
+      reconnectAttempts = 0; // Reset on successful reconnect
+    } catch (error) {
+      console.error("[MQTT] ❌ Reconnect failed:", error);
+      // Will retry again via onConnectionLost
+    }
+  }, delay);
+}
+
+/**
+ * ✅ Initialize persistent MQTT connection with auto-reconnect
+ */
+async function ensureMqttConnection(
+  requiredTopics: string[],
+  isReconnect: boolean = false
+): Promise<void> {
   // ✅ If already connected, just subscribe to new topics if needed
   if (isConnected && globalMqttClient) {
     const missingTopics = requiredTopics.filter(
@@ -53,7 +82,7 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
   }
 
   // ✅ If currently connecting, wait for existing connection attempt
-  if (isConnecting && connectionPromise) {
+  if (isConnecting && connectionPromise && !isReconnect) {
     console.log("[MQTT] ⏳ Connection in progress, waiting...");
     await connectionPromise;
     return;
@@ -63,9 +92,14 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
   isConnecting = true;
 
   connectionPromise = new Promise<void>(async (resolve, reject) => {
-    console.log("[MQTT] 🔌 Initializing persistent MQTT connection...");
+    console.log(
+      `[MQTT] 🔌 ${isReconnect ? "Reconnecting" : "Initializing"} persistent MQTT connection...`
+    );
 
     try {
+      // Store topics for reconnect
+      const topicsToResubscribe = Array.from(subscribedTopics);
+
       globalMqttClient = new Paho.Client(
         getMQTTHost(),
         parseInt(process.env.NEXT_PUBLIC_MQTT_PORT || "9000"),
@@ -78,7 +112,7 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
           const payload = JSON.parse(message.payloadString);
           latestPayloadsCache[message.destinationName] = payload;
 
-          // Simplified cache logging - only log topic names, no count every time
+          // Simplified cache logging
           console.log(`[MQTT] 📥 Update: ${message.destinationName}`);
         } catch (e) {
           console.error(
@@ -87,7 +121,7 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
         }
       };
 
-      // ✅ Connection lost handler - auto-reconnect
+      // ✅ Connection lost handler with auto-reconnect
       globalMqttClient.onConnectionLost = (responseObject) => {
         isConnected = false;
         isConnecting = false;
@@ -97,12 +131,19 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
           "[MQTT] ⚠️  Connection lost:",
           responseObject.errorMessage
         );
+
+        // DON'T clear cache - keep last known values
+        // DON'T null the client yet - we'll reconnect
+
+        // Store current subscribed topics for resubscribe
+        const topicsToRestore = Array.from(subscribedTopics);
+
         console.log(
-          "[MQTT] 🔄 Connection will be re-established on next request"
+          `[MQTT] 🔄 Auto-reconnecting... (${topicsToRestore.length} topics to restore)`
         );
 
-        globalMqttClient = null;
-        subscribedTopics.clear();
+        // Attempt to reconnect
+        attemptReconnect(topicsToRestore);
       };
 
       // ✅ Connect to MQTT broker
@@ -110,37 +151,42 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
         onSuccess: () => {
           isConnected = true;
           isConnecting = false;
+          reconnectAttempts = 0; // Reset reconnect counter
 
-          console.log("[MQTT] ✅ Connected to MQTT broker (PERSISTENT)");
+          console.log(
+            `[MQTT] ✅ ${isReconnect ? "Reconnected" : "Connected"} to MQTT broker (PERSISTENT)`
+          );
 
-          // Subscribe to all required topics
+          // Clear old subscriptions set and resubscribe
+          subscribedTopics.clear();
+
+          // Combine requiredTopics with previously subscribed topics
+          const allTopics = [
+            ...new Set([...requiredTopics, ...topicsToResubscribe]),
+          ];
+
           let subscribeErrors = 0;
-          requiredTopics.forEach((topic) => {
+          allTopics.forEach((topic) => {
             try {
               globalMqttClient!.subscribe(topic);
               subscribedTopics.add(topic);
               console.log(`[MQTT] 📡 Subscribed: ${topic}`);
             } catch (error) {
               subscribeErrors++;
-              console.error(
-                `[MQTT] ❌ Failed to subscribe to ${topic}:`,
-                error
-              );
+              console.error(`[MQTT] ❌ Failed to subscribe to ${topic}:`, error);
             }
           });
 
           console.log(
-            `[MQTT] 🎉 Ready! Subscribed to ${
-              requiredTopics.length - subscribeErrors
-            }/${requiredTopics.length} topic(s)`
+            `[MQTT] 🎉 Ready! Subscribed to ${allTopics.length - subscribeErrors}/${allTopics.length} topic(s)`
           );
 
-          // ✅ Wait briefly for initial payload (only on first connect)
+          // ✅ Wait briefly for initial payload
           setTimeout(() => {
             const cacheSize = Object.keys(latestPayloadsCache).length;
             console.log(`[MQTT] 💾 Cache ready with ${cacheSize} payload(s)`);
             resolve();
-          }, 1500); // Reduced to 1.5 seconds
+          }, isReconnect ? 500 : 1500); // Shorter wait on reconnect
         },
         onFailure: (err) => {
           isConnecting = false;
@@ -148,10 +194,19 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
           connectionPromise = null;
 
           console.error("[MQTT] ❌ Failed to connect:", err.errorMessage);
-          reject(new Error(err.errorMessage));
+
+          if (isReconnect) {
+            // Retry reconnect with backoff
+            const topicsToRetry = Array.from(subscribedTopics);
+            attemptReconnect(topicsToRetry);
+            resolve(); // Don't block the request
+          } else {
+            reject(new Error(err.errorMessage));
+          }
         },
         useSSL: false,
-        keepAliveInterval: 60, // Keep connection alive
+        keepAliveInterval: 30, // Reduced from 60 to 30 seconds
+        timeout: 10, // Connection timeout
         cleanSession: false, // Preserve subscriptions
         reconnect: false, // We handle reconnect manually
       });
@@ -229,12 +284,29 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // ✅ Small delay to ensure we have fresh data (only if cache is empty)
+  // ✅ Wait for fresh data with proper timeout
   const hasAllPayloads = topics.every((topic) => latestPayloadsCache[topic]);
 
   if (!hasAllPayloads) {
-    console.log("[MQTT] ⏳ Waiting briefly for fresh payloads...");
-    await new Promise((resolve) => setTimeout(resolve, 500)); // Just 500ms!
+    console.log("[MQTT] ⏳ Waiting for fresh payloads...");
+
+    // Wait up to 3 seconds for payloads to arrive
+    const waitStart = Date.now();
+    const maxWait = 3000;
+
+    while (Date.now() - waitStart < maxWait) {
+      const allReceived = topics.every((topic) => latestPayloadsCache[topic]);
+      if (allReceived) {
+        console.log(`[MQTT] ✅ All payloads received in ${Date.now() - waitStart}ms`);
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200)); // Check every 200ms
+    }
+
+    const finalCheck = topics.filter((topic) => !latestPayloadsCache[topic]);
+    if (finalCheck.length > 0) {
+      console.warn(`[MQTT] ⚠️  Still missing payloads for: ${finalCheck.join(", ")}`);
+    }
   }
 
   // ✅ Get payloads from cache (INSTANT!)

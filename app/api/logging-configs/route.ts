@@ -1,12 +1,15 @@
 // File: app/api/logging-configs/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 // ============================================
 // GET - Fetch all logging configurations
 // ============================================
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Admin-only access for logging configuration management
+    await requireAdmin(request);
     const configs = await prisma.loggingConfiguration.findMany({
       orderBy: { customName: "asc" },
       include: {
@@ -38,6 +41,9 @@ export async function GET() {
 // ============================================
 export async function POST(request: Request) {
   try {
+    // Admin-only access for creating logging configurations
+    await requireAdmin(request);
+
     const body = await request.json();
     const {
       customName,
