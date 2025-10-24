@@ -673,26 +673,12 @@ model MenuPresetGroup {
 }
 
 model MenuPresetItem {
-  id       String     @id @default(cuid())
+  id       String @id @default(cuid())
   presetId String
   itemId   String
 
-  preset   MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  preset MenuPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
   @@unique([presetId, itemId])
   @@map("MenuPresetItem")
-}
-
-model MQTTConfiguration {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  brokerUrl String
-  username  String?
-  password  String?
-  isActive  Boolean  @default(false)
-  enable    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("MQTTConfiguration")
 }

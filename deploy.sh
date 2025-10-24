@@ -694,10 +694,13 @@ main() {
         log_warning "Some verification tests failed, but deployment may still be functional"
     fi
     
-    # Step 9: Fix database permissions for production
+    # Step 9: Fix critical file permissions after deployment
+    fix_critical_permissions
+
+    # Step 10: Fix database permissions for production
     fix_database_permissions
 
-    # Step 10: Show deployment status
+    # Step 11: Show deployment status
     show_deployment_status
 }
 
@@ -1086,22 +1089,71 @@ EOF
     log_success "Nginx configured for environment: $ENVIRONMENT_TYPE"
 }
 
+# Function to fix critical file permissions for deployment
+fix_critical_permissions() {
+    log "=== Fixing Critical File Permissions for Deployment ==="
+
+    cd "$PROJECT_ROOT"
+
+    # Fix environment file permissions (critical for Next.js)
+    if [[ -f ".env" ]]; then
+        log "Fixing .env file permissions..."
+        chmod 644 .env
+        if [[ -r ".env" ]] && [[ -w ".env" ]]; then
+            log_success ".env file permissions fixed (644)"
+        else
+            log_error "Failed to fix .env file permissions"
+        fi
+    fi
+
+    # Fix .env.local permissions too
+    if [[ -f ".env.local" ]]; then
+        chmod 644 .env.local
+    fi
+
+    # Fix certificate files if they exist
+    find . -name "*.pem" -o -name "*.crt" -o -name "*.key" 2>/dev/null | while read cert_file; do
+        if [[ -f "$cert_file" ]]; then
+            chmod 600 "$cert_file"
+            log "Fixed certificate file permissions: $cert_file"
+        fi
+    done
+
+    # Fix logs directory permissions
+    if [[ -d "logs" ]]; then
+        chmod 755 logs
+        find logs/ -type f -exec chmod 644 {} \; 2>/dev/null || true
+    fi
+
+    # Fix next.js build directory
+    if [[ -d ".next" ]]; then
+        chmod -R 755 .next
+    fi
+
+    # Fix PM2 ecosystem permissions
+    if [[ -f "ecosystem.config.js" ]]; then
+        chmod 644 ecosystem.config.js
+    fi
+
+    log_success "Critical file permissions verification completed"
+}
+
 # Function to fix database permissions for production
 fix_database_permissions() {
     log "=== Fixing Database Permissions for Production ==="
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # Check if database file exists
     if [[ -f "prisma/iot_dashboard.db" ]]; then
         log "Database file found, fixing permissions..."
-        
+
         # Change ownership to current user (not root)
         sudo chown $(whoami):$(whoami) prisma/iot_dashboard.db 2>/dev/null || true
-        
+
         # Set proper permissions for read/write access
         chmod 666 prisma/iot_dashboard.db 2>/dev/null || true
-        
+
         # Verify permissions
         if [[ -w "prisma/iot_dashboard.db" ]]; then
             log_success "Database permissions fixed successfully"

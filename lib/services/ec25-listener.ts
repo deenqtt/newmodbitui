@@ -2,10 +2,12 @@
 import mqtt from "mqtt";
 
 // Import centralized MQTT configuration
-import { getMQTTFullConfig } from "@/lib/mqtt-config";
+import { getMQTTBrokerUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
 
 // Configuration
-const EC25_MQTT_CONFIG = getMQTTFullConfig();
+const MQTT_BROKER_URL = getMQTTBrokerUrl();
+const MQTT_USERNAME = getMQTTUsername();
+const MQTT_PASSWORD = getMQTTPassword();
 
 interface ModemInfo {
   manufacturer?: string;
@@ -142,12 +144,12 @@ class EC25ListenerService {
       };
 
       // Add authentication if available
-      if (EC25_MQTT_CONFIG.username) {
-        connectionOptions.username = EC25_MQTT_CONFIG.username;
-        connectionOptions.password = EC25_MQTT_CONFIG.password;
+      if (MQTT_USERNAME) {
+        connectionOptions.username = MQTT_USERNAME;
+        connectionOptions.password = MQTT_PASSWORD;
       }
 
-      this.client = mqtt.connect(EC25_MQTT_CONFIG.brokerUrl, connectionOptions);
+      this.client = mqtt.connect(MQTT_BROKER_URL, connectionOptions);
 
       this.client.on("connect", () => {
         this.isConnected = true;

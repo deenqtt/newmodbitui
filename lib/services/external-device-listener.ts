@@ -3,10 +3,12 @@ import { PrismaClient } from "@prisma/client";
 import mqtt from "mqtt";
 
 // Import MQTT config from unified configuration
-import { getMQTTFullConfig, getMTTQConfigSync, MQTTConfig } from "@/lib/mqtt-config";
+import { getMQTTBrokerUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
 
-// Configuration - using sync version for compatibility with existing code
-const MQTT_CONFIG: MQTTConfig = getMTTQConfigSync();
+// Configuration - using WebSocket URL for all MQTT connections
+const MQTT_BROKER_URL = getMQTTBrokerUrl();
+const MQTT_USERNAME = getMQTTUsername();
+const MQTT_PASSWORD = getMQTTPassword();
 
 // Global variables
 let mqttClient: mqtt.MqttClient | null = null;
@@ -30,15 +32,15 @@ export function getExternalDeviceListenerService() {
   };
 
   // Add authentication if available
-  if (MQTT_CONFIG.username) {
-    connectionOptions.username = MQTT_CONFIG.username;
-    connectionOptions.password = MQTT_CONFIG.password;
+  if (MQTT_USERNAME) {
+    connectionOptions.username = MQTT_USERNAME;
+    connectionOptions.password = MQTT_PASSWORD;
   }
 
-  mqttClient = mqtt.connect(MQTT_CONFIG.brokerUrl, connectionOptions);
+  mqttClient = mqtt.connect(MQTT_BROKER_URL, connectionOptions);
 
   mqttClient.on("connect", async () => {
-    console.log(`📡 External device MQTT listener connected to: ${MQTT_CONFIG.brokerUrl}`);
+    console.log(`📡 External device MQTT listener connected to: ${MQTT_BROKER_URL}`);
 
     // Subscribe to all registered external devices
     await subscribeToRegisteredDevices();
@@ -53,19 +55,19 @@ export function getExternalDeviceListenerService() {
   });
 
   mqttClient.on("error", (err) => {
-    console.error(`MQTT external device listener error (${MQTT_CONFIG.brokerUrl}):`, err);
+    console.error(`MQTT external device listener error (${MQTT_BROKER_URL}):`, err);
   });
 
   mqttClient.on("close", () => {
-    console.log(`MQTT external device listener disconnected from: ${MQTT_CONFIG.brokerUrl}`);
+    console.log(`MQTT external device listener disconnected from: ${MQTT_BROKER_URL}`);
   });
 
   mqttClient.on("reconnect", () => {
-    console.log(`MQTT external device listener reconnecting to: ${MQTT_CONFIG.brokerUrl}...`);
+    console.log(`MQTT external device listener reconnecting to: ${MQTT_BROKER_URL}...`);
   });
 
   mqttClient.on("offline", () => {
-    console.log(`MQTT external device listener offline from: ${MQTT_CONFIG.brokerUrl}`);
+    console.log(`MQTT external device listener offline from: ${MQTT_BROKER_URL}`);
   });
 }
 
@@ -200,8 +202,8 @@ export async function removeExternalDeviceSubscription(topic: string) {
 export function getExternalDeviceListenerStatus() {
   return {
     connected: mqttClient?.connected || false,
-    brokerUrl: MQTT_CONFIG.brokerUrl,
-    username: MQTT_CONFIG.username || null,
+    brokerUrl: MQTT_BROKER_URL,
+    username: MQTT_USERNAME || null,
     subscribedTopics: Array.from(subscribedTopics),
     cachedDevices: topicDeviceMap.size,
   };

@@ -103,31 +103,7 @@ export function MqttProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Listen for MQTT config reload events
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleMQTTConfigReload = () => {
-        console.log('🔄 MQTT: Configuration reload triggered, reconnecting...');
-        setConnectionStatus("Reconnecting...");
-        setIsReady(false);
-
-        // Disconnect existing client
-        if (clientRef.current && clientRef.current.isConnected()) {
-          clientRef.current.disconnect();
-        }
-
-        // Clear client reference and force reinit
-        clientRef.current = null;
-        setForceReconnectKey(prev => prev + 1);
-      };
-
-      window.addEventListener('mqtt-config-reload', handleMQTTConfigReload);
-
-      return () => {
-        window.removeEventListener('mqtt-config-reload', handleMQTTConfigReload);
-      };
-    }
-  }, []);
+  // Simplified MQTT context - no config reload events needed
 
   useEffect(() => {
     if (clientRef.current) return;

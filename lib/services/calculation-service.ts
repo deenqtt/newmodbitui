@@ -9,7 +9,7 @@ import {
   DeviceExternal,
 } from "@prisma/client";
 import mqtt from "mqtt";
-import { getMQTTTcpUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
+import { getMQTTBrokerUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
 
 // Definisikan tipe gabungan untuk semua konfigurasi
 type AnyConfig = (
@@ -261,7 +261,7 @@ class CalculationService {
     }
 
     // ✅ Use centralized MQTT configuration
-    const brokerUrl = getMQTTTcpUrl();
+    const brokerUrl = getMQTTBrokerUrl();
     const username = getMQTTUsername();
     const password = getMQTTPassword();
 
