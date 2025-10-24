@@ -12,6 +12,7 @@ import { getGatewayStatsListenerService } from "./services/gateway-stats-listene
 import { getEc25ListenerService } from "./services/ec25-listener";
 import { getZigbeeListenerService } from "./services/zigbee-listener";
 import { getThermalListenerService } from "./services/thermal-listener";
+import { getExternalDeviceListenerService } from "./services/external-device-listener";
 import { getBillSchedulerService } from "./services/bill-scheduler";
 
 // 🆕 Import Logging Scheduler
@@ -45,6 +46,7 @@ export async function initializeBackgroundServices() {
   getCleanupService();
   getZigbeeListenerService();
   getThermalListenerService();
+  getExternalDeviceListenerService();
   getLoggingSchedulerService();
   getBillSchedulerService();
 
