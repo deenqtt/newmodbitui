@@ -1,13 +1,29 @@
 // MQTT Configuration - Simplified WebSocket only version
 
-// Get MQTT broker WebSocket URL from environment
+// Get MQTT broker WebSocket URL
 export function getMQTTBrokerUrl(): string {
-  const host = process.env.NEXT_PUBLIC_MQTT_HOST || 'localhost';
-  const port = process.env.NEXT_PUBLIC_MQTT_PORT || '9000';
-  const useSSL = process.env.NEXT_PUBLIC_MQTT_SSL === 'true';
+  let host: string;
+  let port: string;
+  let useSSL: boolean;
+
+  if (process.env.NODE_ENV === 'production') {
+    // In production, use dynamic hostname from browser location
+    host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    // Assume MQTT WS ports: 9000 for ws, 9443 for wss (common defaults)
+    useSSL = typeof window !== 'undefined' ? window.location.protocol === 'https:' : false;
+    port = useSSL ? '443' : '9000';
+  } else {
+    // In development, use environment variables
+    host = process.env.NEXT_PUBLIC_MQTT_HOST || 'localhost';
+    port = process.env.NEXT_PUBLIC_MQTT_PORT || '9000';
+    useSSL = process.env.NEXT_PUBLIC_MQTT_SSL === 'true';
+  }
 
   const protocol = useSSL ? 'wss://' : 'ws://';
-  return `${protocol}${host}:${port}`;
+  const url = `${protocol}${host}:${port}`;
+
+  console.log(`Connecting to MQTT broker: ${url}`);
+  return url;
 }
 
 // Get MQTT authentication credentials
