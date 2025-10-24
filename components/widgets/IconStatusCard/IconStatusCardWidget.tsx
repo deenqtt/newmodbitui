@@ -202,8 +202,10 @@ export const IconStatusCardWidget = ({ config }: Props) => {
               ? rawValue * (config.multiply || 1)
               : rawValue;
 
-          setPreviousValue(displayValue);
-          setDisplayValue(finalValue);
+          setDisplayValue((prevValue) => {
+            setPreviousValue(prevValue); // Set previous value to what displayValue was before this update
+            return finalValue;
+          });
           setStatus("ok");
           setLastUpdate(new Date());
         }
@@ -211,7 +213,7 @@ export const IconStatusCardWidget = ({ config }: Props) => {
         console.error("Failed to parse MQTT payload:", e);
       }
     },
-    [config.selectedKey, config.multiply, displayValue]
+    [config.selectedKey, config.multiply] // Removed displayValue from dependencies
   );
 
   useEffect(() => {

@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo, useRef, type FormEvent } from "react";
 import { showToast } from "@/lib/toast-utils";
 // Impor MqttProvider dan useMqtt
 import { MqttProvider, useMqtt } from "@/contexts/MqttContext";
+// Import hooks for sorting and pagination
+import { useSortableTable } from "@/hooks/use-sort-table";
+import { usePagination } from "@/hooks/use-pagination";
 // --- UI Components & Icons ---
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +76,10 @@ import {
   Search,
   RefreshCw,
   Clock, // 🆕 TAMBAH INI
+  ChevronUp,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 
 // --- Type Definitions ---
@@ -126,6 +133,8 @@ function DevicesForLoggingContent() {
   const [allDevices, setAllDevices] = useState<DeviceSelection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10; // Number of items per page
 
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,16 +151,48 @@ function DevicesForLoggingContent() {
   );
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
-  // Filter configs based on search term
-  const filteredConfigs = useMemo(() => {
+  // Search -> Sort -> Paginate sequence
+  const searchedConfigs = useMemo(() => {
     if (!searchTerm) return loggingConfigs;
+    const lowerSearchTerm = searchTerm.toLowerCase();
     return loggingConfigs.filter(
       (config) =>
-        config.customName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        config.device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        config.key.toLowerCase().includes(searchTerm.toLowerCase())
+        config.customName.toLowerCase().includes(lowerSearchTerm) ||
+        config.device.name.toLowerCase().includes(lowerSearchTerm) ||
+        config.key.toLowerCase().includes(lowerSearchTerm)
     );
   }, [loggingConfigs, searchTerm]);
+
+  // Apply sorting to searched data
+  const { sorted: sortedConfigs, sortField, sortDirection, handleSort } =
+    useSortableTable<LoggingConfig>(searchedConfigs);
+
+  // Apply pagination to sorted data
+  const { paginatedData, totalItems, totalPages, hasPrevPage, hasNextPage } =
+    usePagination(sortedConfigs, pageSize, currentPage);
+
+  // Function to render sort indicator
+  const renderSortIndicator = (field: string) => {
+    if (sortField !== field) return null;
+    return sortDirection === "asc" ? (
+      <ChevronUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ChevronDown className="h-4 w-4 ml-1" />
+    );
+  };
+
+  // Function to handle column sort
+  const handleSortClick = (field: string) => {
+    handleSort(field);
+    setCurrentPage(1); // Reset to first page when sorting changes
+  };
+
+  // Pagination handlers
+  const goToFirstPage = () => setCurrentPage(1);
+  const goToPrevPage = () => setCurrentPage((prev) => Math.max(1, prev - 1));
+  const goToNextPage = () =>
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  const goToLastPage = () => setCurrentPage(totalPages);
 
   // --- MQTT Subscription Logic ---
   useEffect(() => {
@@ -201,6 +242,11 @@ function DevicesForLoggingContent() {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  // Reset page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // --- Form & Modal Handlers ---
   const availableKeys = useMemo(() => {
@@ -545,18 +591,41 @@ function DevicesForLoggingContent() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        Device
+                      <TableHead
+                        className="font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 select-none"
+                        onClick={() => handleSortClick("device.name")}
+                      >
+                        <div className="flex items-center">
+                          Device
+                          {renderSortIndicator("device.name")}
+                        </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        Configuration
+                      <TableHead
+                        className="font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 select-none"
+                        onClick={() => handleSortClick("customName")}
+                      >
+                        <div className="flex items-center">
+                          Configuration
+                          {renderSortIndicator("customName")}
+                        </div>
                       </TableHead>
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        Data Key
+                      <TableHead
+                        className="font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 select-none"
+                        onClick={() => handleSortClick("key")}
+                      >
+                        <div className="flex items-center">
+                          Data Key
+                          {renderSortIndicator("key")}
+                        </div>
                       </TableHead>
-                      {/* 🆕 TAMBAH COLUMN INI */}
-                      <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                        Interval
+                      <TableHead
+                        className="font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 select-none"
+                        onClick={() => handleSortClick("loggingIntervalMinutes")}
+                      >
+                        <div className="flex items-center">
+                          Interval
+                          {renderSortIndicator("loggingIntervalMinutes")}
+                        </div>
                       </TableHead>
                       <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">
                         Actions
@@ -575,28 +644,32 @@ function DevicesForLoggingContent() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ) : filteredConfigs.length === 0 ? (
+                    ) : paginatedData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center h-48">
+                        <TableCell colSpan={5} className="text-center h-48">
                           <div className="flex flex-col items-center gap-3">
                             <Settings className="h-12 w-12 text-muted-foreground/50" />
                             <div className="space-y-1">
                               <p className="text-muted-foreground font-medium">
-                                {searchTerm
+                                {totalItems === 0
+                                  ? "No configurations available"
+                                  : searchTerm
                                   ? "No configurations found"
-                                  : "No configurations available"}
+                                  : `${totalItems} configuration${totalItems !== 1 ? 's' : ''} available - check other pages`}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {searchTerm
+                                {totalItems === 0
+                                  ? "Add your first logging configuration to get started"
+                                  : searchTerm
                                   ? "Try adjusting your search terms"
-                                  : "Add your first logging configuration to get started"}
+                                  : "Use pagination controls below to navigate"}
                               </p>
                             </div>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredConfigs.map((config) => (
+                      paginatedData.map((config: LoggingConfig) => (
                         <TableRow
                           key={config.id}
                           className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors duration-200"
@@ -697,6 +770,69 @@ function DevicesForLoggingContent() {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <span>
+                      Showing {Math.min((currentPage - 1) * pageSize + 1, totalItems)} to{' '}
+                      {Math.min(currentPage * pageSize, totalItems)} of {totalItems} results
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToFirstPage}
+                      disabled={!hasPrevPage}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPrevPage}
+                      disabled={!hasPrevPage}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (pageNum > totalPages) return null;
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={!hasNextPage}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToLastPage}
+                      disabled={!hasNextPage}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

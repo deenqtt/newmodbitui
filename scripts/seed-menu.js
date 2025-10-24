@@ -173,7 +173,7 @@ async function seedMenu() {
       // Analytics Group
       { name: 'alarms-alarm-management', label: 'Alarm Management', path: '/alarms/alarm-management', icon: 'AlertTriangle', order: 0, groupName: 'analytics', isActive: true, isDeveloper: false },
       { name: 'alarms-alarm-log-reports', label: 'Alarm Reports', path: '/alarms/alarm-log-reports', icon: 'FileBarChart', order: 1, groupName: 'analytics', isActive: true, isDeveloper: false },
-      { name: 'analytics-devices-log-report', label: 'Device Analytics', path: '/analytics/devices-log-report', icon: 'BarChart', order: 2, groupName: 'analytics', isActive: true, isDeveloper: false },
+      { name: 'analytics-devices-log-report', label: 'Report Analytics', path: '/analytics/devices-log-report', icon: 'BarChart', order: 2, groupName: 'analytics', isActive: true, isDeveloper: false },
 
       // ========== 4. SECURITY & ACCESS ==========
       // Security Group - Core security features

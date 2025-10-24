@@ -98,7 +98,6 @@ async function seedDashboard() {
     console.log('   🌡️  PH & Temp Sensors: 3 PH index cards + 3 temperature cards + 3 sensor charts');
     console.log('   🌬️  Air Quality: 2 PM2.5 sensor cards + 2 coating temperature cards + 3 air quality charts');
     console.log('   🏠 Shortcuts: Quick access to Layout Canvas 2D monitoring system');
-    console.log('   📊 Total Widgets: 19 widgets configured across multiple parameters');
 
     console.log('✅ Dashboard seeding completed successfully');
     console.log('🚀 Ready-to-use dashboard with monitoring widgets available.');

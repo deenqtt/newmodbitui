@@ -24,7 +24,7 @@ const SEED_CONFIG = {
   ENABLE_LAYOUT2D_DATAPOINTS: process.env.SEED_LAYOUT2D_DATAPOINTS !== 'false', // Default: true
   ENABLE_LOGGING_CONFIGS: process.env.SEED_LOGGING_CONFIGS !== 'false', // Default: true
   ENABLE_MAINTENANCE: process.env.SEED_MAINTENANCE !== 'false', // Default: true
-  ENABLE_ALARM_CONFIGS: process.env.SEED_ALARM_CONFIGS !== 'false', // Default: true
+  ENABLE_ALARM_CONFIGS: process.env.SEED_ALARM_CONFIGS !== 'true', // Default: true
   RESET_DATABASE: process.env.RESET_DB !== 'false', // Default: true
   FORCE_PRISMA_GENERATE: process.env.FORCE_GENERATE !== 'false', // Default: true
 };

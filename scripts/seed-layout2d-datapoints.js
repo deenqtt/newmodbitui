@@ -2,115 +2,185 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Data points untuk IoT-Based Wastewater Treatment Monitoring System
+// Data points untuk IoT-Based Wastewater Treatment Monitoring System dari TASK.md
 const DATAPOINTS_DATA = [
   {
-    // Water Flow Meter 1 - Connected to limbah-flow1 device
-    deviceUniqId: "limbah-flow1",
-    customName: "Water Flow Meter 1",
-    positionX: 31.59340659340659,
-    positionY: 35.3349523404772,
-    fontSize: 18,
-    color: "#fafafa",
-    iconName: "TrendingUp",
-    iconColor: "#00ff1e",
-    showIcon: true,
-    displayLayout: "vertical",
-    selectedKeys: [
+    "id": "cmh4hp3m000apgvn5q5wns7ij",
+    "layoutId": "cmh46o30200glgvd19lxhgvkv",
+    "deviceUniqId": "limbah-flow1",
+    "selectedKey": null,
+    "selectedKeys": [
       {
-        key: "flow_rate",
-        units: "L/s",
-        multiply: 1,
-        customName: "flow_rate"
+        "key": "flow_rate",
+        "units": "L/s",
+        "multiply": 1,
+        "customName": "flow_rate"
       },
       {
-        key: "total_flow_this_month",
-        units: "L",
-        multiply: 1,
-        customName: "total_flow_this_month"
+        "key": "total_flow_this_month",
+        "units": "L",
+        "multiply": 1,
+        "customName": "total_flow_this_month"
       }
-    ]
+    ],
+    "units": null,
+    "multiply": 1,
+    "customName": "Water Flow Meter 1",
+    "positionX": 31.59340659340659,
+    "positionY": 35.3349523404772,
+    "fontSize": 18,
+    "color": "#fafafa",
+    "iconName": "TrendingUp",
+    "iconColor": "#00ff1e",
+    "showIcon": true,
+    "displayLayout": "vertical",
+    "createdAt": "2025-10-24T06:48:19.080Z",
+    "updatedAt": "2025-10-24T06:48:32.305Z",
+    "device": {
+      "uniqId": "limbah-flow1",
+      "name": "WATER FLOW 1",
+      "topic": "limbah/flow1",
+      "lastPayload": {
+        "device_name": "flowMeter1",
+        "protocol_type": "MODBUS RTU",
+        "comport": "/dev/ttyUSB0",
+        "modbus_address": 3,
+        "value": "{\"flow_rate\": 0.0, \"velocity\": 0.0, \"flow_direction\": \"No Flow\", \"total_flow\": 0.0, \"total_flow_today\": 0.0, \"total_flow_this_month\": 21.0, \"error_status\": \"Low Signal\", \"error_code\": 2, \"error_details\": {\"no_signal\": 0, \"low_signal\": 1, \"poor_signal\": 0, \"pipe_empty\": 0, \"hardware_failure\": 0, \"status\": \"Low Signal\"}, \"signal_quality\": 0, \"working_step\": 3, \"upstream_strength\": 3258, \"downstream_strength\": 3357, \"signal_strength_status\": \"Excellent\", \"temperature_inlet\": -0.0, \"temperature_outlet\": -0.0, \"temperature_difference\": -0.0, \"working_hours\": 14925, \"meter_health\": \"Poor\", \"polling_duration\": 2.68637752532959}"
+      },
+      "lastUpdatedByMqtt": "2025-10-24T10:12:14.825Z"
+    }
   },
   {
-    // PH Sensor 1 - Connected to limbah-ph1 device
-    deviceUniqId: "limbah-ph1",
-    customName: "PH Sensor 1",
-    positionX: 36.81318681318682,
-    positionY: 49.66474409568332,
-    fontSize: 18,
-    color: "#ffffff",
-    iconName: "Droplets",
-    iconColor: "#006eff",
-    showIcon: true,
-    displayLayout: "vertical",
-    selectedKeys: [
+    "id": "cmh4hryck00bpgvn5klscf41t",
+    "layoutId": "cmh46o30200glgvd19lxhgvkv",
+    "deviceUniqId": "limbah-ph1",
+    "selectedKey": null,
+    "selectedKeys": [
       {
-        key: "temp",
-        units: "C",
-        multiply: 1,
-        customName: "temp"
+        "key": "temp",
+        "units": "C",
+        "multiply": 1,
+        "customName": "temp"
       },
       {
-        key: "ph",
-        units: "%",
-        multiply: 1,
-        customName: "ph"
+        "key": "ph",
+        "units": "pH",
+        "multiply": 1,
+        "customName": "ph"
       }
-    ]
+    ],
+    "units": null,
+    "multiply": 1,
+    "customName": "PH Sensor 1",
+    "positionX": 36.81318681318682,
+    "positionY": 49.66474409568332,
+    "fontSize": 18,
+    "color": "#ffffff",
+    "iconName": "Droplets",
+    "iconColor": "#006eff",
+    "showIcon": true,
+    "displayLayout": "vertical",
+    "createdAt": "2025-10-24T06:50:32.228Z",
+    "updatedAt": "2025-10-24T08:00:14.103Z",
+    "device": {
+      "uniqId": "limbah-ph1",
+      "name": "SENSOR PH 1",
+      "topic": "limbah/ph1",
+      "lastPayload": {
+        "device_name": "sensorPh1",
+        "protocol_type": "MODBUS RTU",
+        "comport": "/dev/ttyUSB0",
+        "modbus_address": 1,
+        "value": "{\"temp\": 31.65, \"ph\": 2.83, \"PollingDuration\": 1.0475738048553467}"
+      },
+      "lastUpdatedByMqtt": "2025-10-24T10:12:18.103Z"
+    }
   },
   {
-    // PH Sensor 2 - Connected to limbah-ph2 device
-    deviceUniqId: "limbah-ph2",
-    customName: "PH Sensor 2",
-    positionX: 52.30769230769231,
-    positionY: 50.82180802622791,
-    fontSize: 18,
-    color: "#ededed",
-    iconName: "Thermometer",
-    iconColor: "#00ff91",
-    showIcon: true,
-    displayLayout: "vertical",
-    selectedKeys: [
+    "id": "cmh4ht2n000c0gvn5fooytvjc",
+    "layoutId": "cmh46o30200glgvd19lxhgvkv",
+    "deviceUniqId": "limbah-ph2",
+    "selectedKey": null,
+    "selectedKeys": [
       {
-        key: "temp",
-        units: "C",
-        multiply: 1,
-        customName: "temp"
+        "key": "temp",
+        "units": "C",
+        "multiply": 1,
+        "customName": "temp"
       },
       {
-        key: "ph",
-        units: "%",
-        multiply: 1,
-        customName: "ph"
+        "key": "ph",
+        "units": "pH",
+        "multiply": 1,
+        "customName": "ph"
       }
-    ]
+    ],
+    "units": null,
+    "multiply": 1,
+    "customName": "PH Sensor 2",
+    "positionX": 52.30769230769231,
+    "positionY": 50.82180802622791,
+    "fontSize": 18,
+    "color": "#ededed",
+    "iconName": "Thermometer",
+    "iconColor": "#00ff91",
+    "showIcon": true,
+    "displayLayout": "vertical",
+    "createdAt": "2025-10-24T06:51:24.444Z",
+    "updatedAt": "2025-10-24T08:00:14.400Z",
+    "device": {
+      "uniqId": "limbah-ph2",
+      "name": "SENSOR PH 2",
+      "topic": "limbah/ph2",
+      "lastPayload": {
+        "device_name": "sensorPh2",
+        "protocol_type": "MODBUS RTU",
+        "comport": "/dev/ttyUSB0",
+        "modbus_address": 2,
+        "value": "{\"temp\": 31.48, \"ph\": 9.22, \"PollingDuration\": 1.0494210720062256}"
+      },
+      "lastUpdatedByMqtt": "2025-10-24T10:12:21.286Z"
+    }
   },
   {
-    // Water Flow Meter 2 - Connected to limbah-flow2 device
-    deviceUniqId: "limbah-flow2",
-    customName: "Water Flow Meter 2",
-    positionX: 62.91208791208791,
-    positionY: 62.21443749620544,
-    fontSize: 18,
-    color: "#ffffff",
-    iconName: "TrendingDown",
-    iconColor: "#f50000",
-    showIcon: true,
-    displayLayout: "vertical",
-    selectedKeys: [
+    "id": "cmh4hu5on00cegvn5qkzd9p64",
+    "layoutId": "cmh46o30200glgvd19lxhgvkv",
+    "deviceUniqId": "limbah-flow2",
+    "selectedKey": null,
+    "selectedKeys": [
       {
-        key: "flow_rate",
-        units: "L/s",
-        multiply: 1,
-        customName: "flow_rate"
+        "key": "flow_rate",
+        "units": "L/s",
+        "multiply": 1,
+        "customName": "flow_rate"
       },
       {
-        key: "total_flow_this_month",
-        units: "L",
-        multiply: 1,
-        customName: "total_flow_this_month"
+        "key": "total_flow_this_month",
+        "units": "L",
+        "multiply": 1,
+        "customName": "total_flow_this_month"
       }
-    ]
+    ],
+    "units": null,
+    "multiply": 1,
+    "customName": "Water Flow Meter 2",
+    "positionX": 62.91208791208791,
+    "positionY": 62.21443749620544,
+    "fontSize": 18,
+    "color": "#ffffff",
+    "iconName": "TrendingDown",
+    "iconColor": "#f50000",
+    "showIcon": true,
+    "displayLayout": "vertical",
+    "createdAt": "2025-10-24T06:52:15.047Z",
+    "updatedAt": "2025-10-24T08:00:18.463Z",
+    "device": {
+      "uniqId": "limbah-flow2",
+      "name": "WATER FLOW 2",
+      "topic": "limbah/flow2",
+      "lastPayload": null,
+      "lastUpdatedByMqtt": null
+    }
   }
 ];
 
@@ -194,7 +264,7 @@ async function seedLayout2DDataPoints() {
             displayLayout: dataPointData.displayLayout,
             // For backward compatibility
             selectedKey: null,
-            selectedKeys: dataPointData.selectedKeys,
+            selectedKeys: JSON.stringify(dataPointData.selectedKeys),
             units: null,
             multiply: 1
           };
@@ -299,9 +369,15 @@ async function verifyDataPoints() {
         console.log(`      Topic: ${dp.device?.topic}`);
         console.log(`      Icon: ${dp.iconName || 'None'} (${dp.iconColor || 'N/A'})`);
         console.log(`      Position: (${dp.positionX.toFixed(2)}, ${dp.positionY.toFixed(2)})`);
-        console.log(`      Keys: ${dp.selectedKeys?.length || 0} key(s)`);
-        if (dp.selectedKeys && dp.selectedKeys.length > 0) {
-          dp.selectedKeys.forEach(key => {
+        let parsedKeys = [];
+        try {
+          parsedKeys = dp.selectedKeys ? JSON.parse(dp.selectedKeys) : [];
+        } catch (e) {
+          // ignore
+        }
+        console.log(`      Keys: ${parsedKeys.length} key(s)`);
+        if (parsedKeys.length > 0) {
+          parsedKeys.forEach(key => {
             console.log(`         • ${key.customName}: key="${key.key}", units="${key.units}"`);
           });
         }

@@ -45,6 +45,18 @@ const DEVICES_DATA = [
     address: null,
     topic: "limbah/airquality2/sps30",
     uniqId: "limbah-airquality2-sps30"
+  },
+  {
+    name: "AIR QUALITY TH 1",
+    address: null,
+    topic: "limbah/airquality1/sht4x",
+    uniqId: "limbah-airquality1-sht4x"
+  },
+  {
+    name: "AIR QUALITY TH 2",
+    address: null,
+    topic: "limbah/airquality2/sht4x",
+    uniqId: "limbah-airquality2-sht4x"
   }
 ];
 

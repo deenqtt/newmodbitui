@@ -1,1 +1,0 @@
-masih tidak muncul jadi jika saya menggunakan 10.8.0.182:900 jika saya jalankan di local saya npm run dev dia berhasil running, dan topic dari tiap device external terbaca, tapi jika sudah saya install di server 10.9.0.182 dan emnggunakan  localhost topci dari tiap device external tidak terbaca kenapa ya
