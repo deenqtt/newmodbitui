@@ -148,8 +148,9 @@ async function seedMenu() {
 
       // Network Group
       { name: 'network-mqtt-broker', label: 'MQTT Broker', path: '/network/mqtt-broker', icon: 'Radio', order: 0, groupName: 'network', isActive: true, isDeveloper: false },
-      { name: 'network-communication-setup', label: 'Communication Setup', path: '/network/communication-setup', icon: 'Waves', order: 1, groupName: 'network', isActive: true, isDeveloper: false },
-      { name: 'network-register-snmp', label: 'SNMP Registration', path: '/network/register-snmp', icon: 'Database', order: 2, groupName: 'network', isActive: true, isDeveloper: false },
+      { name: 'network-mqtt-configurations', label: 'MQTT Configurations', path: '/mqtt-configurations', icon: 'Settings', order: 1, groupName: 'network', isActive: true, isDeveloper: false },
+      { name: 'network-communication-setup', label: 'Communication Setup', path: '/network/communication-setup', icon: 'Waves', order: 2, groupName: 'network', isActive: true, isDeveloper: false },
+      { name: 'network-register-snmp', label: 'SNMP Registration', path: '/network/register-snmp', icon: 'Database', order: 3, groupName: 'network', isActive: true, isDeveloper: false },
 
       // ========== 3. MONITORING & CONTROL ==========
       // Monitoring Group - Active monitoring features

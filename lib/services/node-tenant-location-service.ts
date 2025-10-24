@@ -353,22 +353,43 @@ class NodeLocationStatusScheduler {
   }
 
   /**
-   * Jalankan update sekali
+   * Jalankan update sekali (Simplified logging)
    */
   async runUpdate() {
     try {
       if (!this.isRunning) return;
 
-      console.log(`[${new Date().toISOString()}] NodeLocationStatusScheduler: Running scheduled update...`);
       const result = await autoUpdateAllNodeTenantLocationStatus();
+      schedulerStats.totalUpdates++;
+      schedulerStats.trueCount += result.updatedToTrue.length;
+      schedulerStats.falseCount += result.updatedToFalse.length;
+      schedulerStats.errorCount += result.errors.length;
 
-      // Log summary
-      if (result.updatedToTrue.length > 0 || result.updatedToFalse.length > 0 || result.errors.length > 0) {
-        console.log(`[${new Date().toISOString()}] Summary - Checked: ${result.totalChecked}, TRUE: ${result.updatedToTrue.length}, FALSE: ${result.updatedToFalse.length}, Errors: ${result.errors.length}`);
+      // Log each status change only if there are changes (reduced verbosity)
+      if (result.updatedToTrue.length > 0) {
+        result.updatedToTrue.forEach(msg => {
+          console.log(`📍 [LOCATION] Status TRUE: ${msg.split(':')[0]}`);
+        });
+      }
+
+      if (result.updatedToFalse.length > 0) {
+        result.updatedToFalse.forEach(msg => {
+          console.log(`📍 [LOCATION] Status FALSE: ${msg.split(':')[0]}`);
+        });
+      }
+
+      // Periodic summary every 10 minutes instead of every minute
+      const now = Date.now();
+      if (now - lastSchedulerSummary > 10 * 60 * 1000) { // 10 minutes
+        console.log(`📈 [SCHEDULER] ${schedulerStats.totalUpdates} updates - TRUE: ${schedulerStats.trueCount}, FALSE: ${schedulerStats.falseCount}, ERRORS: ${schedulerStats.errorCount}`);
+
+        // Reset stats
+        schedulerStats = { totalUpdates: 0, trueCount: 0, falseCount: 0, errorCount: 0 };
+        lastSchedulerSummary = now;
       }
 
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] NodeLocationStatusScheduler: Error in scheduled update:`, error);
+      console.error(`🚨 [SCHEDULER] Critical error:`, error);
     }
   }
 
@@ -386,3 +407,6 @@ class NodeLocationStatusScheduler {
 
 // Export singleton instance
 export const nodeLocationStatusScheduler = new NodeLocationStatusScheduler();
+
+let lastSchedulerSummary = Date.now();
+let schedulerStats = { totalUpdates: 0, trueCount: 0, falseCount: 0, errorCount: 0 };

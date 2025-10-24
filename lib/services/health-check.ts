@@ -11,6 +11,8 @@ const OFFLINE_THRESHOLD_MS = 90000; // Dianggap offline jika tidak ada kabar > 9
 
 let intervalId: NodeJS.Timeout | null = null;
 let mqttClient: mqtt.MqttClient | null = null;
+let lastStatusLog = Date.now(); // Track last status summary log
+let statusSummary = { online: 0, offline: 0, totalChecks: 0 };
 
 async function checkOfflineControllers() {
   const cutoffTime = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
@@ -29,7 +31,11 @@ async function checkOfflineControllers() {
     },
   });
 
+  statusSummary.totalChecks++;
+
   if (controllersToUpdate.length > 0) {
+    statusSummary.offline += controllersToUpdate.length;
+
     const result = await prisma.accessController.updateMany({
       where: {
         id: {
@@ -39,14 +45,25 @@ async function checkOfflineControllers() {
       data: {
         status: "offline",
         lockCount: 0,
-        doorStatus: { set: [-1, -1, -1, -1] },
-        lockAddresses: { set: [] },
       },
     });
+
+    // Log offline detection with summary
+    controllersToUpdate.forEach((controller) => {
+      console.log(`⚠️ [Health Check] Controller offline: ${controller.name}`);
+    });
   } else {
-    console.log(
-      "... [Health Check] Semua controller online sehat. Tidak ada tindakan."
-    );
+    statusSummary.online++;
+  }
+
+  // Periodic status summary every 5 minutes (instead of every minute logging)
+  const now = Date.now();
+  if (now - lastStatusLog > 5 * 60 * 1000) { // 5 minutes
+    console.log(`📊 [Health Check] Status summary - Online: ${statusSummary.online}, Offline: ${statusSummary.offline} (Total checks: ${statusSummary.totalChecks})`);
+
+    // Reset summary counters
+    statusSummary = { online: 0, offline: 0, totalChecks: 0 };
+    lastStatusLog = now;
   }
 }
 
@@ -89,8 +106,6 @@ export function getHealthCheckService() {
             ipAddress: ip,
             status: "online",
             lockCount: locks,
-            doorStatus: { set: doorStatus || [] },
-            lockAddresses: { set: lockAddresses || [] },
             lastSeen: new Date(),
           },
           create: {
@@ -99,9 +114,6 @@ export function getHealthCheckService() {
             name: `New Controller (${ip})`,
             status: "online",
             lockCount: locks,
-            doorStatus: { set: doorStatus || [] },
-            lockAddresses: { set: lockAddresses || [] },
-            // lastSeen juga ditambahkan saat create
             lastSeen: new Date(),
           },
         });

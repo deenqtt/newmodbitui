@@ -78,10 +78,8 @@ async function ensureMqttConnection(requiredTopics: string[]): Promise<void> {
           const payload = JSON.parse(message.payloadString);
           latestPayloadsCache[message.destinationName] = payload;
 
-          const cacheSize = Object.keys(latestPayloadsCache).length;
-          console.log(
-            `[MQTT] 📥 Cached payload: ${message.destinationName} (${cacheSize} total)`
-          );
+          // Simplified cache logging - only log topic names, no count every time
+          console.log(`[MQTT] 📥 Update: ${message.destinationName}`);
         } catch (e) {
           console.error(
             `[MQTT] ❌ Failed to parse payload from ${message.destinationName}`

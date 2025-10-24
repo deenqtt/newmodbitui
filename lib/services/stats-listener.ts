@@ -3,8 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import mqtt from "mqtt";
 
-const MQTT_BROKER_URL =
-  process.env.MQTT_BROKER_URL || "mqtt://52.74.91.79:1883";
+import { getMQTTTcpUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
+
+const MQTT_BROKER_URL = getMQTTTcpUrl();
 const STATS_TOPIC = "iot/door/stats/+"; // Dengarkan semua controller
 
 let mqttClient: mqtt.MqttClient | null = null;

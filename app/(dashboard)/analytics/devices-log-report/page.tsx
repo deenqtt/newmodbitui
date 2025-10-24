@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 
 // --- UI Components & Icons ---
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   Trash2,
   ChevronLeft,
@@ -91,6 +91,21 @@ export default function DeviceLogReportPage() {
   }>({
     configId: "all",
     datePreset: "last_7_days",
+  });
+
+  // Delete confirmation dialog state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText: string;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    confirmText: "",
+    cancelText: "",
   });
 
   const { toast } = useToast();
@@ -201,7 +216,50 @@ export default function DeviceLogReportPage() {
   }, [searchTerm, sortField, sortDirection, filters]);
 
   const handleDeleteAll = () => {
-    console.log("Delete all functionality disabled");
+    setDeleteConfirmation({
+      open: true,
+      title: "Delete All Device Logs",
+      description: `Are you sure you want to permanently delete ${logs.length} logged data entries? This action cannot be undone and will remove all historical monitoring data from your system.`,
+      confirmText: "Yes, Delete All Logs",
+      cancelText: "Cancel",
+    });
+  };
+
+  const confirmDeleteAll = async () => {
+    setDeleteConfirmation({ ...deleteConfirmation, open: false });
+
+    try {
+      const response = await fetch("/api/devices-log-report", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete logs");
+      }
+
+      toast({
+        title: "Logs Deleted Successfully",
+        description: "All device log entries have been removed from the system.",
+        variant: "default",
+      });
+
+      // Refresh the data after successful deletion
+      fetchLogs();
+    } catch (error: any) {
+      console.error("Delete all logs error:", error);
+      toast({
+        title: "Failed to Delete Logs",
+        description: error.message || "Could not delete device logs. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const cancelDeleteAll = () => {
+    setDeleteConfirmation({ ...deleteConfirmation, open: false });
   };
 
   const handleExport = () => {
@@ -673,6 +731,20 @@ export default function DeviceLogReportPage() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmationDialog
+          open={deleteConfirmation.open}
+          onOpenChange={(open) => setDeleteConfirmation({ ...deleteConfirmation, open })}
+          type="destructive"
+          title={deleteConfirmation.title}
+          description={deleteConfirmation.description}
+          confirmText={deleteConfirmation.confirmText}
+          cancelText={deleteConfirmation.cancelText}
+          onConfirm={confirmDeleteAll}
+          onCancel={cancelDeleteAll}
+          destructive={true}
+        />
       </div>
     </div>
   );

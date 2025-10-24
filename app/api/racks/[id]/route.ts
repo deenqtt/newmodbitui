@@ -9,7 +9,7 @@ const rackUpdateSchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
 });
 
-// GET /api/racks/[id] - Get rack by ID with full details
+// GET /api/racks/[id] - Get rack by ID with full details and device relationships
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -21,13 +21,23 @@ export async function GET(
       where: { id },
       include: {
         devices: {
+          include: {
+            device: {
+              select: {
+                id: true,
+                uniqId: true,
+                name: true,
+                topic: true,
+                address: true,
+                lastPayload: true,
+                lastUpdatedByMqtt: true
+              }
+            }
+          },
           orderBy: [
             { positionU: 'desc' }, // Sort by position (higher U first)
             { createdAt: 'desc' }
           ]
-        },
-        _count: {
-          select: { devices: true }
         }
       }
     });
@@ -39,9 +49,13 @@ export async function GET(
       );
     }
 
-    // Calculate capacity information
-    const usedU = rack.devices.reduce((total: number, device: any) => {
-      return total + (device.sizeU || 1);
+    // Calculate capacity information - exclude sensor devices from capacity calculation
+    const usedU = rack.devices.reduce((total, rackDevice) => {
+      // Sensor devices don't occupy physical rack space, so they don't count towards capacity
+      if (rackDevice.deviceType === "SENSOR") {
+        return total; // Don't add sensor devices to used capacity
+      }
+      return total + rackDevice.sizeU;
     }, 0);
 
     const rackWithCapacity = {
@@ -105,7 +119,8 @@ export async function PUT(
           select: {
             id: true,
             positionU: true,
-            sizeU: true
+            sizeU: true,
+            status: true
           }
         },
         _count: {

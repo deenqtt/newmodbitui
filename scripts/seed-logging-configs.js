@@ -11,6 +11,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "L/s",
     multiply: 1,
     deviceUniqId: "limbah-flow1",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:23:16.559Z",
     updatedAt: "2025-10-17T04:23:16.559Z"
   },
@@ -21,6 +22,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "L/s",
     multiply: 1,
     deviceUniqId: "limbah-flow2",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:24:09.002Z",
     updatedAt: "2025-10-17T04:24:09.002Z"
   },
@@ -31,6 +33,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "%",
     multiply: 1,
     deviceUniqId: "limbah-ph1",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:25:45.483Z",
     updatedAt: "2025-10-17T04:25:45.483Z"
   },
@@ -38,9 +41,10 @@ const LOGGING_CONFIGS_DATA = [
     id: "ph-sensor-2",
     customName: "PH [PH Sensor 2]",
     key: "ph",
-    units: "C",
+    units: "%",
     multiply: 1,
     deviceUniqId: "limbah-ph2",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:26:04.788Z",
     updatedAt: "2025-10-17T04:26:04.788Z"
   },
@@ -51,6 +55,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "C",
     multiply: 1,
     deviceUniqId: "limbah-ph1",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:25:07.173Z",
     updatedAt: "2025-10-17T04:25:07.173Z"
   },
@@ -61,6 +66,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "C",
     multiply: 1,
     deviceUniqId: "limbah-ph2",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:26:24.709Z",
     updatedAt: "2025-10-17T04:26:24.709Z"
   },
@@ -71,6 +77,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "L",
     multiply: 1,
     deviceUniqId: "limbah-flow1",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:23:49.875Z",
     updatedAt: "2025-10-17T04:23:49.875Z"
   },
@@ -81,6 +88,7 @@ const LOGGING_CONFIGS_DATA = [
     units: "L",
     multiply: 1,
     deviceUniqId: "limbah-flow2",
+    loggingIntervalMinutes: 10,
     createdAt: "2025-10-17T04:24:35.002Z",
     updatedAt: "2025-10-17T04:24:35.002Z"
   }
@@ -136,6 +144,7 @@ async function seedLoggingConfigs() {
                 customName: configData.customName,
                 units: configData.units,
                 multiply: configData.multiply,
+                loggingIntervalMinutes: configData.loggingIntervalMinutes,
                 deviceUniqId: configData.deviceUniqId,
                 updatedAt: new Date()
               }
@@ -151,6 +160,7 @@ async function seedLoggingConfigs() {
                 customName: configData.customName,
                 units: configData.units,
                 multiply: configData.multiply,
+                loggingIntervalMinutes: configData.loggingIntervalMinutes,
                 updatedAt: new Date()
               }
             });
@@ -166,6 +176,7 @@ async function seedLoggingConfigs() {
                 key: configData.key,
                 units: configData.units,
                 multiply: configData.multiply,
+                loggingIntervalMinutes: configData.loggingIntervalMinutes,
                 deviceUniqId: configData.deviceUniqId,
                 createdAt: new Date(configData.createdAt),
                 updatedAt: new Date(configData.updatedAt)

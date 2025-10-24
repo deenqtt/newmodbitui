@@ -30,50 +30,32 @@ export async function initializeBackgroundServices() {
     return;
   }
 
-  console.log("🚀 Initializing all background services for production...\n");
+  console.log("🚀 Starting background services...");
 
-  // Seed default users first (if needed)
-  try {
-    await userSeederService.seedDefaultUsers();
-  } catch (error) {
-    console.error("Failed to seed default users:", error);
-  }
+  // Background user seeding (silent)
+  userSeederService.seedDefaultUsers().catch(() => {});
 
-  // Initialize all services
+  // Initialize all services (silent where possible)
   getAlarmMonitorService();
   getCalculationService();
   getHealthCheckService();
   getLogListenerService();
   getZkTecoService();
   getStatsListenerService();
-  // getLoraListenerService();
   getCleanupService();
-  // getGatewayStatsListenerService();
   getZigbeeListenerService();
   getThermalListenerService();
-
-  // 🆕 Initialize Logging Scheduler Service
   getLoggingSchedulerService();
   getBillSchedulerService();
 
-  // 🆕 Start NodeTenantLocation Status Scheduler
-  try {
-    nodeLocationStatusScheduler.start(1); // Monitor setiap 1 menit
-    console.log("✅ NodeTenantLocation Status Scheduler started (1 minute intervals)");
-  } catch (error) {
-    console.error("❌ Failed to start NodeTenantLocation Status Scheduler:", error);
-  }
+  // Start schedulers (minimal logging)
+  nodeLocationStatusScheduler.start(1);
 
-  // 🆕 Start NodeTenantLocation MQTT Listener (setelah semua service lain ready)
+  // Start MQTT listener with delay
   setTimeout(async () => {
-    try {
-      await nodeTenantLocationMqttListener.start();
-      console.log("✅ NodeTenantLocation MQTT Listener started successfully");
-    } catch (error) {
-      console.error("❌ Failed to start NodeTenantLocation MQTT Listener:", error);
-    }
-  }, 5000); // Delay 5 detik agar MQTT connection sudah siap
+    await nodeTenantLocationMqttListener.start();
+  }, 3000); // Reduced to 3 seconds
 
   servicesInitialized = true;
-  console.log("\n✅ All background services started successfully.\n");
+  console.log("✅ All services started");
 }

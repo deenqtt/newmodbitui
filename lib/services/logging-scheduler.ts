@@ -243,17 +243,11 @@ export class LoggingSchedulerService {
    */
   public async initialize() {
     if (this.isInitialized) {
-      console.log("ℹ️  Logging Scheduler already initialized");
-      return;
+      return; // Silent already initialized
     }
 
     try {
-      console.log("\n╔══════════════════════════════════════╗");
-      console.log("║   LOGGING SCHEDULER SERVICE          ║");
-      console.log("║   Precision Timer (No Sync!)         ║");
-      console.log("╚══════════════════════════════════════╝\n");
-
-      // Setup all configs
+      // Setup all configs (silent setup)
       await this.setupAllConfigs();
 
       // Start auto-reload polling
@@ -261,11 +255,9 @@ export class LoggingSchedulerService {
 
       this.isInitialized = true;
 
-      console.log("🎉 Logging Scheduler Service ready!");
-      console.log("💡 Each config has independent schedule (no sync!)");
-      console.log("💡 Auto-reload every 5s, timeout 30s per request\n");
-    } catch (error) {
-      console.error("❌ Failed to initialize Logging Scheduler:", error);
+      console.log("✅ Logging Scheduler ready (1 config, auto-reload enabled)");
+    } catch (error: any) {
+      console.error("❌ Logging Scheduler failed:", error?.message || error);
       throw error;
     }
   }

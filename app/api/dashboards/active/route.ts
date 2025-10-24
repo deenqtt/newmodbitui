@@ -10,29 +10,65 @@ export async function GET(request: Request) {
   }
 
   try {
-    const activeDashboard = await prisma.dashboardLayout.findFirst({
+    // First try to find active dashboard for the current user
+    const userActiveDashboard = await prisma.dashboardLayout.findFirst({
       where: {
         userId: auth.userId,
-        inUse: true, // Cari yang ditandai sebagai aktif
+        inUse: true,
       },
     });
 
-    if (!activeDashboard) {
-      // Jika tidak ada yang aktif, cari dashboard pertama yang dibuat sebagai cadangan
-      const fallbackDashboard = await prisma.dashboardLayout.findFirst({
-        where: { userId: auth.userId },
+    if (userActiveDashboard) {
+      return NextResponse.json(userActiveDashboard);
+    }
+
+    // If no active dashboard for user, try to find any dashboard for this user as fallback
+    const userFallbackDashboard = await prisma.dashboardLayout.findFirst({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (userFallbackDashboard) {
+      return NextResponse.json(userFallbackDashboard);
+    }
+
+    // If no dashboard for this user, fallback to admin's active dashboard
+    // Get admin user first
+    const adminUser = await prisma.user.findFirst({
+      where: {
+        role_data: {
+          name: 'ADMIN'
+        }
+      }
+    });
+
+    if (adminUser) {
+      const admin_activeDashboard = await prisma.dashboardLayout.findFirst({
+        where: {
+          userId: adminUser.id,
+          inUse: true,
+        },
+      });
+
+      if (admin_activeDashboard) {
+        return NextResponse.json(admin_activeDashboard);
+      }
+
+      // If no active admin dashboard, get any admin dashboard
+      const admin_fallbackDashboard = await prisma.dashboardLayout.findFirst({
+        where: { userId: adminUser.id },
         orderBy: { createdAt: "asc" },
       });
 
-      if (!fallbackDashboard) {
-        return new NextResponse("No dashboards found for this user", {
-          status: 404,
-        });
+      if (admin_fallbackDashboard) {
+        return NextResponse.json(admin_fallbackDashboard);
       }
-      return NextResponse.json(fallbackDashboard);
     }
 
-    return NextResponse.json(activeDashboard);
+    // No dashboards found anywhere
+    return new NextResponse("No dashboards found", {
+      status: 404,
+    });
   } catch (error) {
     console.error("[ACTIVE_DASHBOARD_GET]", error);
     return new NextResponse("Internal Server Error", { status: 500 });

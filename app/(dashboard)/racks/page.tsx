@@ -298,7 +298,10 @@ export default function RacksPage() {
             >
               <Database className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Button onClick={() => {
+              setFormData({ name: "", capacityU: 42, location: "", notes: "" });
+              setIsCreateDialogOpen(true);
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Rack
             </Button>
@@ -421,45 +424,49 @@ export default function RacksPage() {
           </CardContent>
         </Card>
 
-        {/* Racks Table/List - Following the pattern */}
-        <div className="rounded-lg border bg-background shadow-sm">
-          <div className="p-4 border-b">
-            <h3 className="text-lg font-semibold">
-              Server Racks ({racks.length})
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Manage server racks and equipment placement
-            </p>
-          </div>
-          <div className="p-4">
-            {isLoading ? (
-              <div className="text-center py-8">
-                <Server className="mx-auto h-16 w-16 text-muted-foreground mb-4 animate-pulse" />
-                <h3 className="text-lg font-semibold mb-2">
-                  Loading racks...
-                </h3>
-                <p className="text-muted-foreground">
-                  Fetching rack information from database
+        {/* Racks Table/List - Clean Table Layout */}
+        <Card className="shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                  <Server className="h-6 w-6 text-primary" />
+                  Server Racks ({racks.length})
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage server racks and equipment placement
                 </p>
               </div>
+              <Button onClick={() => {
+                setFormData({ name: "", capacityU: 42, location: "", notes: "" });
+                setIsCreateDialogOpen(true);
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Rack
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <Server className="mx-auto h-16 w-16 text-muted-foreground mb-4 animate-pulse" />
+                <h3 className="text-lg font-semibold mb-2">Loading racks...</h3>
+                <p className="text-muted-foreground">Fetching rack information from database</p>
+              </div>
             ) : racks.length === 0 ? (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
                 <Server className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  No racks found
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  Get started by adding your first server rack
-                </p>
+                <h3 className="text-lg font-semibold mb-2">No racks found</h3>
+                <p className="text-muted-foreground mb-4">Get started by adding your first server rack</p>
                 <Button onClick={() => setIsCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Rack
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                {/* Search and Sort Controls */}
-                <div className="flex items-center gap-4 mb-4">
+              <div className="space-y-4">
+                {/* Search and Controls */}
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -470,22 +477,15 @@ export default function RacksPage() {
                       className="pl-10"
                     />
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Showing {paginatedRacks.length} of {sorted.length} racks (Page {currentPage} of {totalPages})
-                  </div>
-                </div>
-
-                {/* Items per page selector */}
-                <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">Items per page:</span>
+                    <span className="text-sm text-muted-foreground">Items per page:</span>
                     <select
                       value={itemsPerPage}
                       onChange={(e) => {
                         setItemsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      className="px-2 py-1 text-sm border rounded"
+                      className="px-3 py-1 text-sm border rounded-md bg-background"
                     >
                       <option value={5}>5</option>
                       <option value={10}>10</option>
@@ -495,11 +495,181 @@ export default function RacksPage() {
                   </div>
                 </div>
 
-                {/* Pagination Controls */}
+                {/* Table */}
+                <div className="rounded-lg border-2 border-border overflow-hidden shadow-sm">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 border-b-2 border-border">
+                        <TableHead className="font-semibold border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('name')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-left justify-start"
+                          >
+                            Rack Name
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold text-center w-24 border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('capacityU')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-center justify-center"
+                          >
+                            Capacity
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold text-center w-20 border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('usedU')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-center justify-center"
+                          >
+                            Used
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold text-center w-24 border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('availableU')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-center justify-center"
+                          >
+                            Available
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold text-center w-32 border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('utilizationPercent')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-center justify-center"
+                          >
+                            Utilization
+                            <ArrowUpDown className="ml-1 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold w-32 border-r border-border/50 px-4 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('location')}
+                            className="h-auto p-0 font-semibold hover:bg-transparent text-left justify-start"
+                          >
+                            Location
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                        <TableHead className="font-semibold text-center w-32 px-4 py-3">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedRacks.length === 0 ? (
+                        <TableRow className="border-b border-border/30">
+                          <TableCell colSpan={7} className="text-center py-12 border-r border-border/30">
+                            <div className="flex flex-col items-center">
+                              <Server className="h-12 w-12 text-muted-foreground mb-4" />
+                              <h3 className="text-lg font-medium text-foreground mb-2">No racks found</h3>
+                              <p className="text-muted-foreground">
+                                {searchQuery ? "No racks match your search criteria" : "Get started by adding your first server rack"}
+                              </p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedRacks.map((rack, index) => (
+                          <TableRow key={rack.id} className="hover:bg-muted/30 transition-colors border-b border-border/30">
+                            <TableCell className="font-medium py-4 px-4 border-r border-border/30">
+                              <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                <span className="truncate max-w-[200px]" title={rack.name}>
+                                  {rack.name}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center py-4 px-4 border-r border-border/30">
+                              <Badge variant="outline" className="font-semibold">
+                                {rack.capacityU}U
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center py-4 px-4 border-r border-border/30">
+                              <span className="text-orange-600 font-semibold text-sm">
+                                {rack.usedU}U
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center py-4 px-4 border-r border-border/30">
+                              <span className="text-green-600 font-semibold text-sm">
+                                {rack.availableU}U
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center py-4 px-4 border-r border-border/30">
+                              <div className="flex items-center justify-center gap-3">
+                                <div className="w-20 bg-muted rounded-full h-2 border border-border/20">
+                                  <div
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                      rack.utilizationPercent < 30 ? 'bg-emerald-500' :
+                                      rack.utilizationPercent < 70 ? 'bg-amber-500' :
+                                      rack.utilizationPercent < 90 ? 'bg-orange-500' : 'bg-red-500'
+                                    }`}
+                                    style={{ width: `${Math.min(rack.utilizationPercent, 100)}%` }}
+                                  />
+                                </div>
+                                <span className={`text-sm font-semibold min-w-[3rem] ${getUtilizationColor(rack.utilizationPercent)}`}>
+                                  {rack.utilizationPercent}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-4 px-4 border-r border-border/30">
+                              <span className="text-sm text-muted-foreground truncate max-w-[120px] block" title={rack.location || 'No location set'}>
+                                {rack.location || '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center py-4 px-4">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => router.push(`/racks/${rack.id}`)}
+                                  title="View Rack Layout"
+                                  className="h-8 w-8 p-0 hover:bg-primary/10"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(rack)}
+                                  title="Edit Rack"
+                                  className="h-8 w-8 p-0 hover:bg-primary/10"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setRackToDelete(rack);
+                                    setIsDeleteDialogOpen(true);
+                                  }}
+                                  title="Delete Rack"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center justify-between pt-4 border-t">
                     <div className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
+                      Showing {paginatedRacks.length} of {sorted.length} racks (Page {currentPage} of {totalPages})
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -508,13 +678,12 @@ export default function RacksPage() {
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         disabled={currentPage === 1}
                       >
-                        <ChevronLeft className="h-4 w-4" />
+                        <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
                       </Button>
 
                       {/* Page Numbers */}
                       {totalPages <= 7 ? (
-                        // Show all pages if 7 or fewer
                         Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                           <Button
                             key={page}
@@ -527,7 +696,6 @@ export default function RacksPage() {
                           </Button>
                         ))
                       ) : (
-                        // Show ellipsis pattern for more pages
                         <>
                           {currentPage <= 4 && (
                             <>
@@ -622,164 +790,15 @@ export default function RacksPage() {
                         disabled={currentPage === totalPages}
                       >
                         Next
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
                 )}
-
-                {/* Table View */}
-                <div className="rounded-md border mt-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSort('name')}
-                            className="h-auto p-0 font-semibold hover:bg-transparent"
-                          >
-                            Rack Name
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSort('location')}
-                            className="h-auto p-0 font-semibold hover:bg-transparent"
-                          >
-                            Location
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSort('capacityU')}
-                            className="h-auto p-0 font-semibold hover:bg-transparent"
-                          >
-                            Capacity
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSort('utilizationPercent')}
-                            className="h-auto p-0 font-semibold hover:bg-transparent"
-                          >
-                            Utilization
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSort('devices.length')}
-                            className="h-auto p-0 font-semibold hover:bg-transparent"
-                          >
-                            Devices
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedRacks.map((rack) => (
-                        <TableRow key={rack.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{rack.name}</span>
-                              {rack.notes && (
-                                <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                                  {rack.notes}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={rack.location ? '' : 'text-muted-foreground italic'}>
-                              {rack.location || 'Not specified'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className="font-mono">
-                              {rack.capacityU}U
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className={`font-medium ${getUtilizationColor(rack.utilizationPercent)}`}>
-                                {rack.utilizationPercent.toFixed(1)}%
-                              </span>
-                              <div className="w-full bg-muted rounded-full h-1.5 max-w-[60px]">
-                                <div
-                                  className="bg-primary h-1.5 rounded-full transition-all"
-                                  style={{ width: `${Math.min(rack.utilizationPercent, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <Badge variant="secondary" className="min-w-[24px]">
-                                {rack.devices.length}
-                              </Badge>
-                              {rack.devices.length > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  {rack.usedU}U used
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => router.push(`/racks/${rack.id}`)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openEditDialog(rack)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setRackToDelete(rack);
-                                    setIsDeleteDialogOpen(true);
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                  disabled={rack.devices.length > 0}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  {rack.devices.length > 0 ? 'Cannot Delete' : 'Delete'}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
       {/* Create Rack Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

@@ -9,6 +9,7 @@ import {
   DeviceExternal,
 } from "@prisma/client";
 import mqtt from "mqtt";
+import { getMQTTTcpUrl, getMQTTUsername, getMQTTPassword } from "@/lib/mqtt-config";
 
 // Definisikan tipe gabungan untuk semua konfigurasi
 type AnyConfig = (
@@ -178,7 +179,7 @@ class CalculationService {
       try {
         // Parse pduList dari JSON string
         if (config.pduList) {
-          pduList = JSON.parse(config.pduList);
+          pduList = JSON.parse(String(config.pduList));
           // Safety check: pastikan hasilnya array
           if (!Array.isArray(pduList)) {
             pduList = [];
@@ -187,7 +188,7 @@ class CalculationService {
 
         // Parse mainPower dari JSON string
         if (config.mainPower) {
-          mainPower = JSON.parse(config.mainPower);
+          mainPower = JSON.parse(String(config.mainPower));
         }
       } catch (error) {
         console.error(
@@ -259,19 +260,23 @@ class CalculationService {
       (global as any).calcMqttClient.end(true);
     }
 
-    // UBAH INI - Dynamic host resolution
-    const brokerHost = this.getMQTTHost();
-    const brokerPort = 1883;
-    const brokerUrl = `mqtt://${brokerHost}:${brokerPort}`;
+    // ✅ Use centralized MQTT configuration
+    const brokerUrl = getMQTTTcpUrl();
+    const username = getMQTTUsername();
+    const password = getMQTTPassword();
 
-    const options = {
+    const options: mqtt.IClientOptions = {
       protocolVersion: 4,
       clientId: `calculation-service-${Math.random()
         .toString(16)
         .slice(2, 10)}`,
+      ...(username && { username }),
+      ...(password && { password }),
     };
+
     this.mqttClient = mqtt.connect(brokerUrl, options);
     (global as any).calcMqttClient = this.mqttClient;
+
     this.mqttClient.on("connect", () =>
       console.log(`[CALC SERVICE] Terhubung ke Broker MQTT di ${brokerUrl}`)
     );
@@ -295,15 +300,17 @@ class CalculationService {
       }
       const valueObject = JSON.parse(parsedPayload.value);
       for (const key in valueObject) {
-        const value = parseFloat(valueObject[key]);
-        if (!isNaN(value)) {
-          this.lastValues.set(`${device.uniqId}:${key}`, {
-            value,
-            timestamp: new Date(),
-          });
-          console.log(
-            `[CALC SERVICE] 📥 Cached: ${device.uniqId}:${key} = ${value}`
-          );
+        if (valueObject.hasOwnProperty(key)) {
+          const value = parseFloat(String((valueObject as Record<string, any>)[key]));
+          if (!isNaN(value)) {
+            this.lastValues.set(`${device.uniqId}:${key}`, {
+              value,
+              timestamp: new Date(),
+            });
+            console.log(
+              `[CALC SERVICE] 📥 Cached: ${device.uniqId}:${key} = ${value}`
+            );
+          }
         }
       }
       this.configs.forEach((config) => {
@@ -422,10 +429,10 @@ class CalculationService {
 
     try {
       if (config.mainPower) {
-        mainPowerConfig = JSON.parse(config.mainPower);
+        mainPowerConfig = JSON.parse(String(config.mainPower));
       }
       if (config.pduList) {
-        pduList = JSON.parse(config.pduList);
+        pduList = JSON.parse(String(config.pduList));
         if (!Array.isArray(pduList)) pduList = [];
       }
     } catch (error) {
@@ -471,10 +478,10 @@ class CalculationService {
 
     try {
       if (config.mainPower) {
-        mainPowerConfig = JSON.parse(config.mainPower);
+        mainPowerConfig = JSON.parse(String(config.mainPower));
       }
       if (config.pduList) {
-        pduList = JSON.parse(config.pduList);
+        pduList = JSON.parse(String(config.pduList));
         if (!Array.isArray(pduList)) pduList = [];
       }
     } catch (error) {

@@ -3,10 +3,10 @@ import { PrismaClient } from "@prisma/client";
 import mqtt from "mqtt";
 
 // Import MQTT config from unified configuration
-import { getMQTTFullConfig, MQTTConfig } from "@/lib/mqtt-config";
+import { getMQTTFullConfig, getMTTQConfigSync, MQTTConfig } from "@/lib/mqtt-config";
 
-// Configuration
-const MQTT_CONFIG: MQTTConfig = getMQTTFullConfig();
+// Configuration - using sync version for compatibility with existing code
+const MQTT_CONFIG: MQTTConfig = getMTTQConfigSync();
 const AUTO_DISCOVERY = process.env.THERMAL_AUTO_DISCOVERY !== "false"; // Default true
 
 // Global variables
@@ -150,10 +150,8 @@ async function subscribeToRegisteredDevices() {
   }
 }
 
-// Setup auto-discovery patterns
+// Setup auto-discovery patterns (silent)
 async function setupAutoDiscovery() {
-  console.log("Setting up auto-discovery patterns...");
-
   const discoveryPatterns = [
     "sensors/thermal_stream/+", // Local pattern from publisher
     "+/thermal/+/data", // Generic thermal pattern
@@ -164,11 +162,10 @@ async function setupAutoDiscovery() {
 
   for (const pattern of discoveryPatterns) {
     mqttClient?.subscribe(pattern, { qos: 1 }, (err) => {
-      if (!err) {
-        console.log(`Auto-discovery pattern subscribed: ${pattern}`);
-      } else {
+      if (err) {
         console.error(`Failed to subscribe to pattern ${pattern}:`, err);
       }
+      // Silent success subscription
     });
   }
 }

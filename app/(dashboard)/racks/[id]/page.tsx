@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +15,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -34,26 +30,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Server, HardDrive, Activity, Building, Search, CheckCircle, XCircle, Wrench, TrendingUp, HardDriveUpload, Plus, AlertCircle, MonitorSpeaker, Cpu, Database as DatabaseIcon, Router, HardDrive as HardDriveIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  ArrowLeft,
+  Server,
+  HardDrive,
+  Plus,
+  Edit,
+  Trash2,
+  Database,
+  Activity,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Wrench,
+  X,
+  ShieldCheck,
+} from "lucide-react";
 
-interface Device {
+interface RackDevice {
   id: string;
-  name: string;
-  deviceType: string;
-  manufacturer?: string;
-  modelId?: string;
-  firmware?: string;
-  positionU: number | null;
+  rackId: string;
+  deviceId: string;
+  positionU: number;
   sizeU: number;
-  powerWatt?: number;
-  notes?: string;
-  status: string;
-  ipAddress?: string;
-  lastSeen?: string;
-  rack: {
+  deviceType: "SERVER" | "SWITCH" | "STORAGE" | "PDU" | "SENSOR";
+  status: "PLANNED" | "INSTALLED" | "MAINTENANCE" | "REMOVED";
+  createdAt: string;
+  updatedAt: string;
+  device: {
     id: string;
+    uniqId: string;
     name: string;
-  } | null;
+    topic: string;
+    address: string | null;
+    lastPayload: any;
+    lastUpdatedByMqtt: string | null;
+  };
 }
 
 interface Rack {
@@ -67,62 +82,59 @@ interface Rack {
   usedU: number;
   availableU: number;
   utilizationPercent: number;
-  devices: Device[];
-  _count: {
-    devices: number;
-  };
+  devices: RackDevice[];
+}
+
+interface DeviceOption {
+  id: string;
+  uniqId: string;
+  name: string;
+  topic: string;
+  address: string | null;
 }
 
 export default function RackDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
+  const rackId = params.id as string;
+
   const [rack, setRack] = useState<Rack | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [rackUnits, setRackUnits] = useState<any[]>([]);
-  const [selectedUnit, setSelectedUnit] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false);
-
-  // New Device Form State
-  const [newDevice, setNewDevice] = useState({
-    name: "",
-    deviceType: "",
-    manufacturer: "",
-    modelId: "",
-    firmware: "",
+  const [availableDevices, setAvailableDevices] = useState<DeviceOption[]>([]);
+  const [isAddDeviceDialogOpen, setIsAddDeviceDialogOpen] = useState(false);
+  const [isEditDeviceDialogOpen, setIsEditDeviceDialogOpen] = useState(false);
+  const [isRemoveDeviceDialogOpen, setIsRemoveDeviceDialogOpen] = useState(false);
+  const [selectedRackDevice, setSelectedRackDevice] = useState<RackDevice | null>(null);
+  const [deviceForm, setDeviceForm] = useState<{
+    deviceId: string;
+    positionU: number;
+    sizeU: number;
+    deviceType: "SERVER" | "SWITCH" | "STORAGE" | "PDU" | "SENSOR";
+    status: "PLANNED" | "INSTALLED" | "MAINTENANCE" | "REMOVED";
+  }>({
+    deviceId: "",
+    positionU: 1,
     sizeU: 1,
-    positionU: 0,
-    powerWatt: "",
-    ipAddress: "",
-    notes: "",
+    deviceType: "SERVER",
+    status: "PLANNED",
   });
+  const [deviceSearchQuery, setDeviceSearchQuery] = useState("");
+  const [isReverseLayout, setIsReverseLayout] = useState(true); // Default to true (bottom-up: 1 at bottom)
 
-  const rackId = params?.id as string;
+  const { toast } = useToast();
 
-  const filteredDevices = rack?.devices.filter(device =>
-    device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    device.deviceType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    device.ipAddress?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
-
-  // Fetch rack data
-  const fetchRack = async () => {
-    if (!rackId) return;
-
+  // Fetch rack details
+  const fetchRackDetails = async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/racks/${rackId}`);
       if (!response.ok) {
-        throw new Error("Failed to fetch rack");
+        throw new Error("Failed to fetch rack details");
       }
       const data = await response.json();
       setRack(data);
-
-      // Generate rack units visualization
-      generateRackUnits(data);
     } catch (error) {
-      console.error("Error fetching rack:", error);
+      console.error("Error fetching rack details:", error);
       toast({
         title: "Error",
         description: "Failed to load rack details",
@@ -133,652 +145,1025 @@ export default function RackDetailPage() {
     }
   };
 
-  // Generate rack units for 2D visualization
-  const generateRackUnits = (rackData: Rack) => {
-    const units: any[] = [];
-    const deviceMap = new Map<number, Device[]>();
-
-    // Group devices by their position
-    rackData.devices.forEach((device) => {
-      const pos = device.positionU || 1;
-      for (let i = 0; i < device.sizeU; i++) {
-        const unitPos = pos + i;
-        if (!deviceMap.has(unitPos)) {
-          deviceMap.set(unitPos, []);
-        }
-        deviceMap.get(unitPos)!.push(device);
-      }
-    });
-
-    // Generate units from top (capacityU) to bottom (1)
-    for (let pos = rackData.capacityU; pos >= 1; pos--) {
-      const installedDevices = deviceMap.get(pos) || [];
-      const isOccupied = installedDevices.length > 0;
-
-      units.push({
-        position: pos,
-        device: isOccupied ? installedDevices[0] : null,
-        isOccupied,
-        installedDevices,
-      });
-    }
-
-    setRackUnits(units);
-  };
-
-  // Device type icons
-  const getDeviceIcon = (deviceType: string) => {
-    switch (deviceType.toLowerCase()) {
-      case "server":
-        return Server;
-      case "cpu":
-      case "processor":
-        return Cpu;
-      case "storage":
-      case "nas":
-        return DatabaseIcon;
-      case "network":
-      case "switch":
-      case "router":
-        return Router;
-      case "storage":
-        return HardDriveIcon;
-      case "monitor":
-        return MonitorSpeaker;
-      default:
-        return Server;
-    }
-  };
-
-  const getDeviceStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "online":
-        return "text-green-600 bg-green-50 border-green-200";
-      case "offline":
-        return "text-red-600 bg-red-50 border-red-200";
-      case "maintenance":
-        return "text-orange-600 bg-orange-50 border-orange-200";
-      default:
-        return "text-gray-600 bg-gray-50 border-gray-200";
-    }
-  };
-
-  const getDeviceStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "online":
-        return CheckCircle;
-      case "offline":
-        return XCircle;
-      case "maintenance":
-        return Wrench;
-      default:
-        return AlertCircle;
-    }
-  };
-
-  const getCapacityUtilizationColor = (usedU: number, totalU: number) => {
-    if (totalU === 0) return "text-muted-foreground";
-    const percentage = (usedU / totalU) * 100;
-    if (percentage >= 90) return "text-red-600 dark:text-red-400";
-    if (percentage >= 75) return "text-orange-600 dark:text-orange-400";
-    if (percentage >= 50) return "text-yellow-600 dark:text-yellow-400";
-    return "text-green-600 dark:text-green-400";
-  };
-
-  const getCapacityUtilizationBadge = (usedU: number, totalU: number) => {
-    if (totalU === 0) return <Badge variant="secondary">No Capacity</Badge>;
-    const percentage = (usedU / totalU) * 100;
-    if (percentage >= 90) return <Badge variant="destructive">Critical</Badge>;
-    if (percentage >= 75) return <Badge className="bg-orange-500 dark:bg-orange-600 text-white">High</Badge>;
-    if (percentage >= 50) return <Badge className="bg-yellow-500 dark:bg-yellow-600 text-white dark:text-gray-900">Medium</Badge>;
-    return <Badge className="bg-green-500 dark:bg-green-600 text-white">Low</Badge>;
-  };
-
-  // Initialize
-  useEffect(() => {
-    if (rackId) {
-      fetchRack();
-    }
-  }, [rackId]);
-
-  // Handle adding new device
-  const handleAddDevice = async () => {
-    if (!rackId) return;
-
-    const deviceData = {
-      ...newDevice,
-      positionU: newDevice.positionU || null,
-      rackId,
-      status: "offline",
-      powerWatt: newDevice.powerWatt ? parseInt(newDevice.powerWatt) : null,
-    };
-
+  // Fetch available devices (not assigned to any rack)
+  const fetchAvailableDevices = async () => {
     try {
-      const response = await fetch("/api/devices-internal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(deviceData),
-      });
-
+      const response = await fetch("/api/devices/external");
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to add device");
+        throw new Error("Failed to fetch devices");
       }
+      const devices = await response.json();
 
-      toast({
-        title: "Success",
-        description: "Device added successfully",
-      });
+      // Filter devices that are not already assigned to this rack
+      const assignedDeviceIds = new Set(rack?.devices.map(rd => rd.deviceId) || []);
+      const available = devices.filter((device: DeviceOption) => !assignedDeviceIds.has(device.uniqId));
 
-      setIsAddDeviceOpen(false);
-      setNewDevice({
-        name: "",
-        deviceType: "",
-        manufacturer: "",
-        modelId: "",
-        firmware: "",
-        sizeU: 1,
-        positionU: 0,
-        powerWatt: "",
-        ipAddress: "",
-        notes: "",
-      });
-      fetchRack();
-    } catch (error: any) {
+      setAvailableDevices(available);
+    } catch (error) {
+      console.error("Error fetching available devices:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to add device",
+        description: "Failed to fetch available devices",
         variant: "destructive",
       });
     }
   };
 
+  // Check if position is available for new device
+  // Note: Sensor devices don't occupy physical rack space, so they don't conflict with positions
+  const isPositionAvailable = (positionU: number, sizeU: number, excludeDeviceId?: string): boolean => {
+    if (!rack) return false;
+
+    // Calculate the range this device would occupy
+    const startU = positionU;
+    const endU = positionU + sizeU - 1;
+
+    // Check if any existing NON-SENSOR device conflicts with this range
+    // Sensor devices don't occupy physical space, so they don't cause position conflicts
+    for (const device of rack.devices) {
+      // Skip the device we're editing (if any)
+      if (excludeDeviceId && device.deviceId === excludeDeviceId) continue;
+
+      // Skip sensor devices as they don't occupy physical rack space
+      if (device.deviceType === "SENSOR") continue;
+
+      const deviceStartU = device.positionU;
+      const deviceEndU = device.positionU + device.sizeU - 1;
+
+      // Check for overlap
+      if (startU <= deviceEndU && endU >= deviceStartU) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // Add device to rack
+  const handleAddDevice = async () => {
+    if (!deviceForm.deviceId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a device",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For sensor devices, set default values for size and position
+    const formData = { ...deviceForm };
+    if (deviceForm.deviceType === "SENSOR") {
+      formData.sizeU = 1; // Default size for sensors
+      formData.positionU = 1; // Default position for sensors
+    }
+
+    // Frontend validation for position availability (only for non-sensor devices)
+    if (deviceForm.deviceType !== "SENSOR" && !isPositionAvailable(formData.positionU, formData.sizeU)) {
+      toast({
+        title: "Position Conflict",
+        description: `Position ${formData.positionU} to ${formData.positionU + formData.sizeU - 1}U is already occupied by another device`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/racks/${rackId}/devices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message);
+      }
+
+      toast({
+        title: "Success",
+        description: "Device added to rack successfully",
+      });
+
+      setIsAddDeviceDialogOpen(false);
+      resetDeviceForm();
+      fetchRackDetails();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add device to rack",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Edit device
+  const handleEditDevice = (rackDevice: RackDevice) => {
+    setSelectedRackDevice(rackDevice);
+    setDeviceForm({
+      deviceId: rackDevice.deviceId,
+      positionU: rackDevice.positionU,
+      sizeU: rackDevice.sizeU,
+      deviceType: rackDevice.deviceType,
+      status: rackDevice.status,
+    });
+    setIsEditDeviceDialogOpen(true);
+  };
+
+  // Remove device
+  const handleRemoveDevice = (rackDevice: RackDevice) => {
+    setSelectedRackDevice(rackDevice);
+    setIsRemoveDeviceDialogOpen(true);
+  };
+
+  // Update device
+  const handleUpdateDevice = async () => {
+    if (!selectedRackDevice) return;
+
+    // Frontend validation for position availability (exclude current device)
+    // Skip position validation for sensor devices as they don't occupy physical space
+    if (selectedRackDevice.deviceType !== "SENSOR" && !isPositionAvailable(deviceForm.positionU, deviceForm.sizeU, selectedRackDevice.deviceId)) {
+      toast({
+        title: "Position Conflict",
+        description: `Position ${deviceForm.positionU} to ${deviceForm.positionU + deviceForm.sizeU - 1}U is already occupied by another device`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/racks/${rackId}/devices/${selectedRackDevice.deviceId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(deviceForm),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message);
+      }
+
+      toast({
+        title: "Success",
+        description: "Device updated successfully",
+      });
+
+      setIsEditDeviceDialogOpen(false);
+      setSelectedRackDevice(null);
+      resetDeviceForm();
+      fetchRackDetails();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update device",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Confirm remove device
+  const handleConfirmRemoveDevice = async () => {
+    if (!selectedRackDevice) return;
+
+    try {
+      const response = await fetch(`/api/racks/${rackId}/devices/${selectedRackDevice.deviceId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message);
+      }
+
+      toast({
+        title: "Success",
+        description: "Device removed from rack successfully",
+      });
+
+      setIsRemoveDeviceDialogOpen(false);
+      setSelectedRackDevice(null);
+      fetchRackDetails();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove device",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Reset device form
+  const resetDeviceForm = () => {
+    setDeviceForm({
+      deviceId: "",
+      positionU: 1,
+      sizeU: 1,
+      deviceType: "SERVER",
+      status: "PLANNED",
+    });
+  };
+
+  // Get status color - Dark mode compatible
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "INSTALLED":
+        return "text-green-600 bg-green-100 border-green-300 dark:text-green-200 dark:bg-green-900/20 dark:border-green-500";
+      case "PLANNED":
+        return "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950 dark:border-blue-800";
+      case "MAINTENANCE":
+        return "text-orange-600 bg-orange-100 border-orange-300 dark:text-orange-200 dark:bg-orange-900/20 dark:border-orange-500";
+      case "REMOVED":
+        return "text-red-600 bg-red-100 border-red-300 dark:text-red-200 dark:bg-red-900/20 dark:border-red-500";
+      default:
+        return "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-800";
+    }
+  };
+
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "INSTALLED":
+        return <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />;
+      case "PLANNED":
+        return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+      case "MAINTENANCE":
+        return <Wrench className="h-4 w-4 text-orange-600 dark:text-orange-400" />;
+      case "REMOVED":
+        return <X className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    }
+  };
+
+  // Toggle rack layout view (normal/reverse)
+  const toggleRackLayout = () => {
+    setIsReverseLayout(!isReverseLayout);
+  };
+
+  // Generate rack layout visualization with bottom-up positioning and search filtering
+  // Only show non-sensor devices in rack layout - sensors don't occupy physical rack space
+  const generateRackLayout = (): Array<{
+    u: number;
+    device: RackDevice | undefined;
+    isOccupied: boolean;
+    isDeviceStart: boolean;
+    isDeviceContinuation: boolean;
+  }> => {
+    if (!rack) return [];
+
+    const layout: Array<{
+      u: number;
+      device: RackDevice | undefined;
+      isOccupied: boolean;
+      isDeviceStart: boolean;
+      isDeviceContinuation: boolean;
+    }> = [];
+    const deviceMap = new Map<number, RackDevice>();
+    const deviceStartPositions = new Map<string, number>(); // Track where each device starts
+
+    // Filter devices: exclude ALL sensors from rack layout (they don't occupy physical space)
+    let filteredDevices = rack.devices.filter(device => device.deviceType !== "SENSOR");
+
+    // Note: Search functionality is now only for device list, not rack layout
+    // Rack layout shows all devices regardless of search query
+
+    // Map devices by their bottom position (positionU represents bottom of device)
+    filteredDevices.forEach(device => {
+      const startPos = device.positionU;
+      deviceStartPositions.set(device.deviceId, startPos);
+
+      // Calculate the actual rack units occupied by this device
+      // positionU is the bottom position, device occupies positionU to positionU + sizeU - 1
+      for (let u = startPos; u < startPos + device.sizeU; u++) {
+        deviceMap.set(u, device);
+      }
+    });
+
+    // Generate U positions - support reverse layout
+    const positions = isReverseLayout
+      ? Array.from({ length: rack.capacityU }, (_, i) => rack.capacityU - i) // 42, 41, 40, ..., 1
+      : Array.from({ length: rack.capacityU }, (_, i) => i + 1); // 1, 2, 3, ..., 42
+
+    positions.forEach(u => {
+      const device = deviceMap.get(u);
+      const isDeviceStart = device && deviceStartPositions.get(device.deviceId) === u;
+      const isDeviceContinuation = device && deviceStartPositions.get(device.deviceId) !== u;
+
+      layout.push({
+        u,
+        device,
+        isOccupied: !!device,
+        isDeviceStart: !!isDeviceStart,
+        isDeviceContinuation: !!isDeviceContinuation,
+      });
+    });
+
+    return layout;
+  };
+
+  useEffect(() => {
+    if (rackId) {
+      fetchRackDetails();
+    }
+  }, [rackId]);
+
+  useEffect(() => {
+    if (rack) {
+      fetchAvailableDevices();
+    }
+  }, [rack]);
+
   if (isLoading) {
     return (
-      <SidebarInset>
-        <div className="p-6 space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <Server className="mx-auto h-16 w-16 text-muted-foreground mb-4 animate-pulse" />
+            <h3 className="text-lg font-semibold mb-2">Loading rack details...</h3>
           </div>
         </div>
-      </SidebarInset>
+      </div>
     );
   }
 
   if (!rack) {
     return (
-      <SidebarInset>
-        <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-          <Card>
-            <CardContent className="pt-6">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-center">Rack not found</h2>
-              <p className="text-center text-muted-foreground mt-2">
-                The requested rack could not be found.
-              </p>
-              <Button
-                onClick={() => router.back()}
-                className="mt-4 mx-auto block"
-              >
-                Go Back
-              </Button>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <AlertCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Rack not found</h3>
+            <Button onClick={() => router.push("/racks")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Racks
+            </Button>
+          </div>
         </div>
-      </SidebarInset>
+      </div>
     );
   }
 
+  const rackLayout = generateRackLayout();
+
   return (
-    <SidebarInset>
-      {/* Header */}
-      <header className="flex h-16 items-center justify-between border-b px-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/racks")}
-            className="mr-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="outline" onClick={() => router.push("/racks")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Racks
           </Button>
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <HardDriveUpload className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">
-            Rack Details: {rack.name}
-            {rack.location && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                - {rack.location}
-              </span>
-            )}
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              {rack.name}
+            </h1>
+            <p className="text-muted-foreground">
+              Rack Layout & Device Management
+            </p>
+          </div>
         </div>
-      </header>
 
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 m-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
-            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <HardDriveUpload className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rack.capacityU}U</div>
-            <p className="text-xs text-muted-foreground">
-              Rack size
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Used Capacity</CardTitle>
-            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <HardDrive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rack.usedU} U</div>
-            <p className="text-xs text-muted-foreground">Units occupied</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Capacity</CardTitle>
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Building className="h-4 w-4 text-green-600 dark:text-green-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rack.availableU} U</div>
-            <p className="text-xs text-muted-foreground">Units remaining</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Devices</CardTitle>
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rack.devices.length}</div>
-            <p className="text-xs text-muted-foreground">Installed devices</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilization</CardTitle>
-            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
-              <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rack.utilizationPercent}%</div>
-            <p className="text-xs text-muted-foreground">
-              {rack.utilizationPercent > 90 ? 'Critical' : rack.utilizationPercent > 70 ? 'High' : 'Normal'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 2D Rack Capacity View */}
-      <Card className="m-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Server className="h-5 w-5" />
-            Rack Layout - {rack.name}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Device positions and capacity utilization
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted/30 p-3 rounded-lg border">
-            {/* Rack Header */}
-            <div className="bg-card border rounded-t-md p-2 mb-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-sm">{rack.name}</div>
-                  <div className="text-xs text-muted-foreground">{rack.capacityU}U Server Rack</div>
+        {/* Rack Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Server className="h-6 w-6 text-blue-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Capacity</p>
+                  <p className="text-2xl font-bold">{rack.capacityU}U</p>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {rack.utilizationPercent}% Used
-                </Badge>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Rack Units Grid - Compact */}
-            <div className="bg-background border border-border rounded-b-md min-h-48 p-3 relative">
-              {/* Rack Frame */}
-              <div className="absolute inset-y-0 left-2 right-2 top-1 bottom-1 border-l-2 border-r-2 border-border"></div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <HardDrive className="h-6 w-6 text-orange-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Used</p>
+                  <p className="text-2xl font-bold">{rack.usedU}U</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Units Display - Smaller */}
-              <div className="relative space-y-0.5 px-3 py-1">
-                {rackUnits.slice().reverse().map((unit) => {
-                  return (
-                    <div key={unit.position} className="relative">
-                      <div
-                        className={`
-                          relative cursor-pointer border transition-colors
-                          ${unit.isOccupied
-                            ? 'bg-primary/10 border-primary/30 text-foreground'
-                            : 'bg-background border-border hover:bg-muted/50'
-                          }
-                        `}
-                        style={{ height: '20px' }}
-                      >
-                        {/* Unit Position Label - Small */}
-                        <div className={`absolute -left-8 top-1/2 transform -translate-y-1/2 text-xs font-medium bg-background border border-border px-1 rounded`}>
-                          U{unit.position}
-                        </div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Database className="h-6 w-6 text-green-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Available</p>
+                  <p className="text-2xl font-bold">{rack.availableU}U</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                        {/* Unit Content - Compact */}
-                        {unit.isOccupied ? (
-                          <div className="h-full flex items-center justify-center px-1 overflow-hidden rounded-full">
-                            {unit.installedDevices.map((device: Device) => {
-                              const Icon = getDeviceIcon(device.deviceType);
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <Activity className="h-6 w-6 text-purple-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-muted-foreground">Devices</p>
+                  <p className="text-2xl font-bold">{rack.devices.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-                              return (
-                                <div key={device.id} className="flex items-center gap-1 min-w-0 flex-1">
-                                  <Icon className="h-3 w-3 flex-shrink-0" />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-xs font-medium">
-                                      {device.name}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Rack Layout Visualization */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rack Layout</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-950 dark:border-blue-800">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                    <Server className="h-4 w-4" />
+                    <span className="font-medium">Rack Layout Guide:</span>
+                  </div>
+                  <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                    <p>• <strong>Rack Position</strong>: Bottom position of device (1 = bottom, {rack.capacityU} = top)</p>
+                    <p>• <strong>Size (U)</strong>: How many rack units the device occupies upward</p>
+                    <p>• <strong>Status</strong>: Current installation status of the device</p>
+                    <p>• <strong>Colors</strong>: Green = Installed, Blue = Planned, Orange = Maintenance, Red = Removed</p>
+                  </div>
+                </div>
+                <div className="border rounded-lg overflow-hidden bg-card dark:border-gray-700 shadow-sm">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 dark:bg-muted/5 border-b">
+                        <TableHead className="w-20 font-semibold text-foreground py-4 text-center">(U) Location</TableHead>
+                        <TableHead className="font-semibold text-foreground py-4 text-center">Device</TableHead>
+                        <TableHead className="w-20 font-semibold text-foreground py-4 text-center">Size</TableHead>
+                        <TableHead className="w-28 font-semibold text-foreground py-4 text-center">Status</TableHead>
+                        <TableHead className="w-24 font-semibold text-foreground py-4 text-center">Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rackLayout.map(({ u, device, isOccupied, isDeviceStart, isDeviceContinuation }) => {
+                        const isLastContinuation = device && isDeviceContinuation && (u === device.positionU + device.sizeU - 1);
+
+                        return (
+                          <TableRow
+                            key={u}
+                            className={`
+                              border-b border-border/50 hover:bg-muted/20 dark:hover:bg-muted/5 transition-colors
+                              ${isOccupied && isDeviceStart ? 'bg-blue-50/30 dark:bg-blue-950/10 border-l-8 border-l-blue-500 rounded-l-lg' : ''}
+                              ${isOccupied && isDeviceContinuation ? 'bg-blue-50/20 dark:bg-blue-950/5 border-l-8 border-l-blue-400 rounded-l-lg' : ''}
+                              ${!isOccupied ? 'bg-muted/10 dark:bg-muted/5' : ''}
+                            `}
+                          >
+                            {/* Position Column */}
+                            <TableCell className="py-3">
+                              <div className="flex items-center justify-center">
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                                  {u}
+                                </span>
+                              </div>
+                            </TableCell>
+
+                            {/* Device Column */}
+                            <TableCell className="py-3">
+                              {isOccupied && device ? (
+                                <div className="flex items-center gap-3">
+                                  {isDeviceStart ? (
+                                    <>
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                                        <div className="flex flex-col">
+                                          <span className="font-semibold text-foreground text-sm leading-tight">
+                                            {device.device.name}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {device.device.lastPayload && (
+                                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                          <Wifi className="h-3 w-3" />
+                                          <span className="text-xs font-medium">Live</span>
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : isDeviceContinuation ? (
+                                    <div className="flex items-center gap-2 ml-6">
+                                      <div className="w-px h-4 bg-border"></div>
+                                      <span className="text-xs text-muted-foreground italic">
+                                        Continuation of {device.device.name} ({u - device.positionU + 1}/{device.sizeU})
+                                      </span>
+                                      {isLastContinuation && (
+                                        <div className="w-px h-4 bg-border"></div>
+                                      )}
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-foreground text-sm">
+                                        {device.device.name}
+                                      </span>
+                                      {device.device.lastPayload && (
+                                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                          <Wifi className="h-3 w-3" />
+                                          <span className="text-xs font-medium">Live</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Available</span>
-                        )}
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                                  <span className="text-muted-foreground text-sm italic">Empty slot</span>
+                                </div>
+                              )}
+                            </TableCell>
+
+                            {/* Size Column */}
+                            <TableCell className="py-3 text-center">
+                              {isOccupied && device && isDeviceStart ? (
+                                <Badge variant="secondary" className="text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  {device.sizeU}U
+                                </Badge>
+                              ) : isDeviceContinuation ? (
+                                <div className="w-px h-4 bg-border mx-auto"></div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </TableCell>
+
+                            {/* Status Column */}
+                            <TableCell className="py-3 text-center">
+                              {isOccupied && device && isDeviceStart ? (
+                                <div className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border ${getStatusColor(device.status)} shadow-sm`}>
+                                  {getStatusIcon(device.status)}
+                                  <span className="ml-2">{device.status}</span>
+                                </div>
+                              ) : isDeviceContinuation ? (
+                                <div className="w-px h-4 bg-border mx-auto"></div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </TableCell>
+
+                            {/* Type Column */}
+                            <TableCell className="py-3 text-center">
+                              {isOccupied && device && isDeviceStart ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs font-semibold border-primary/20 text-primary bg-primary/5 hover:bg-primary/10"
+                                >
+                                  {device.deviceType}
+                                </Badge>
+                              ) : isDeviceContinuation ? (
+                                <div className="w-px h-4 bg-border mx-auto"></div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Device List */}
+          <div>
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <Server className="h-5 w-5 text-primary" />
+                      DEVICES ({rack.devices.length})
+                    </CardTitle>
+                    <Button onClick={() => {
+                      resetDeviceForm();
+                      setIsAddDeviceDialogOpen(true);
+                    }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Device
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Search devices..."
+                      className="flex-1"
+                      value={deviceSearchQuery}
+                      onChange={(e) => setDeviceSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {(() => {
+                  // Filter devices based on search query
+                  const filteredDevices = deviceSearchQuery.trim()
+                    ? rack.devices.filter(device =>
+                        device.device.name.toLowerCase().includes(deviceSearchQuery.toLowerCase()) ||
+                        device.device.topic.toLowerCase().includes(deviceSearchQuery.toLowerCase())
+                      )
+                    : rack.devices;
+
+                  return filteredDevices.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                        <Server className="h-8 w-8 text-muted-foreground" />
                       </div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                        {deviceSearchQuery.trim() ? "No devices found" : "No devices installed"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {deviceSearchQuery.trim()
+                          ? "Try adjusting your search criteria"
+                          : "Add devices to see them here"
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredDevices.map((rackDevice) => (
+                        <div key={rackDevice.id} className="group p-4 border rounded-lg hover:shadow-sm transition-all duration-200 bg-card hover:bg-muted/20 dark:border-gray-700">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className="w-2 h-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-foreground text-sm leading-tight mb-1">
+                                  {rackDevice.device.name}
+                                </h4>
+                                <div className="flex items-center gap-2">
+                                  {rackDevice.deviceType !== "SENSOR" && (
+                                    <Badge variant="outline" className="text-xs border-primary/20 text-primary bg-primary/5">
+                                      {rackDevice.positionU}U - {rackDevice.positionU + rackDevice.sizeU - 1}U
+                                    </Badge>
+                                  )}
+                                  {rackDevice.deviceType === "SENSOR" && (
+                                    <Badge variant="outline" className="text-xs border-blue-500/20 text-blue-600 bg-blue-50 dark:bg-blue-950 dark:text-blue-400">
+                                      Sensor Device
+                                    </Badge>
+                                  )}
+                                  <Badge className={`text-xs ${getStatusColor(rackDevice.status)}`}>
+                                    {getStatusIcon(rackDevice.status)}
+                                    <span className="ml-1">{rackDevice.status}</span>
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditDevice(rackDevice)}
+                              className="h-8 px-3 text-xs font-medium hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-300 transition-colors"
+                            >
+                              <Edit className="h-3 w-3 mr-1.5" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveDevice(rackDevice)}
+                              className="h-8 px-3 text-xs font-medium text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1.5" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   );
-                })}
-              </div>
-
-              {/* Rack Base - Simple */}
-              <div className="absolute bottom-0 left-0 right-0 h-4 bg-muted border-t flex justify-center items-center">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                  Power
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                  Cool
-                </div>
-              </div>
-            </div>
-
-            {/* Capacity Stats - Simple */}
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <div className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 p-2 rounded border">
-                <div className="flex items-center gap-1 mb-1">
-                  <CheckCircle className="h-3 w-3" />
-                  <span className="text-xs font-medium">Free</span>
-                </div>
-                <div className="text-sm font-bold">{rack.availableU}U</div>
-              </div>
-
-              <div className="bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-2 rounded border">
-                <div className="flex items-center gap-1 mb-1">
-                  <Server className="h-3 w-3" />
-                  <span className="text-xs font-medium">Used</span>
-                </div>
-                <div className="text-sm font-bold">{rack.usedU}U</div>
-              </div>
-
-              <div className={`p-2 rounded border ${
-                rack.utilizationPercent > 90 ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300' :
-                rack.utilizationPercent > 70 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300' :
-                'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-300'
-              }`}>
-                <div className="flex items-center gap-1 mb-1">
-                  <TrendingUp className="h-3 w-3" />
-                  <span className="text-xs font-medium">Usage</span>
-                </div>
-                <div className="text-sm font-bold">{rack.utilizationPercent}%</div>
-              </div>
-            </div>
+                })()}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Device Management Table */}
-      <Card className="m-4">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Device Management Summary ({filteredDevices.length})</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 transform -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search devices..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-8 w-64"
-                />
-              </div>
-              <Button onClick={() => setIsAddDeviceOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Device
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredDevices.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Device</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>IP Address</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDevices.map((device) => (
-                  <TableRow key={device.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded">
-                          <Server className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        {device.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{device.deviceType}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`font-bold ${getCapacityUtilizationColor(device.positionU || 0, rack.capacityU)}`}>
-                        U{device.positionU || "?"}
-                        {device.sizeU > 1 && `-${(device.positionU || 0) + device.sizeU - 1}`}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className={`flex items-center gap-1 ${
-                        device.status.toLowerCase() === 'online' ? 'text-green-600 dark:text-green-400' :
-                        device.status.toLowerCase() === 'offline' ? 'text-red-600 dark:text-red-400' :
-                        device.status.toLowerCase() === 'maintenance' ? 'text-orange-600 dark:text-orange-400' :
-                        'text-gray-600 dark:text-gray-400'
-                      }`}>
-                        {device.status.toLowerCase() === 'online' && <CheckCircle className="h-4 w-4" />}
-                        {device.status.toLowerCase() === 'offline' && <XCircle className="h-4 w-4" />}
-                        {device.status.toLowerCase() === 'maintenance' && <Wrench className="h-4 w-4" />}
-                        <span className="capitalize">{device.status}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{device.sizeU}U</TableCell>
-                    <TableCell>
-                      {device.ipAddress ? (
-                        <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">
-                          {device.ipAddress}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">N/A</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm">
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-12">
-              <Server className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                {searchQuery ? "No devices found matching your search" : "No devices installed"}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery
-                  ? "Try adjusting your search terms"
-                  : "Get started by adding your first device to this rack"
-                }
-              </p>
-              {!searchQuery && (
-                <Button onClick={() => setIsAddDeviceOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Device
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Add Device Dialog */}
+        <Dialog open={isAddDeviceDialogOpen} onOpenChange={setIsAddDeviceDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Device to Rack</DialogTitle>
+              <DialogDescription>
+                Assign a device to a specific position in this rack
+              </DialogDescription>
+            </DialogHeader>
 
-      {/* Add Device Dialog */}
-      <Dialog open={isAddDeviceOpen} onOpenChange={setIsAddDeviceOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Device to {rack.name}</DialogTitle>
-            <DialogDescription>
-              Install a new device in this rack
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="device-name">Device Name *</Label>
-                <Input
-                  id="device-name"
-                  value={newDevice.name}
-                  onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
-                  placeholder="Server-01"
-                />
-              </div>
-              <div>
-                <Label htmlFor="device-type">Device Type *</Label>
-                <Select
-                  value={newDevice.deviceType}
-                  onValueChange={(value) => setNewDevice({ ...newDevice, deviceType: value })}
-                >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="device-select">Device *</Label>
+                <Select value={deviceForm.deviceId} onValueChange={(value) => setDeviceForm({ ...deviceForm, deviceId: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue placeholder="Select a device" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Server">Server</SelectItem>
-                    <SelectItem value="Network">Network Switch</SelectItem>
-                    <SelectItem value="Storage">Storage</SelectItem>
-                    <SelectItem value="UPS">UPS</SelectItem>
-                    <SelectItem value="Monitor">Monitor</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    {availableDevices.map((device) => (
+                      <SelectItem key={device.uniqId} value={device.uniqId}>
+                        {device.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="device-type">Device Type *</Label>
+                <Select value={deviceForm.deviceType} onValueChange={(value: any) => setDeviceForm({ ...deviceForm, deviceType: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SERVER">Server</SelectItem>
+                    <SelectItem value="SWITCH">Switch</SelectItem>
+                    <SelectItem value="STORAGE">Storage</SelectItem>
+                    <SelectItem value="PDU">PDU</SelectItem>
+                    <SelectItem value="SENSOR">Sensor</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select the type of device being installed
+                </p>
+              </div>
+
+              {/* Show Size and Location fields only for non-sensor devices */}
+              {deviceForm.deviceType !== "SENSOR" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="size-u">(U) Size *</Label>
+                    <Input
+                      id="size-u"
+                      type="number"
+                      min="1"
+                      max={rack.capacityU}
+                      value={deviceForm.sizeU}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (value > rack.capacityU) {
+                          toast({
+                            title: "Invalid Size",
+                            description: `Size cannot exceed rack capacity (${rack.capacityU}U)`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        setDeviceForm({ ...deviceForm, sizeU: value });
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How many rack units this device occupies (max: {rack.capacityU}U)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="position-u">(U) Location *</Label>
+                    <Input
+                      id="position-u"
+                      type="number"
+                      min="1"
+                      max={rack.capacityU}
+                      value={deviceForm.positionU}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, positionU: parseInt(e.target.value) })}
+                      className={!isPositionAvailable(deviceForm.positionU, deviceForm.sizeU) ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {!isPositionAvailable(deviceForm.positionU, deviceForm.sizeU) && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Position {deviceForm.positionU} to {deviceForm.positionU + deviceForm.sizeU - 1}U is already occupied
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Bottom position of the device (1 = bottom, {rack.capacityU} = top)
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={deviceForm.status} onValueChange={(value: any) => setDeviceForm({ ...deviceForm, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PLANNED">Planned</SelectItem>
+                    <SelectItem value="INSTALLED">Installed</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="REMOVED">Removed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="size-u">Size (U) *</Label>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddDeviceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddDevice} disabled={!deviceForm.deviceId}>
+                Add Device
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Device Dialog */}
+        <Dialog open={isEditDeviceDialogOpen} onOpenChange={setIsEditDeviceDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Device</DialogTitle>
+              <DialogDescription>
+                Update device position, size, or status in this rack
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-device-select">Device *</Label>
                 <Select
-                  value={newDevice.sizeU.toString()}
-                  onValueChange={(value) => setNewDevice({ ...newDevice, sizeU: parseInt(value) })}
+                  value={deviceForm.deviceId}
+                  onValueChange={(value) => setDeviceForm({ ...deviceForm, deviceId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4].map((u) => (
-                      <SelectItem key={u} value={u.toString()}>{u}U</SelectItem>
+                    {availableDevices.concat(selectedRackDevice ? [{
+                      id: selectedRackDevice.device.id,
+                      uniqId: selectedRackDevice.device.uniqId,
+                      name: selectedRackDevice.device.name,
+                      topic: selectedRackDevice.device.topic,
+                      address: selectedRackDevice.device.address
+                    }] : []).map((device) => (
+                      <SelectItem key={device.uniqId} value={device.uniqId}>
+                        {device.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="position-u">Start Position (U)</Label>
-                <Input
-                  id="position-u"
-                  type="number"
-                  min="1"
-                  max={rack.capacityU}
-                  value={newDevice.positionU || ""}
-                  onChange={(e) => setNewDevice({ ...newDevice, positionU: parseInt(e.target.value) || 0 })}
-                  placeholder="e.g., 5"
-                />
+
+              {/* Show Size and Location fields only for non-sensor devices */}
+              {deviceForm.deviceType !== "SENSOR" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-position-u">(U) Location *</Label>
+                    <Input
+                      id="edit-position-u"
+                      type="number"
+                      min="1"
+                      max={rack.capacityU}
+                      value={deviceForm.positionU}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, positionU: parseInt(e.target.value) })}
+                      className={!isPositionAvailable(deviceForm.positionU, deviceForm.sizeU, selectedRackDevice?.deviceId) ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    {!isPositionAvailable(deviceForm.positionU, deviceForm.sizeU, selectedRackDevice?.deviceId) && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Position {deviceForm.positionU} to {deviceForm.positionU + deviceForm.sizeU - 1}U is already occupied
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Bottom position of the device (1 = bottom, {rack.capacityU} = top)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-size-u">Size (U) *</Label>
+                    <Input
+                      id="edit-size-u"
+                      type="number"
+                      min="1"
+                      max={rack.capacityU}
+                      value={deviceForm.sizeU}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (value > rack.capacityU) {
+                          toast({
+                            title: "Invalid Size",
+                            description: `Size cannot exceed rack capacity (${rack.capacityU}U)`,
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        setDeviceForm({ ...deviceForm, sizeU: value });
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How many rack units this device occupies (max: {rack.capacityU}U)
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Show sensor info for sensor devices */}
+              {deviceForm.deviceType === "SENSOR" && (
+                <div className="space-y-2">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-950 dark:border-blue-800">
+                    <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                      <Activity className="h-4 w-4" />
+                      <span className="font-medium">Sensor Device</span>
+                    </div>
+                    <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                      <p>• Sensor devices don't occupy physical rack space</p>
+                      <p>• They are only used for monitoring and data collection</p>
+                      <p>• Position and size are automatically set to default values</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-device-type">Device Type *</Label>
+                <Select value={deviceForm.deviceType} onValueChange={(value: any) => setDeviceForm({ ...deviceForm, deviceType: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SERVER">Server</SelectItem>
+                    <SelectItem value="SWITCH">Switch</SelectItem>
+                    <SelectItem value="STORAGE">Storage</SelectItem>
+                    <SelectItem value="PDU">PDU</SelectItem>
+                    <SelectItem value="SENSOR">Sensor</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select the type of device being installed
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select value={deviceForm.status} onValueChange={(value: any) => setDeviceForm({ ...deviceForm, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PLANNED">Planned</SelectItem>
+                    <SelectItem value="INSTALLED">Installed</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="REMOVED">Removed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="ip">IP Address</Label>
-                <Input
-                  id="ip"
-                  value={newDevice.ipAddress}
-                  onChange={(e) => setNewDevice({ ...newDevice, ipAddress: e.target.value })}
-                  placeholder="192.168.1.100"
-                />
-              </div>
-              <div>
-                <Label htmlFor="power">Power (Watts)</Label>
-                <Input
-                  id="power"
-                  value={newDevice.powerWatt}
-                  onChange={(e) => setNewDevice({ ...newDevice, powerWatt: e.target.value })}
-                  placeholder="350"
-                />
-              </div>
-            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDeviceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateDevice}>
+                Update Device
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Input
-                id="notes"
-                value={newDevice.notes}
-                onChange={(e) => setNewDevice({ ...newDevice, notes: e.target.value })}
-                placeholder="Additional information..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDeviceOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddDevice} disabled={!newDevice.name.trim() || !newDevice.deviceType}>
-              Add Device
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </SidebarInset>
+        {/* Remove Device Dialog */}
+        <Dialog open={isRemoveDeviceDialogOpen} onOpenChange={setIsRemoveDeviceDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Remove Device</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to remove this device from the rack?
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedRackDevice && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-md">
+                  <h4 className="font-medium">{selectedRackDevice.device.name}</h4>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline">{selectedRackDevice.positionU}U</Badge>
+                    <Badge className={`text-xs ${getStatusColor(selectedRackDevice.status)}`}>
+                      {getStatusIcon(selectedRackDevice.status)}
+                      <span className="ml-1">{selectedRackDevice.status}</span>
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  This action cannot be undone. The device will be removed from this rack but will remain available for assignment to other racks.
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRemoveDeviceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmRemoveDevice}>
+                Remove Device
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 }

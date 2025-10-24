@@ -9,29 +9,38 @@ const rackSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
-// GET /api/racks - Get all racks with device count
+// GET /api/racks - Get all racks with device count and rack-device relationships
 export async function GET() {
   try {
     const racks = await prisma.rack.findMany({
       include: {
         devices: {
-          select: {
-            id: true,
-            positionU: true,
-            sizeU: true
+          include: {
+            device: {
+              select: {
+                id: true,
+                uniqId: true,
+                name: true,
+                topic: true,
+                address: true,
+                lastPayload: true,
+                lastUpdatedByMqtt: true
+              }
+            }
           }
-        },
-        _count: {
-          select: { devices: true }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Calculate used capacity for each rack
+    // Calculate used capacity for each rack - exclude sensor devices from capacity calculation
     const racksWithCapacityInfo = racks.map((rack: any) => {
-      const usedU = rack.devices.reduce((total: number, device: any) => {
-        return total + (device.sizeU || 1);
+      const usedU = rack.devices.reduce((total: number, rackDevice: any) => {
+        // Sensor devices don't occupy physical rack space, so they don't count towards capacity
+        if (rackDevice.deviceType === "SENSOR") {
+          return total; // Don't add sensor devices to used capacity
+        }
+        return total + rackDevice.sizeU;
       }, 0);
 
       return {
@@ -39,7 +48,7 @@ export async function GET() {
         usedU,
         availableU: rack.capacityU - usedU,
         utilizationPercent: Math.round((usedU / rack.capacityU) * 100),
-        devices: rack.devices, // Keep device details
+        devices: rack.devices, // Keep device details with full device info
       };
     });
 

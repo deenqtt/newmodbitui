@@ -1,42 +1,54 @@
 // hooks/useMQTTStatus.ts
 "use client";
 
-import { useEffect, useState } from "react";
-import { connectMQTT, getMQTTClient } from "@/lib/mqttClient";
+import { useEffect, useState, useCallback } from "react";
+import { connectMQTT } from "@/lib/mqttClient";
 
 export function useMQTTStatus() {
-  const initialClient = getMQTTClient();
+  const [status, setStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
 
-  const [status, setStatus] = useState(() => {
-    if (!initialClient) return "connecting";
-    if (initialClient.connected) return "connected";
-    if (initialClient.disconnected) return "disconnected";
-    return "connecting";
-  });
+  const updateStatus = useCallback((newStatus: "connecting" | "connected" | "disconnected" | "error") => {
+    setStatus(currentStatus => {
+      // Prevent unnecessary updates
+      if (currentStatus === newStatus) return currentStatus;
+      return newStatus;
+    });
+  }, []);
 
   useEffect(() => {
-    const client = connectMQTT();
+    let client = connectMQTT();
 
-    if (client.connected) {
-      setStatus("connected");
-    } else if (client.disconnected) {
-      setStatus("disconnected");
-    } else {
-      setStatus("connecting");
-    }
+    // Event handlers with stable references
+    const handleConnect = () => updateStatus("connected");
+    const handleError = () => updateStatus("error");
+    const handleClose = () => {
+      // Check if really disconnected, not just temp
+      setTimeout(() => {
+        if (client && !client.connected) {
+          updateStatus("disconnected");
+        }
+      }, 100);
+    };
+    const handleReconnect = () => updateStatus("connecting");
+    const handleOffline = () => updateStatus("disconnected");
 
-    const handleConnect = () => setStatus("connected");
-    const handleError = () => setStatus("error");
-    const handleClose = () => setStatus("disconnected");
-    const handleReconnect = () => setStatus("connecting");
-    const handleOffline = () => setStatus("disconnected");
-
+    // Attach event listeners
     client.on("connect", handleConnect);
     client.on("error", handleError);
     client.on("close", handleClose);
     client.on("reconnect", handleReconnect);
     client.on("offline", handleOffline);
 
+    // Initial status check
+    if (client.connected) {
+      updateStatus("connected");
+    } else if (client.disconnected) {
+      updateStatus("disconnected");
+    } else {
+      updateStatus("connecting");
+    }
+
+    // Cleanup function
     return () => {
       client.off("connect", handleConnect);
       client.off("error", handleError);
@@ -44,7 +56,7 @@ export function useMQTTStatus() {
       client.off("reconnect", handleReconnect);
       client.off("offline", handleOffline);
     };
-  }, []);
+  }, [updateStatus]);
 
   return status;
 }

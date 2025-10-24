@@ -66,7 +66,6 @@ class ZigbeeListenerService {
       // Smart home ecosystems
       Hive: "Hive",
       "Centralite Systems": "Centralite",
-      SmartThings: "SmartThings",
       "Securifi Ltd.": "Securifi",
       Heiman: "Heiman",
       HEIMAN: "Heiman",
@@ -391,23 +390,21 @@ class ZigbeeListenerService {
     if (!this.client) return;
 
     this.client.on("connect", () => {
-      console.log("✅ Connected to Zigbee2MQTT broker");
       this.reconnectAttempts = 0;
 
       const subscriptions = [
         { topic: "zigbee2mqtt/+", qos: 0 },
         { topic: "zigbee2mqtt/bridge/+", qos: 1 },
-        { topic: "zigbee2mqtt/bridge/devices", qos: 1 },
+        { topic: "zigbee2mqtt/bridge/devices" }, // Remove QoS - default to 1
         { topic: "zigbee2mqtt/bridge/response/+", qos: 1 },
       ];
 
       subscriptions.forEach(({ topic, qos }) => {
-        this.client?.subscribe(topic, { qos }, (error) => {
+        this.client?.subscribe(topic, { qos: (qos || 1) as 0 | 1 | 2 }, (error) => {
           if (error) {
             console.error(`❌ Failed to subscribe to ${topic}:`, error);
-          } else {
-            console.log(`✅ Subscribed to ${topic} (QoS ${qos})`);
           }
+          // Silent success subscription
         });
       });
 
@@ -618,7 +615,7 @@ class ZigbeeListenerService {
             data: {
               friendlyName: update.friendlyName,
               manufacturer: update.manufacturer,
-              modelId: update.modelId,
+              model: update.modelId,
               deviceType: update.deviceType,
               capabilities: update.capabilities,
               isOnline: update.isOnline,
@@ -987,8 +984,8 @@ class ZigbeeListenerService {
     });
 
     // LEVEL 1: Exact model mapping (highest accuracy)
-    if (this.deviceMapping.models[modelId]) {
-      const mappedName = this.deviceMapping.models[modelId];
+    if ((this.deviceMapping.models as any)[modelId]) {
+      const mappedName = (this.deviceMapping.models as any)[modelId];
       const detectedType = this.classifyFromModelName(mappedName);
       if (detectedType !== "unknown") {
         console.log(
@@ -1784,8 +1781,8 @@ class ZigbeeListenerService {
   ): string {
     if (!manufacturer && !modelId) return "Unknown";
 
-    if (manufacturer && this.deviceMapping.manufacturers[manufacturer]) {
-      return this.deviceMapping.manufacturers[manufacturer];
+    if (manufacturer && (this.deviceMapping.manufacturers as any)[manufacturer]) {
+      return (this.deviceMapping.manufacturers as any)[manufacturer];
     }
 
     if (modelId) {
@@ -1804,8 +1801,8 @@ class ZigbeeListenerService {
   private getProperModel(modelId?: string, definitionModel?: string): string {
     if (!modelId) return "Unknown";
 
-    if (this.deviceMapping.models[modelId]) {
-      return this.deviceMapping.models[modelId];
+    if ((this.deviceMapping.models as any)[modelId]) {
+      return (this.deviceMapping.models as any)[modelId];
     }
 
     return definitionModel || modelId || "Unknown";
